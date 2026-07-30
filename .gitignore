@@ -1,0 +1,26 @@
+# Rust target and build outputs
+/target/
+**/target/
+**/*.rs.bk
+Cargo.lock
+
+# Environment and Secret files
+.env
+*.env
+!.env.example
+
+# Exclude Flutter projects
+flutter/
+
+# IDE, OS, & Editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Database and docker volume data
+postgres_data/
+*.db
+*.sqlite

@@ -1,0 +1,89 @@
+use axum::{
+    async_trait,
+    extract::FromRequestParts,
+    http::{header, request::Parts, StatusCode},
+    Json,
+};
+use uuid::Uuid;
+
+use crate::{
+    api::routes::{ApiErrorDetail, ApiErrorResponse},
+    domain::auth::verify_jwt_token,
+};
+
+const JWT_SECRET: &str = "default_cmtool_jwt_secret_key_2026";
+
+#[derive(Debug, Clone)]
+pub struct AuthenticatedUser {
+    pub user_id: Uuid,
+    pub username: String,
+}
+
+#[async_trait]
+impl<S> FromRequestParts<S> for AuthenticatedUser
+where
+    S: Send + Sync,
+{
+    type Rejection = (StatusCode, Json<ApiErrorResponse>);
+
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        let auth_header = parts
+            .headers
+            .get(header::AUTHORIZATION)
+            .and_then(|h| h.to_str().ok())
+            .ok_or_else(|| {
+                (
+                    StatusCode::UNAUTHORIZED,
+                    Json(ApiErrorResponse {
+                        error: ApiErrorDetail {
+                            code: "MISSING_AUTH_HEADER".into(),
+                            message: "Missing Authorization header".into(),
+                        },
+                    }),
+                )
+            })?;
+
+        if !auth_header.starts_with("Bearer ") {
+            return Err((
+                StatusCode::UNAUTHORIZED,
+                Json(ApiErrorResponse {
+                    error: ApiErrorDetail {
+                        code: "INVALID_AUTH_FORMAT".into(),
+                        message: "Authorization header format must be 'Bearer <token>'".into(),
+                    },
+                }),
+            ));
+        }
+
+        let token = &auth_header[7..];
+
+        let claims = verify_jwt_token(token, JWT_SECRET).map_err(|e| {
+            (
+                StatusCode::UNAUTHORIZED,
+                Json(ApiErrorResponse {
+                    error: ApiErrorDetail {
+                        code: "INVALID_TOKEN".into(),
+                        message: format!("Invalid or expired JWT token: {}", e),
+                    },
+                }),
+            )
+        })?;
+
+        let user_id = Uuid::parse_str(&claims.sub).map_err(|_| {
+            (
+                StatusCode::UNAUTHORIZED,
+                Json(ApiErrorResponse {
+                    error: ApiErrorDetail {
+                        code: "INVALID_USER_ID".into(),
+                        message: "JWT claim subject is not a valid UUID".into(),
+                    },
+                }),
+            )
+        })?;
+
+        Ok(AuthenticatedUser {
+            user_id,
+            username: claims.username,
+        })
+    }
+}
