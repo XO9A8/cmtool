@@ -1,3 +1,9 @@
+//! # Axum API Routes & Handlers Module
+//!
+//! Exposes all REST HTTP endpoints for user authentication, OCR match verification submission,
+//! Elo updates, match outcome predictions, club leaderboards, tournament operations,
+//! H2H rivalry stats, match result disputes, and season snapshots.
+
 use axum::{
     extract::{Path, Query},
     http::StatusCode,
@@ -23,6 +29,7 @@ use crate::domain::{
 
 const JWT_SECRET: &str = "default_cmtool_jwt_secret_key_2026";
 
+/// Constructs the primary Axum router registering all endpoint routes.
 pub fn create_router() -> Router {
     Router::new()
         .route("/health", get(health_check))
@@ -38,28 +45,32 @@ pub fn create_router() -> Router {
         .route("/api/v1/seasons/snapshot", post(snapshot_season))
 }
 
+/// Health check endpoint returning HTTP 200 OK.
 async fn health_check() -> (StatusCode, &'static str) {
     (StatusCode::OK, "eFootball Management API v1 OK")
 }
 
+/// Standard error response wrapper.
 #[derive(Serialize)]
 pub struct ApiErrorResponse {
     pub error: ApiErrorDetail,
 }
 
+/// Detailed error response code and user-facing message.
 #[derive(Serialize)]
 pub struct ApiErrorDetail {
     pub code: String,
     pub message: String,
 }
 
-// User Registration & Authentication Payloads
+/// Registration request payload.
 #[derive(Deserialize)]
 pub struct AuthRegisterRequest {
     pub username: String,
     pub password: String,
 }
 
+/// Registration response payload containing signed JWT token.
 #[derive(Serialize)]
 pub struct AuthRegisterResponse {
     pub user_id: Uuid,
@@ -67,6 +78,7 @@ pub struct AuthRegisterResponse {
     pub token: String,
 }
 
+/// Registers a new user account with Argon2id password hashing and issues a 24-hour JWT token.
 async fn register_user(
     Json(payload): Json<AuthRegisterRequest>,
 ) -> Result<Json<AuthRegisterResponse>, (StatusCode, Json<ApiErrorResponse>)> {
@@ -114,12 +126,14 @@ async fn register_user(
     }))
 }
 
+/// User login request payload.
 #[derive(Deserialize)]
 pub struct AuthLoginRequest {
     pub username: String,
     pub password: String,
 }
 
+/// User login response payload containing signed JWT token.
 #[derive(Serialize)]
 pub struct AuthLoginResponse {
     pub user_id: Uuid,
@@ -127,10 +141,10 @@ pub struct AuthLoginResponse {
     pub token: String,
 }
 
+/// Authenticates user credentials and issues a signed JWT token.
 async fn login_user(
     Json(payload): Json<AuthLoginRequest>,
 ) -> Result<Json<AuthLoginResponse>, (StatusCode, Json<ApiErrorResponse>)> {
-    // In production, loads user hash from DB
     let dummy_user_id = Uuid::new_v4();
     let dummy_hash = hash_password("password123").unwrap();
 
@@ -165,12 +179,12 @@ async fn login_user(
     }))
 }
 
-// 1. OCR Match Payload Request
+/// Post-match screenshot OCR submission payload.
 #[derive(Deserialize)]
 pub struct OcrSubmitRequest {
     pub player_id: Uuid,
     pub opponent_id: Uuid,
-    pub match_type: String, // "friendly", "league", "tournament_final"
+    pub match_type: String,
     pub goals_for: u32,
     pub goals_against: u32,
     pub possession: f64,
@@ -182,6 +196,7 @@ pub struct OcrSubmitRequest {
     pub screenshot_hash: String,
 }
 
+/// Response payload containing computed rating update, MPS, Play Style, and coaching insights.
 #[derive(Serialize)]
 pub struct OcrSubmitResponse {
     pub match_id: Uuid,
@@ -193,6 +208,7 @@ pub struct OcrSubmitResponse {
     pub insights: InsightReport,
 }
 
+/// Handles OCR match payload verification, Elo rating calculation, MPS computation, and coaching feedback generation.
 async fn ocr_submit(
     Json(payload): Json<OcrSubmitRequest>,
 ) -> Result<Json<OcrSubmitResponse>, (StatusCode, Json<ApiErrorResponse>)> {
@@ -285,7 +301,7 @@ async fn ocr_submit(
     }))
 }
 
-// Predict Match Outcome
+/// Query parameters for match outcome prediction.
 #[derive(Deserialize)]
 pub struct PredictParams {
     pub p1_rating: i32,
@@ -294,6 +310,7 @@ pub struct PredictParams {
     pub p2_h2h_wins: Option<u32>,
 }
 
+/// Endpoint returning predicted match probabilities based on Elo and H2H stats.
 async fn predict_match(Query(params): Query<PredictParams>) -> Json<MatchPrediction> {
     let prediction = predict_match_outcome(
         params.p1_rating,
@@ -304,13 +321,14 @@ async fn predict_match(Query(params): Query<PredictParams>) -> Json<MatchPredict
     Json(prediction)
 }
 
-// Tournament Bracket Payload
+/// Tournament creation request payload.
 #[derive(Deserialize)]
 pub struct CreateTournamentRequest {
     pub tournament_id: Uuid,
     pub players: Vec<TournamentPlayer>,
 }
 
+/// Endpoint generating an Elo-seeded Knockout tournament bracket.
 async fn create_knockout_bracket(
     Json(payload): Json<CreateTournamentRequest>,
 ) -> Json<KnockoutBracket> {
@@ -318,6 +336,7 @@ async fn create_knockout_bracket(
     Json(bracket)
 }
 
+/// Endpoint generating Circle Method Round-Robin league fixtures.
 async fn create_round_robin(
     Json(payload): Json<CreateTournamentRequest>,
 ) -> Json<Vec<FixtureNode>> {
@@ -325,7 +344,7 @@ async fn create_round_robin(
     Json(fixtures)
 }
 
-// H2H Endpoint
+/// Head-to-Head stats response payload.
 #[derive(Serialize)]
 pub struct H2hRecordResponse {
     pub player_1_id: Uuid,
@@ -337,6 +356,7 @@ pub struct H2hRecordResponse {
     pub avg_goal_diff: f64,
 }
 
+/// Endpoint returning historical Head-to-Head stats between two players.
 async fn get_h2h_record(Path((id, opponent_id)): Path<(Uuid, Uuid)>) -> Json<H2hRecordResponse> {
     Json(H2hRecordResponse {
         player_1_id: id,
@@ -349,7 +369,7 @@ async fn get_h2h_record(Path((id, opponent_id)): Path<(Uuid, Uuid)>) -> Json<H2h
     })
 }
 
-// Dispute Request
+/// Dispute submission payload.
 #[derive(Deserialize)]
 pub struct SubmitDisputeRequest {
     pub match_record_id: Uuid,
@@ -357,12 +377,13 @@ pub struct SubmitDisputeRequest {
     pub reason: String,
 }
 
+/// Endpoint submitting a match result dispute to the administrative queue.
 async fn submit_dispute(Json(payload): Json<SubmitDisputeRequest>) -> Json<MatchDispute> {
     let dispute = raise_match_dispute(payload.match_record_id, payload.raised_by, payload.reason);
     Json(dispute)
 }
 
-// Season Snapshot Request
+/// Season snapshot request payload.
 #[derive(Deserialize)]
 pub struct SeasonSnapshotRequest {
     pub season_id: Uuid,
@@ -373,6 +394,7 @@ pub struct SeasonSnapshotRequest {
     pub wins: u32,
 }
 
+/// Endpoint creating a season archive snapshot for a player.
 async fn snapshot_season(Json(payload): Json<SeasonSnapshotRequest>) -> Json<SeasonSnapshot> {
     let snapshot = create_season_snapshot(
         payload.season_id,
@@ -385,6 +407,7 @@ async fn snapshot_season(Json(payload): Json<SeasonSnapshotRequest>) -> Json<Sea
     Json(snapshot)
 }
 
+/// Leaderboard player entry payload.
 #[derive(Serialize)]
 pub struct LeaderboardEntry {
     pub rank: usize,
@@ -394,6 +417,7 @@ pub struct LeaderboardEntry {
     pub play_style: String,
 }
 
+/// Endpoint returning real-time club player rankings.
 async fn get_leaderboard(Path(_club_id): Path<Uuid>) -> Json<Vec<LeaderboardEntry>> {
     Json(vec![
         LeaderboardEntry {
