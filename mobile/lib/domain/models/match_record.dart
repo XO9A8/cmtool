@@ -1,20 +1,42 @@
+/// Match Record domain data model for OCR post-match statistics.
 class MatchRecord {
-  final String id;
+  /// Unique player UUID string.
   final String playerId;
+
+  /// Unique opponent UUID string.
   final String opponentId;
+
+  /// Match category ('friendly', 'league', 'tournament_final').
   final String matchType;
+
+  /// Goals scored by primary player.
   final int goalsFor;
+
+  /// Goals conceded by primary player.
   final int goalsAgainst;
+
+  /// Possession percentage (0.0 to 100.0).
   final double possession;
+
+  /// Number of completed passes.
   final int passesCompleted;
+
+  /// Total attempted passes.
   final int passesAttempted;
+
+  /// Shots on target.
   final int shotsOnTarget;
+
+  /// Total shots taken.
   final int shotsTotal;
+
+  /// Defensive interceptions.
   final int interceptions;
+
+  /// SHA-256 hash string of match screenshot for deduplication.
   final String screenshotHash;
 
-  MatchRecord({
-    required this.id,
+  const MatchRecord({
     required this.playerId,
     required this.opponentId,
     required this.matchType,
@@ -29,6 +51,7 @@ class MatchRecord {
     required this.screenshotHash,
   });
 
+  /// Converts model instance to JSON map payload for API submission.
   Map<String, dynamic> toJson() => {
         'player_id': playerId,
         'opponent_id': opponentId,
@@ -45,54 +68,50 @@ class MatchRecord {
       };
 }
 
+/// Response data model returned by `/api/v1/matches/ocr-submit`.
 class OcrSubmitResult {
+  /// Unique match ID.
   final String matchId;
-  final String playerId;
-  final int newSkillRating;
-  final int ratingDelta;
-  final double matchPerformanceScore;
-  final String playStyleTag;
-  final InsightReportResult insights;
 
-  OcrSubmitResult({
+  /// Updated skill Elo rating.
+  final int newSkillRating;
+
+  /// Net rating delta.
+  final int ratingDelta;
+
+  /// Match Performance Score (0.0 to 100.0).
+  final double matchPerformanceScore;
+
+  /// Classified tactical play style tag.
+  final String playStyleTag;
+
+  /// Strengths list from AI coaching report.
+  final List<String> strengths;
+
+  /// Weaknesses list from AI coaching report.
+  final List<String> weaknesses;
+
+  const OcrSubmitResult({
     required this.matchId,
-    required this.playerId,
     required this.newSkillRating,
     required this.ratingDelta,
     required this.matchPerformanceScore,
     required this.playStyleTag,
-    required this.insights,
-  });
-
-  factory OcrSubmitResult.fromJson(Map<String, dynamic> json) {
-    return OcrSubmitResult(
-      matchId: json['match_id'],
-      playerId: json['player_id'],
-      newSkillRating: json['new_skill_rating'],
-      ratingDelta: json['rating_delta'],
-      matchPerformanceScore: (json['match_performance_score'] as num).toDouble(),
-      playStyleTag: json['play_style_tag'],
-      insights: InsightReportResult.fromJson(json['insights']),
-    );
-  }
-}
-
-class InsightReportResult {
-  final String summary;
-  final List<String> strengths;
-  final List<String> areasForImprovement;
-
-  InsightReportResult({
-    required this.summary,
     required this.strengths,
-    required this.areasForImprovement,
+    required this.weaknesses,
   });
 
-  factory InsightReportResult.fromJson(Map<String, dynamic> json) {
-    return InsightReportResult(
-      summary: json['summary'],
-      strengths: List<String>.from(json['strengths'] ?? []),
-      areasForImprovement: List<String>.from(json['areas_for_improvement'] ?? []),
+  /// Constructs result model from JSON API response map.
+  factory OcrSubmitResult.fromJson(Map<String, dynamic> json) {
+    final insights = json['insights'] ?? {};
+    return OcrSubmitResult(
+      matchId: json['match_id'] ?? '',
+      newSkillRating: json['new_skill_rating'] ?? 1000,
+      ratingDelta: json['rating_delta'] ?? 0,
+      matchPerformanceScore: (json['match_performance_score'] as num?)?.toDouble() ?? 0.0,
+      playStyleTag: json['play_style_tag'] ?? 'Possession Master',
+      strengths: List<String>.from(insights['strengths'] ?? []),
+      weaknesses: List<String>.from(insights['weaknesses'] ?? []),
     );
   }
 }

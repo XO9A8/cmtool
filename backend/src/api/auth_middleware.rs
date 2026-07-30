@@ -1,3 +1,8 @@
+//! # Axum Authentication Bearer Middleware
+//!
+//! Provides an Axum request extractor (`AuthenticatedUser`) that validates incoming HTTP
+//! `Authorization: Bearer <token>` JWT tokens and extracts authenticated user claims.
+
 use axum::{
     async_trait,
     extract::FromRequestParts,
@@ -11,11 +16,16 @@ use crate::{
     domain::auth::verify_jwt_token,
 };
 
+#[allow(dead_code)]
 const JWT_SECRET: &str = "default_cmtool_jwt_secret_key_2026";
 
+/// Extracted user credentials attached to authenticated Axum HTTP requests.
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct AuthenticatedUser {
+    /// Authenticated user ID.
     pub user_id: Uuid,
+    /// Authenticated username.
     pub username: String,
 }
 
