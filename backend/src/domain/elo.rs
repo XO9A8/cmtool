@@ -1,10 +1,21 @@
+//! # Dynamic Elo Rating System Module
+//!
+//! Provides mathematical calculations for player skill ratings in 1v1 and 2v2 competitive matches.
+//! Includes expected score calculation, dynamic K-factor scaling based on margin of victory and
+//! provisional status, and inverse-weighted 2v2 rating distribution.
+
+/// Match categories determining the baseline K-factor multiplier.
 pub enum MatchType {
+    /// Friendly match (Base K = 16)
     Friendly,
+    /// Standard League match (Base K = 32)
     League,
+    /// Tournament Final match (Base K = 40)
     TournamentFinal,
 }
 
 impl MatchType {
+    /// Returns the baseline K-factor integer multiplier for the match category.
     pub fn base_k(&self) -> f64 {
         match self {
             MatchType::TournamentFinal => 40.0,
@@ -14,24 +25,43 @@ impl MatchType {
     }
 }
 
+/// Input parameters required to compute an Elo rating update for a single player.
 pub struct EloInput {
+    /// Current Elo rating of the primary player.
     pub player_rating: i32,
+    /// Current Elo rating of the opponent.
     pub opponent_rating: i32,
+    /// Goals scored by the primary player.
     pub goals_for: i32,
+    /// Goals conceded by the primary player.
     pub goals_against: i32,
+    /// Match type category determining base K-factor.
     pub match_type: MatchType,
+    /// Whether the player has played fewer than 10 matches (multiplier = 1.5x).
     pub is_provisional: bool,
 }
 
+/// Output results returned by the Elo rating calculation engine.
 #[allow(dead_code)]
 pub struct EloResult {
+    /// Win probability / Expected score $E$ (0.0 to 1.0).
     pub expected_score: f64,
+    /// Actual outcome score $S$ (1.0 = Win, 0.5 = Draw, 0.0 = Loss).
     pub actual_score: f64,
+    /// Dynamic K-factor computed for this match ($K_{base} \cdot M_{margin} \cdot M_{provisional}$).
     pub k_factor: f64,
+    /// The net change in rating points (positive or negative).
     pub rating_delta: i32,
+    /// The updated skill rating integer ($R_{new} = R_{old} + \Delta R$).
     pub new_rating: i32,
 }
 
+/// Calculates the updated Elo rating for a 1v1 match.
+///
+/// Implements the formula:
+/// $E = \frac{1}{1 + 10^{(R_{opp} - R_{player}) / 400}}$
+///
+/// $\Delta R = K \cdot (S - E)$
 pub fn calculate_elo(input: &EloInput) -> EloResult {
     let r_player = input.player_rating as f64;
     let r_opp = input.opponent_rating as f64;
@@ -70,25 +100,39 @@ pub fn calculate_elo(input: &EloInput) -> EloResult {
     }
 }
 
+/// Parameters for calculating 2v2 Co-op team Elo rating updates.
 #[allow(dead_code)]
 pub struct CoOpEloInput {
+    /// Rating of Player 1 on Team A.
     pub p1_rating: i32,
+    /// Rating of Player 2 on Team A.
     pub p2_rating: i32,
+    /// Combined team rating of opposing Team B.
     pub opp_team_rating: i32,
+    /// Goals scored by Team A.
     pub goals_for: i32,
+    /// Goals conceded by Team A.
     pub goals_against: i32,
+    /// Match category type.
     pub match_type: MatchType,
 }
 
+/// Output rating deltas for both co-op team members.
 #[allow(dead_code)]
 pub struct CoOpEloResult {
+    /// Computed baseline team rating.
     pub team_rating: i32,
+    /// Updated rating for Player 1.
     pub p1_new_rating: i32,
+    /// Updated rating for Player 2.
     pub p2_new_rating: i32,
+    /// Net rating change for Player 1.
     pub p1_delta: i32,
+    /// Net rating change for Player 2.
     pub p2_delta: i32,
 }
 
+/// Calculates inverse-weighted 2v2 Co-Op Elo rating adjustments to prevent rating boosting.
 #[allow(dead_code)]
 pub fn calculate_coop_elo(input: &CoOpEloInput) -> CoOpEloResult {
     let team_rating = ((input.p1_rating + input.p2_rating) as f64 / 2.0).round() as i32;

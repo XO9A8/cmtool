@@ -1,24 +1,50 @@
+//! # Match Performance Score (MPS) Module
+//!
+//! Computes a single match performance rating on a 0-100 scale evaluating possession,
+//! pass completion accuracy, shot conversion efficiency, and defensive interceptions,
+//! scaled by the opponent rating difficulty coefficient ($C_{opp}$).
+
+/// Input statistical parameters extracted from post-match screenshot OCR payload.
 pub struct MpsInput {
+    /// Match possession percentage (0.0 to 100.0).
     pub possession: f64,
+    /// Number of completed passes.
     pub passes_completed: u32,
+    /// Total number of attempted passes.
     pub passes_attempted: u32,
+    /// Number of goals scored by player.
     pub goals_scored: u32,
+    /// Shots on target.
     pub shots_on_target: u32,
+    /// Total defensive interceptions performed.
     pub interceptions: u32,
+    /// Player's Elo rating before match.
     pub player_rating: i32,
+    /// Opponent's Elo rating before match.
     pub opponent_rating: i32,
 }
 
+/// Results of the Match Performance Score evaluation.
 #[allow(dead_code)]
 pub struct MpsResult {
+    /// Final overall Match Performance Score (0.0 to 100.0).
     pub mps: f64,
+    /// Possession sub-score component (weight = 0.20).
     pub possession_score: f64,
+    /// Pass completion accuracy sub-score component (weight = 0.30).
     pub passing_score: f64,
+    /// Shot conversion efficiency sub-score component (weight = 0.30).
     pub efficiency_score: f64,
+    /// Defensive actions sub-score component (weight = 0.20).
     pub defense_score: f64,
+    /// Opponent difficulty multiplier coefficient $C_{opp}$ (clamped 0.8 to 1.2).
     pub opponent_coeff: f64,
 }
 
+/// Evaluates a single match performance against historical weights and opponent difficulty coefficient.
+///
+/// Formula:
+/// $\text{MPS} = \min\left(100, \left( 0.20 \cdot S_{possession} + 0.30 \cdot S_{passing} + 0.30 \cdot S_{efficiency} + 0.20 \cdot S_{defense} \right) \times C_{opp} \right)$
 pub fn calculate_mps(input: &MpsInput) -> MpsResult {
     // Sub-score 1: Possession (0-100)
     let possession_score = input.possession.clamp(0.0, 100.0);

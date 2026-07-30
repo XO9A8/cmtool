@@ -1,31 +1,51 @@
+//! # Tournament Operations & Fixture Generation Module
+//!
+//! Provides Elo-seeded Knockout Bracket generation, Circle Method Round-Robin league fixture scheduling,
+//! and match outcome probability prediction.
+
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+/// Participant player info in a tournament event.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TournamentPlayer {
+    /// Unique user ID.
     pub id: Uuid,
+    /// Player display username.
     pub username: String,
+    /// Player's current Elo skill rating.
     pub skill_rating: i32,
 }
 
+/// A fixture match node within a tournament bracket or schedule.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FixtureNode {
+    /// Unique match node ID.
     pub id: Uuid,
+    /// Round number (1-indexed).
     pub round_number: u32,
+    /// Match index within round.
     pub match_number: u32,
+    /// Player 1 assigned to fixture.
     pub player_1: Option<TournamentPlayer>,
+    /// Player 2 assigned to fixture (or None if Bye).
     pub player_2: Option<TournamentPlayer>,
+    /// Winner user ID once completed.
     pub winner_id: Option<Uuid>,
 }
 
+/// A full single-elimination knockout tournament bracket.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KnockoutBracket {
+    /// ID of tournament event.
     pub tournament_id: Uuid,
+    /// Total rounds required to reach final.
     pub total_rounds: u32,
+    /// Round 1 fixture nodes.
     pub fixtures: Vec<FixtureNode>,
 }
 
-/// Automated Knockout Bracket Generator using Elo Seeding
+/// Automated Knockout Bracket Generator using Elo Seeding.
 /// Higher seeds play lower seeds in Round 1 (1 vs N, 2 vs N-1, etc.)
 pub fn generate_knockout_bracket(
     tournament_id: Uuid,
@@ -85,7 +105,7 @@ pub fn generate_knockout_bracket(
     }
 }
 
-/// Circle Method Scheduler for Round-Robin / League format
+/// Circle Method Scheduler for Round-Robin / League format.
 pub fn generate_round_robin_fixtures(
     _tournament_id: Uuid,
     mut players: Vec<TournamentPlayer>,
@@ -130,30 +150,34 @@ pub fn generate_round_robin_fixtures(
     fixtures
 }
 
-/// Match Prediction Engine: Calculates Win / Draw / Loss Probabilities using Elo math & H2H adjustment
+/// Match Prediction Engine: Calculates Win / Draw / Loss Probabilities using Elo math & H2H adjustment.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MatchPrediction {
+    /// Player 1 win probability (0.0 to 1.0).
     pub player_1_win_prob: f64,
+    /// Draw probability (0.0 to 1.0).
     pub draw_prob: f64,
+    /// Player 2 win probability (0.0 to 1.0).
     pub player_2_win_prob: f64,
+    /// Raw expected score for Player 1.
     pub expected_score_p1: f64,
+    /// Raw expected score for Player 2.
     pub expected_score_p2: f64,
 }
 
+/// Calculates predicted match probabilities combining expected Elo scores and historical H2H records.
 pub fn predict_match_outcome(
     p1_rating: i32,
     p2_rating: i32,
     h2h_p1_wins: u32,
     h2h_p2_wins: u32,
 ) -> MatchPrediction {
-    // 1. Elo expected score
     let r1 = p1_rating as f64;
     let r2 = p2_rating as f64;
 
     let e1 = 1.0 / (1.0 + 10.0_f64.powf((r2 - r1) / 400.0));
     let e2 = 1.0 - e1;
 
-    // 2. H2H Bonus Adjustment
     let total_h2h = (h2h_p1_wins + h2h_p2_wins) as f64;
     let h2h_bonus = if total_h2h >= 3.0 {
         ((h2h_p1_wins as f64 - h2h_p2_wins as f64) / total_h2h) * 0.05
@@ -162,7 +186,7 @@ pub fn predict_match_outcome(
     };
 
     let adj_e1 = (e1 + h2h_bonus).clamp(0.05, 0.95);
-    let draw_prob = 0.22; // Base draw probability in competitive eFootball matches
+    let draw_prob = 0.22; // Base draw probability in eFootball matches
 
     let remaining_prob = 1.0 - draw_prob;
     let player_1_win_prob = (adj_e1 * remaining_prob * 100.0).round() / 100.0;
@@ -194,7 +218,6 @@ mod tests {
         assert_eq!(bracket.total_rounds, 2);
         assert_eq!(bracket.fixtures.len(), 2);
 
-        // Top seed (1500) plays bottom seed (1000)
         let f1 = &bracket.fixtures[0];
         assert_eq!(f1.player_1.as_ref().unwrap().skill_rating, 1500);
         assert_eq!(f1.player_2.as_ref().unwrap().skill_rating, 1000);
@@ -210,7 +233,6 @@ mod tests {
         ];
 
         let fixtures = generate_round_robin_fixtures(Uuid::new_v4(), players);
-        // 4 players -> 3 rounds, 2 matches per round = 6 total matches
         assert_eq!(fixtures.len(), 6);
     }
 }
