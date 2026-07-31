@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS Clubs (
 CREATE TABLE IF NOT EXISTS Users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     username VARCHAR(50) UNIQUE NOT NULL,
+    password_hash TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     deleted_at TIMESTAMPTZ

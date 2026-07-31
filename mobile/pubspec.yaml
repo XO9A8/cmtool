@@ -13,7 +13,12 @@ dependencies:
   dio: ^5.4.0
   crypto: ^3.0.3
   uuid: ^4.3.3
+  shared_preferences: ^2.2.3
+  sqflite: ^2.3.2
+  connectivity_plus: ^6.0.3
   cupertino_icons: ^1.0.6
+  google_fonts: ^8.2.0
+  flutter_animate: ^4.5.2
 
 dev_dependencies:
   flutter_test:

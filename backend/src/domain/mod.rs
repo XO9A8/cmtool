@@ -3,6 +3,7 @@ pub mod auth;
 pub mod disputes;
 pub mod elo;
 pub mod fallback_insights;
+pub mod feature_flags;
 pub mod mps;
 pub mod play_style;
 pub mod seasons;

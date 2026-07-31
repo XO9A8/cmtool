@@ -88,6 +88,28 @@ pub fn calculate_mps(input: &MpsInput) -> MpsResult {
     }
 }
 
+/// Calculates the Exponentially Weighted Moving Average (EWMA) of recent Match Performance Scores.
+///
+/// EWMA prioritises recent form over older results.
+/// Formula: `EWMA_n = α · MPS_n + (1 − α) · EWMA_{n-1}`
+///
+/// # Arguments
+/// * `mps_history` - Ordered slice of MPS values from oldest to most-recent.
+/// * `alpha` - Smoothing factor (0.0–1.0). Use `0.3` for standard form tracking.
+///
+/// Returns `50.0` (neutral baseline) if the history slice is empty.
+pub fn calculate_ewma_form(mps_history: &[f64], alpha: f64) -> f64 {
+    if mps_history.is_empty() {
+        return 50.0;
+    }
+    let alpha = alpha.clamp(0.0, 1.0);
+    let mut ewma = mps_history[0];
+    for &mps in &mps_history[1..] {
+        ewma = alpha * mps + (1.0 - alpha) * ewma;
+    }
+    (ewma * 100.0).round() / 100.0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

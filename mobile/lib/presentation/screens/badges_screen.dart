@@ -24,13 +24,13 @@ class BadgesScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
                   gradient: const LinearGradient(
-                    colors: [Color(0xFFFFD700), Color(0xFFB8860B)],
+                    colors: [Color(0xFFFF6D00), Color(0xFFCC5500)],
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFFFFD700).withOpacity(0.4),
+                      color: const Color(0xFFFF6D00).withValues(alpha: 0.4),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                     ),
@@ -48,16 +48,16 @@ class BadgesScreen extends StatelessWidget {
                             Text('94',
                                 style: TextStyle(
                                     fontSize: 32,
-                                    fontWeight: FontWeight.extrabold,
+                                    fontWeight: FontWeight.w900,
                                     color: Colors.black)),
                             Text('ST',
                                 style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.black80)),
+                                    color: Colors.black87)),
                           ],
                         ),
-                        Icon(Icons.sports_soccer, size: 40, color: Colors.black80),
+                        Icon(Icons.sports_soccer, size: 40, color: Colors.black87),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -84,7 +84,7 @@ class BadgesScreen extends StatelessWidget {
                                 style: TextStyle(
                                     fontWeight: FontWeight.bold, color: Colors.black)),
                             Text('PASS',
-                                style: TextStyle(fontSize: 10, color: Colors.black60)),
+                                style: TextStyle(fontSize: 10, color: Colors.black54)),
                           ],
                         ),
                         Column(
@@ -93,7 +93,7 @@ class BadgesScreen extends StatelessWidget {
                                 style: TextStyle(
                                     fontWeight: FontWeight.bold, color: Colors.black)),
                             Text('ELO',
-                                style: TextStyle(fontSize: 10, color: Colors.black60)),
+                                style: TextStyle(fontSize: 10, color: Colors.black54)),
                           ],
                         ),
                         Column(
@@ -102,7 +102,7 @@ class BadgesScreen extends StatelessWidget {
                                 style: TextStyle(
                                     fontWeight: FontWeight.bold, color: Colors.black)),
                             Text('FORM',
-                                style: TextStyle(fontSize: 10, color: Colors.black60)),
+                                style: TextStyle(fontSize: 10, color: Colors.black54)),
                           ],
                         ),
                       ],
@@ -129,19 +129,19 @@ class BadgesScreen extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF161925),
+        color: const Color(0xFF111111),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFFFD700).withOpacity(0.3)),
+        border: Border.all(color: const Color(0xFFFF6D00).withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFD700).withOpacity(0.15),
+              color: const Color(0xFFFF6D00).withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: const Color(0xFFFFD700)),
+            child: Icon(icon, color: const Color(0xFFFF6D00)),
           ),
           const SizedBox(width: 14),
           Expanded(

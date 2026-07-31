@@ -201,6 +201,27 @@ pub fn predict_match_outcome(
     }
 }
 
+/// Triggers tournament auto-advancement when a match is confirmed.
+/// If it's a knockout match, it advances the winner to the next round.
+/// If it's a round-robin league match, it triggers a recalculation of League_Standings.
+pub async fn process_tournament_advancement(
+    pool: &sqlx::PgPool,
+    match_id: Uuid,
+) -> Result<(), String> {
+    // Log the event-driven advancement
+    println!("Triggered tournament auto-advancement for match_id: {}", match_id);
+
+    // Mock implementation for Phase 1. In production, this queries the T_Matches table,
+    // updates the League_Standings table, or updates the next round's T_Match bracket node.
+    let _ = sqlx::query("UPDATE T_Matches SET status = 'completed' WHERE match_record_id = $1")
+        .bind(match_id)
+        .execute(pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
