@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../theme/app_theme.dart';
 import '../providers/match_provider.dart';
+import '../../infrastructure/api_client.dart';
 import 'tournament_detail_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -286,6 +287,9 @@ class _CreateTournamentSheet extends ConsumerStatefulWidget {
 class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> {
   final _nameCtrl = TextEditingController();
   String _formatType = 'round_robin';
+  int _legs = 1; // 1 = single round-robin, 2 = double round-robin
+  final Set<String> _selectedPlayerIds = {};
+  bool _initializedMembers = false;
   bool _isLoading = false;
   String? _errorMsg;
   final _focusNode = FocusNode();
@@ -310,6 +314,10 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
       setState(() => _errorMsg = 'Please enter a tournament name');
       return;
     }
+    if (_selectedPlayerIds.length < 2) {
+      setState(() => _errorMsg = 'Please select at least 2 participating players');
+      return;
+    }
     setState(() {
       _isLoading = true;
       _errorMsg = null;
@@ -320,6 +328,10 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
         clubId: widget.clubId,
         name: name,
         formatType: _formatType,
+        rulesConfig: {
+          'legs': _legs,
+          'participant_ids': _selectedPlayerIds.toList(),
+        },
       );
       widget.onCreated();
       if (mounted) Navigator.of(context).pop();
@@ -327,7 +339,7 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMsg = e.toString().replaceFirst('Exception: ', '');
+          _errorMsg = ApiClient.formatErrorMessage(e);
         });
       }
     }
@@ -335,139 +347,290 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: GlassCard(
-        margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-        borderRadius: 24,
-        borderColor: AppColors.primary.withValues(alpha: 0.35),
-        padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Drag handle
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 20),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.25),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
+    final membersAsync = ref.watch(clubMembersProvider(widget.clubId));
 
-            Row(
+    membersAsync.whenData((data) {
+      if (!_initializedMembers) {
+        final members = (data['members'] as List<dynamic>? ?? []);
+        _selectedPlayerIds.addAll(members.map((m) => m['user_id']?.toString() ?? '').where((id) => id.isNotEmpty));
+        _initializedMembers = true;
+      }
+    });
+
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
+      ),
+      child: Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: GlassCard(
+          margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          borderRadius: 24,
+          borderColor: AppColors.primary.withValues(alpha: 0.35),
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(10),
+                // Drag handle
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.25),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
-                  child: const Icon(Icons.emoji_events, color: AppColors.primary, size: 20),
                 ),
-                const SizedBox(width: 12),
+
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.emoji_events, color: AppColors.primary, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'CREATE TOURNAMENT',
+                      style: GoogleFonts.rajdhani(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                // Name field
+                TextField(
+                  controller: _nameCtrl,
+                  focusNode: _focusNode,
+                  style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 16),
+                  decoration: InputDecoration(
+                    labelText: 'Tournament Name',
+                    labelStyle: GoogleFonts.rajdhani(color: AppColors.textMuted),
+                    filled: true,
+                    fillColor: AppColors.surfaceLight.withValues(alpha: 0.6),
+                    prefixIcon: Icon(
+                      Icons.emoji_events,
+                      color: _isFocused ? AppColors.primary : AppColors.textMuted,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+
+                // Format type
                 Text(
-                  'CREATE TOURNAMENT',
+                  'FORMAT TYPE',
                   style: GoogleFonts.rajdhani(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.2,
+                    color: AppColors.textMuted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _FormatChip(
+                        label: 'LEAGUE',
+                        icon: Icons.swap_horiz,
+                        selected: _formatType == 'round_robin',
+                        onTap: () => setState(() => _formatType = 'round_robin'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _FormatChip(
+                        label: 'KNOCKOUT',
+                        icon: Icons.account_tree,
+                        selected: _formatType == 'knockout',
+                        onTap: () => setState(() => _formatType = 'knockout'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+
+                // Encounters (Legs) selection
+                if (_formatType == 'round_robin') ...[
+                  Text(
+                    'MATCH ENCOUNTERS',
+                    style: GoogleFonts.rajdhani(
+                      color: AppColors.textMuted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _FormatChip(
+                          label: 'SINGLE (1x)',
+                          icon: Icons.filter_1,
+                          selected: _legs == 1,
+                          onTap: () => setState(() => _legs = 1),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _FormatChip(
+                          label: 'DOUBLE (2x)',
+                          icon: Icons.repeat,
+                          selected: _legs == 2,
+                          onTap: () => setState(() => _legs = 2),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                ],
+
+                // Participants selection section
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'PARTICIPATING PLAYERS',
+                      style: GoogleFonts.rajdhani(
+                        color: AppColors.textMuted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                    membersAsync.maybeWhen(
+                      data: (d) {
+                        final members = (d['members'] as List<dynamic>? ?? []);
+                        final allSelected = _selectedPlayerIds.length == members.length;
+                        return TextButton(
+                          onPressed: () {
+                            setState(() {
+                              if (allSelected) {
+                                _selectedPlayerIds.clear();
+                              } else {
+                                _selectedPlayerIds.addAll(members.map((m) => m['user_id']?.toString() ?? '').where((id) => id.isNotEmpty));
+                              }
+                            });
+                          },
+                          style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(50, 20)),
+                          child: Text(
+                            allSelected ? 'DESELECT ALL' : 'SELECT ALL',
+                            style: GoogleFonts.rajdhani(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        );
+                      },
+                      orElse: () => const SizedBox.shrink(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+
+                membersAsync.when(
+                  loading: () => const Center(child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2))),
+                  error: (e, _) => Text('Failed to load members: $e', style: GoogleFonts.rajdhani(color: AppColors.lossRed, fontSize: 13)),
+                  data: (d) {
+                    final members = (d['members'] as List<dynamic>? ?? []);
+                    if (members.isEmpty) {
+                      return Text('No members found in this club', style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 13));
+                    }
+                    return Container(
+                      constraints: const BoxConstraints(maxHeight: 160),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceLight.withValues(alpha: 0.4),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                      ),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: members.length,
+                        separatorBuilder: (_, __) => Divider(height: 1, color: Colors.white.withValues(alpha: 0.05)),
+                        itemBuilder: (ctx, i) {
+                          final m = members[i];
+                          final id = m['user_id']?.toString() ?? '';
+                          final name = m['username']?.toString() ?? 'Player';
+                          final role = m['role']?.toString() ?? 'player';
+                          final isChecked = _selectedPlayerIds.contains(id);
+
+                          return CheckboxListTile(
+                            dense: true,
+                            value: isChecked,
+                            activeColor: AppColors.primary,
+                            checkColor: Colors.black,
+                            title: Text(
+                              name,
+                              style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+                            ),
+                            subtitle: Text(
+                              role.toUpperCase(),
+                              style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 11),
+                            ),
+                            onChanged: (val) {
+                              setState(() {
+                                if (val == true) {
+                                  _selectedPlayerIds.add(id);
+                                } else {
+                                  _selectedPlayerIds.remove(id);
+                                }
+                              });
+                            },
+                          );
+                        },
+                      ),
+                    );
+                  },
+                ),
+
+                if (_errorMsg != null) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.lossRed.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.lossRed.withValues(alpha: 0.3)),
+                    ),
+                    child: Text(
+                      _errorMsg!,
+                      style: GoogleFonts.rajdhani(color: AppColors.lossRed, fontSize: 14),
+                    ),
+                  ),
+                ],
+
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: EsportsButton(
+                    label: 'CREATE TOURNAMENT',
+                    icon: Icons.add_circle_outline,
+                    isLoading: _isLoading,
+                    onPressed: _createTournament,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 24),
-
-            // Name field
-            TextField(
-              controller: _nameCtrl,
-              focusNode: _focusNode,
-              style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 16),
-              decoration: InputDecoration(
-                labelText: 'Tournament Name',
-                labelStyle: GoogleFonts.rajdhani(color: AppColors.textMuted),
-                filled: true,
-                fillColor: AppColors.surfaceLight.withValues(alpha: 0.6),
-                prefixIcon: Icon(
-                  Icons.emoji_events,
-                  color: _isFocused ? AppColors.primary : AppColors.textMuted,
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Format toggle
-            Text(
-              'FORMAT TYPE',
-              style: GoogleFonts.rajdhani(
-                color: AppColors.textMuted,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 1.5,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: _FormatChip(
-                    label: 'ROUND ROBIN',
-                    icon: Icons.swap_horiz,
-                    selected: _formatType == 'round_robin',
-                    onTap: () => setState(() => _formatType = 'round_robin'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _FormatChip(
-                    label: 'KNOCKOUT',
-                    icon: Icons.account_tree,
-                    selected: _formatType == 'knockout',
-                    onTap: () => setState(() => _formatType = 'knockout'),
-                  ),
-                ),
-              ],
-            ),
-
-            if (_errorMsg != null) ...[
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.lossRed.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.lossRed.withValues(alpha: 0.3)),
-                ),
-                child: Text(
-                  _errorMsg!,
-                  style: GoogleFonts.rajdhani(color: AppColors.lossRed, fontSize: 14),
-                ),
-              ),
-            ],
-
-            const SizedBox(height: 28),
-            SizedBox(
-              width: double.infinity,
-              child: EsportsButton(
-                label: 'CREATE TOURNAMENT',
-                icon: Icons.add_circle_outline,
-                isLoading: _isLoading,
-                onPressed: _createTournament,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -793,7 +956,7 @@ class _TournamentHeroCard extends StatelessWidget {
                   Row(
                     children: [
                       GlowBadge(
-                        label: isKnockout ? 'KNOCKOUT' : 'ROUND ROBIN',
+                        label: isKnockout ? 'KNOCKOUT' : 'LEAGUE',
                         color: AppColors.cyan,
                         icon: isKnockout ? Icons.account_tree : Icons.swap_horiz,
                       ),
@@ -871,7 +1034,7 @@ class _TournamentScheduledCardState extends ConsumerState<_TournamentScheduledCa
           style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
         ),
         content: Text(
-          'Start "$name"? The backend will generate fixtures from all club members.',
+          'Start "$name"? This will generate all fixtures and set the tournament to LIVE. This cannot be undone.',
           style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 15),
         ),
         actions: [
@@ -900,7 +1063,7 @@ class _TournamentScheduledCardState extends ConsumerState<_TournamentScheduledCa
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to start: $e', style: GoogleFonts.rajdhani()),
+            content: Text('Failed to start: ${ApiClient.formatErrorMessage(e)}', style: GoogleFonts.rajdhani()),
             backgroundColor: AppColors.lossRed,
           ),
         );
@@ -964,7 +1127,7 @@ class _TournamentScheduledCardState extends ConsumerState<_TournamentScheduledCa
             ),
             const SizedBox(height: 6),
             Text(
-              isKnockout ? '⚡ KNOCKOUT' : '↔ ROUND ROBIN',
+              isKnockout ? '⚡ KNOCKOUT' : '↔ LEAGUE',
               style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 12),
             ),
             Text(
@@ -1042,7 +1205,7 @@ class _TournamentCompletedRow extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Text(
-              format == 'knockout' ? 'KNOCKOUT' : 'ROUND ROBIN',
+              format == 'knockout' ? 'KNOCKOUT' : 'LEAGUE',
               style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 11),
             ),
             const SizedBox(width: 8),

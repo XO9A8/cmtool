@@ -1486,3 +1486,26 @@ pub async fn get_player_scheduled_matches(
     Ok(rows)
 }
 
+/// Checks if a user is a club official (admin, organizer, president, captain, vice-captain).
+pub async fn is_club_official(
+    pool: &PgPool,
+    club_id: Uuid,
+    user_id: Uuid,
+) -> Result<bool, sqlx::Error> {
+    let row = sqlx::query!(
+        r#"
+        SELECT EXISTS (
+            SELECT 1 FROM Club_Memberships
+            WHERE club_id = $1 AND player_id = $2
+              AND LOWER(role) IN ('admin', 'organizer', 'president', 'captain', 'vice-captain')
+        ) AS is_official
+        "#,
+        club_id,
+        user_id
+    )
+    .fetch_one(pool)
+    .await?;
+
+    Ok(row.is_official.unwrap_or(false))
+}
+

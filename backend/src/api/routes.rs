@@ -142,6 +142,19 @@ fn bad_request(code: &str, msg: &str) -> (StatusCode, Json<ApiErrorResponse>) {
     )
 }
 
+fn forbidden(code: &str, msg: &str) -> (StatusCode, Json<ApiErrorResponse>) {
+    tracing::warn!("⚠️ [HTTP 403 Forbidden] [{}]: {}", code, msg);
+    (
+        StatusCode::FORBIDDEN,
+        Json(ApiErrorResponse {
+            error: ApiErrorDetail {
+                code: code.to_string(),
+                message: msg.to_string(),
+            },
+        }),
+    )
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Health Check
 // ─────────────────────────────────────────────────────────────────────────────
@@ -717,7 +730,7 @@ async fn create_round_robin(
     _auth: AuthenticatedUser,
     Json(payload): Json<CreateTournamentRequest>,
 ) -> Json<Vec<FixtureNode>> {
-    Json(generate_round_robin_fixtures(payload.tournament_id, payload.players))
+    Json(generate_round_robin_fixtures(payload.tournament_id, payload.players, 1))
 }
 
 /// Fetches live tournament bracket state from the database.
@@ -1327,9 +1340,19 @@ pub struct CreateTournamentDbRequest {
 /// Creates a tournament and persists it to the Tournaments table.
 async fn create_tournament(
     State(state): State<Arc<AppState>>,
-    _auth: AuthenticatedUser,
+    auth: AuthenticatedUser,
     Json(payload): Json<CreateTournamentDbRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ApiErrorResponse>)> {
+    let is_official = db::is_club_official(&state.pool, payload.club_id, auth.user_id)
+        .await
+        .map_err(|e| internal_error(e))?;
+    if !is_official {
+        return Err(forbidden(
+            "FORBIDDEN",
+            "Only club officials (Admin/Organizer) can create tournaments.",
+        ));
+    }
+
     let rules = if payload.rules_config.is_null() {
         serde_json::json!({})
     } else {
@@ -1363,25 +1386,88 @@ pub struct StartTournamentRequest {
 /// Starts a tournament: generates bracket/fixtures, initializes standings, and sets status to active.
 async fn start_tournament(
     State(state): State<Arc<AppState>>,
-    _auth: AuthenticatedUser,
+    auth: AuthenticatedUser,
     Path(tournament_id): Path<Uuid>,
     Json(payload): Json<StartTournamentRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ApiErrorResponse>)> {
-    if payload.players.len() < 2 {
-        return Err(bad_request("INSUFFICIENT_PLAYERS", "At least 2 players are required"));
+    let mut players = payload.players;
+
+    let tourney = sqlx::query!(
+        "SELECT club_id, format_type, rules_config FROM Tournaments WHERE id = $1 AND deleted_at IS NULL",
+        tournament_id
+    )
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| internal_error(e))?;
+
+    let (club_id, format_type, rules_config) = match tourney {
+        Some(t) => match t.club_id {
+            Some(cid) => (cid, t.format_type, t.rules_config.unwrap_or(serde_json::json!({}))),
+            None => return Err(bad_request("NO_CLUB", "Tournament is not associated with a club")),
+        },
+        None => return Err(bad_request("TOURNAMENT_NOT_FOUND", "Tournament not found")),
+    };
+
+    let is_official = db::is_club_official(&state.pool, club_id, auth.user_id)
+        .await
+        .map_err(|e| internal_error(e))?;
+    if !is_official {
+        return Err(forbidden(
+            "FORBIDDEN",
+            "Only club officials (Admin/Organizer) can start tournaments.",
+        ));
     }
 
-    // Generate fixtures and persist them
-    let player_ids: Vec<Uuid> = payload.players.iter().map(|p| p.id).collect();
-    let fixtures = generate_round_robin_fixtures(tournament_id, payload.players);
+    let legs = rules_config.get("legs").and_then(|v| v.as_u64()).unwrap_or(1) as u32;
+
+    if players.is_empty() {
+        let members = db::get_club_members(&state.pool, club_id)
+            .await
+            .map_err(|e| internal_error(e))?;
+
+        let selected_ids: Option<Vec<Uuid>> = rules_config.get("participant_ids")
+            .and_then(|v| v.as_array())
+            .map(|arr| arr.iter().filter_map(|val| val.as_str().and_then(|s| Uuid::parse_str(s).ok())).collect());
+
+        players = members
+            .into_iter()
+            .filter(|m| {
+                if let Some(ref ids) = selected_ids {
+                    ids.contains(&m.user_id)
+                } else {
+                    true
+                }
+            })
+            .map(|m| TournamentPlayer {
+                id: m.user_id,
+                username: m.username,
+                skill_rating: m.skill_rating as i32,
+            })
+            .collect();
+    }
+
+    if players.len() < 2 {
+        return Err(bad_request(
+            "INSUFFICIENT_PLAYERS",
+            "At least 2 players are required to start a tournament",
+        ));
+    }
+
+    let player_ids: Vec<Uuid> = players.iter().map(|p| p.id).collect();
+    let fixtures: Vec<FixtureNode> = if format_type == "knockout" {
+        generate_knockout_bracket(tournament_id, players).fixtures
+    } else {
+        generate_round_robin_fixtures(tournament_id, players, legs)
+    };
 
     for f in &fixtures {
-        if let (Some(p1), Some(p2)) = (&f.player_1, &f.player_2) {
+        if let Some(p1) = &f.player_1 {
+            let p2_id = f.player_2.as_ref().map(|p| p.id);
             let _ = db::insert_tournament_match(
                 &state.pool,
                 tournament_id,
                 p1.id,
-                Some(p2.id),
+                p2_id,
                 f.round_number as i32,
             )
             .await;

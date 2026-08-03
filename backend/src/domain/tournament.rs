@@ -105,11 +105,13 @@ pub fn generate_knockout_bracket(
     }
 }
 
-/// Circle Method Scheduler for Round-Robin / League format.
+/// Circle Method Scheduler for Round-Robin / League format (supports Single & Double Round-Robin).
 pub fn generate_round_robin_fixtures(
     _tournament_id: Uuid,
     mut players: Vec<TournamentPlayer>,
+    legs: u32,
 ) -> Vec<FixtureNode> {
+    let num_legs = legs.max(1);
     if players.len() % 2 != 0 {
         // Add dummy bye player if odd count
         players.push(TournamentPlayer {
@@ -120,31 +122,45 @@ pub fn generate_round_robin_fixtures(
     }
 
     let n = players.len();
-    let rounds = n - 1;
+    let rounds_per_leg = n - 1;
     let matches_per_round = n / 2;
 
     let mut fixtures = Vec::new();
+    let initial_players = players.clone();
 
-    for round in 0..rounds {
-        for i in 0..matches_per_round {
-            let p1 = &players[i];
-            let p2 = &players[n - 1 - i];
+    for leg in 0..num_legs {
+        players = initial_players.clone();
+        let swap_home_away = leg % 2 == 1;
 
-            if p1.id != Uuid::nil() && p2.id != Uuid::nil() {
-                fixtures.push(FixtureNode {
-                    id: Uuid::new_v4(),
-                    round_number: (round + 1) as u32,
-                    match_number: (i + 1) as u32,
-                    player_1: Some(p1.clone()),
-                    player_2: Some(p2.clone()),
-                    winner_id: None,
-                });
+        for round in 0..rounds_per_leg {
+            let actual_round = leg * rounds_per_leg as u32 + round as u32 + 1;
+
+            for i in 0..matches_per_round {
+                let p1 = &players[i];
+                let p2 = &players[n - 1 - i];
+
+                if p1.id != Uuid::nil() && p2.id != Uuid::nil() {
+                    let (home, away) = if swap_home_away {
+                        (p2.clone(), p1.clone())
+                    } else {
+                        (p1.clone(), p2.clone())
+                    };
+
+                    fixtures.push(FixtureNode {
+                        id: Uuid::new_v4(),
+                        round_number: actual_round,
+                        match_number: (i + 1) as u32,
+                        player_1: Some(home),
+                        player_2: Some(away),
+                        winner_id: None,
+                    });
+                }
             }
-        }
 
-        // Rotate players array using Circle Method (keep 0 fixed, rotate others)
-        let last = players.pop().unwrap();
-        players.insert(1, last);
+            // Rotate players array using Circle Method (keep 0 fixed, rotate others)
+            let last = players.pop().unwrap();
+            players.insert(1, last);
+        }
     }
 
     fixtures
