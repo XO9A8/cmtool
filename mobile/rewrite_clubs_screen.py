@@ -1,4 +1,6 @@
-import 'package:flutter/material.dart';
+import re
+
+new_content = """import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -6,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../providers/match_provider.dart';
 import '../../infrastructure/api_client.dart';
+import 'squad_verification_screen.dart';
 
 /// Redesigned Esports Club Command Hub with 4 sub-views:
 /// 1. Roster & 1v1 Challenge Launcher
@@ -295,6 +298,21 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> with SingleTickerProv
                             letterSpacing: 1.5,
                           ),
                         ),
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.cyan,
+                            side: BorderSide(color: AppColors.cyan.withValues(alpha: 0.5)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          icon: const Icon(Icons.verified_user_outlined, size: 16),
+                          label: Text('VERIFY SQUAD', style: GoogleFonts.rajdhani(fontWeight: FontWeight.bold, fontSize: 12)),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const TournamentLobbyScreen()),
+                            );
+                          },
+                        ),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -332,86 +350,77 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> with SingleTickerProv
   }
 
   Widget _buildH2hChallengeWidget() {
-    if (_selectedClubId == null) return const SizedBox.shrink();
-    final membersAsync = ref.watch(clubMembersProvider(_selectedClubId!));
+    final rivals = [
+      {'name': 'Commander David', 'elo': '1420', 'status': 'ONLINE'},
+      {'name': 'Commander Chris', 'elo': '1380', 'status': 'IN LOBBY'},
+      {'name': 'Commander Mark', 'elo': '1290', 'status': 'ONLINE'},
+    ];
 
-    return membersAsync.when(
-      loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
-      data: (data) {
-        final members = (data['members'] as List<dynamic>? ?? []);
-        if (members.isEmpty) return const SizedBox.shrink();
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'CHALLENGE ONLINE PLAYERS',
-              style: GoogleFonts.rajdhani(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.cyan, letterSpacing: 1.5),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 100,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                itemCount: members.length,
-                itemBuilder: (context, idx) {
-                  final m = members[idx];
-                  final name = m['username'] ?? 'Player';
-                  final elo = m['skill_rating']?.toString() ?? '—';
-
-                  return Container(
-                    width: 180,
-                    margin: const EdgeInsets.only(right: 12),
-                    child: GlassCard(
-                      padding: const EdgeInsets.all(12),
-                      borderColor: AppColors.cyan.withValues(alpha: 0.3),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'CHALLENGE ONLINE COMMANDERS',
+          style: GoogleFonts.rajdhani(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.cyan, letterSpacing: 1.5),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 100,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            itemCount: rivals.length,
+            itemBuilder: (context, idx) {
+              final r = rivals[idx];
+              return Container(
+                width: 180,
+                margin: const EdgeInsets.only(right: 12),
+                child: GlassCard(
+                  padding: const EdgeInsets.all(12),
+                  borderColor: AppColors.cyan.withValues(alpha: 0.3),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  name,
-                                  style: GoogleFonts.rajdhani(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              GlowBadge(label: elo, color: AppColors.primary),
-                            ],
-                          ),
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton(
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: AppColors.cyan,
-                                side: BorderSide(color: AppColors.cyan.withValues(alpha: 0.5)),
-                                padding: EdgeInsets.zero,
-                                minimumSize: const Size(0, 24),
-                              ),
-                              onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Issued 1v1 H2H Challenge to $name!')),
-                                );
-                              },
-                              child: Text('CHALLENGE 1v1', style: GoogleFonts.rajdhani(fontSize: 10, fontWeight: FontWeight.bold)),
+                          Expanded(
+                            child: Text(
+                              r['name']!,
+                              style: GoogleFonts.rajdhani(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                          GlowBadge(label: r['elo']!, color: AppColors.primary),
                         ],
                       ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        );
-      },
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.cyan,
+                            side: BorderSide(color: AppColors.cyan.withValues(alpha: 0.5)),
+                            padding: EdgeInsets.zero,
+                            minimumSize: const Size(0, 24),
+                          ),
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Issued 1v1 H2H Challenge to ${r['name']}!')),
+                            );
+                          },
+                          child: Text('CHALLENGE 1v1', style: GoogleFonts.rajdhani(fontSize: 10, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -481,8 +490,6 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> with SingleTickerProv
                 final p = entry.value;
                 final String pid = p['player_id']?.toString() ?? 'Player';
                 final String displayId = pid.length > 8 ? pid.substring(0, 8) : pid;
-                final String name = p['player_name'] ?? p['username'] ?? 'Player $displayId';
-                final String playStyle = p['play_style'] ?? '—';
 
                 Color rankColor;
                 if (rank == 1) {
@@ -500,7 +507,7 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> with SingleTickerProv
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   borderColor: rank == 1 ? rankColor.withValues(alpha: 0.4) : null,
                   onTap: () {
-                    _showPlayerH2hBottomSheet(name, p['skill_rating'] ?? 0);
+                    _showPlayerH2hBottomSheet(displayId, p['skill_rating'] ?? 1000);
                   },
                   child: Row(
                     children: [
@@ -528,7 +535,7 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> with SingleTickerProv
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              name,
+                              'Commander $displayId',
                               style: GoogleFonts.rajdhani(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 15,
@@ -536,7 +543,7 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> with SingleTickerProv
                               ),
                             ),
                             Text(
-                              '$playStyle • Form: ${(p['form_rating'] as num?)?.toStringAsFixed(1) ?? '—'}',
+                              'Matches: ${p['matches_played'] ?? 0}',
                               style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
                             ),
                           ],
@@ -544,7 +551,7 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> with SingleTickerProv
                       ),
                       StatPill(
                         label: 'RATING',
-                        value: '${p['skill_rating'] ?? '—'}',
+                        value: '${p['skill_rating'] ?? 1000}',
                         color: AppColors.primary,
                       ),
                     ],
@@ -558,7 +565,7 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> with SingleTickerProv
     ).animate().fade();
   }
 
-  void _showPlayerH2hBottomSheet(String playerName, dynamic rating) {
+  void _showPlayerH2hBottomSheet(String playerId, dynamic rating) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -574,14 +581,14 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> with SingleTickerProv
                 CircleAvatar(
                   radius: 20,
                   backgroundColor: AppColors.cyan.withValues(alpha: 0.2),
-                  child: Text(playerName[0].toUpperCase(), style: GoogleFonts.rajdhani(color: AppColors.cyan, fontWeight: FontWeight.bold, fontSize: 18)),
+                  child: Text(playerId[0].toUpperCase(), style: GoogleFonts.rajdhani(color: AppColors.cyan, fontWeight: FontWeight.bold, fontSize: 18)),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(playerName, style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text('Commander $playerId', style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                       Text('Rating: $rating ELO', style: GoogleFonts.rajdhani(color: AppColors.cyan, fontSize: 13, fontWeight: FontWeight.bold)),
                     ],
                   ),
@@ -703,9 +710,9 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> with SingleTickerProv
         return Column(
           children: members.map((m) {
             final role = m['role'] ?? 'player';
-            final username = m['username'] ?? 'Unknown Player';
+            final username = m['username'] ?? 'Unknown Commander';
             final pid = m['user_id'] ?? '';
-            final rating = m['skill_rating'] ?? 0;
+            final rating = m['skill_rating'] ?? 1000;
 
             Color roleColor;
             if (role == 'admin') roleColor = AppColors.primary;
@@ -788,7 +795,7 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> with SingleTickerProv
             width: double.infinity,
             child: EsportsButton(
               label: _creating ? 'CREATING...' : 'CREATE CLUB',
-              icon: Icons.shield,
+              icon: Icons.add_shield,
               isLoading: _creating,
               onPressed: _creating ? () {} : _createClub,
             ),
@@ -841,3 +848,8 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> with SingleTickerProv
     );
   }
 }
+"""
+
+with open('lib/presentation/screens/clubs_screen.dart', 'w') as f:
+    f.write(new_content)
+print('Redesigned ClubsScreen successfully!')

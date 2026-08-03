@@ -22,9 +22,12 @@ pub struct MpsInput {
     pub player_rating: i32,
     /// Opponent's Elo rating before match.
     pub opponent_rating: i32,
+    /// Whether this is a 2v2 co-op match.
+    pub is_coop: bool,
 }
 
 /// Results of the Match Performance Score evaluation.
+#[derive(Clone)]
 #[allow(dead_code)]
 pub struct MpsResult {
     /// Final overall Match Performance Score (0.0 to 100.0).
@@ -45,7 +48,10 @@ pub struct MpsResult {
 ///
 /// Formula:
 /// $\text{MPS} = \min\left(100, \left( 0.20 \cdot S_{possession} + 0.30 \cdot S_{passing} + 0.30 \cdot S_{efficiency} + 0.20 \cdot S_{defense} \right) \times C_{opp} \right)$
-pub fn calculate_mps(input: &MpsInput) -> MpsResult {
+pub fn calculate_mps(input: &MpsInput) -> Option<MpsResult> {
+    if input.is_coop {
+        return None;
+    }
     // Sub-score 1: Possession (0-100)
     let possession_score = input.possession.clamp(0.0, 100.0);
 
@@ -78,14 +84,14 @@ pub fn calculate_mps(input: &MpsInput) -> MpsResult {
 
     let final_mps = (base_mps * opponent_coeff).min(100.0);
 
-    MpsResult {
+    Some(MpsResult {
         mps: (final_mps * 100.0).round() / 100.0,
         possession_score,
         passing_score,
         efficiency_score,
         defense_score,
         opponent_coeff,
-    }
+    })
 }
 
 /// Calculates the Exponentially Weighted Moving Average (EWMA) of recent Match Performance Scores.
@@ -125,9 +131,10 @@ mod tests {
             interceptions: 10,
             player_rating: 1000,
             opponent_rating: 1200,
+            is_coop: false,
         };
 
-        let result = calculate_mps(&input);
+        let result = calculate_mps(&input).unwrap();
         assert_eq!(result.mps, 100.0);
     }
 }

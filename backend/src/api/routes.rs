@@ -60,7 +60,10 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/api/v1/clubs/:id/members/:player_id", axum::routing::delete(remove_member))
         .route("/api/v1/clubs/:id", axum::routing::put(update_club))
         .route("/api/v1/clubs/:id/tournaments", get(get_club_tournaments))
+        .route("/api/v1/clubs/:id/activity", get(get_club_activity))
+        .route("/api/v1/clubs/:id/seasons", get(get_club_seasons))
         .route("/api/v1/matches/ocr-submit", post(ocr_submit))
+        .route("/api/v1/matches/pending", get(get_pending_matches))
         .route("/api/v1/matches/:id/confirm", post(confirm_match))
         .route("/api/v1/matches/predict", get(predict_match))
         .route("/api/v1/leaderboards/:club_id", get(get_leaderboard))
@@ -68,18 +71,24 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/api/v1/tournaments/bracket", post(create_knockout_bracket))
         .route("/api/v1/tournaments/round-robin", post(create_round_robin))
         .route("/api/v1/tournaments/:id/bracket", get(get_tournament_bracket))
-        .route("/api/v1/tournaments/:id/squad-check", post(squad_check))
+
         .route("/api/v1/tournaments/:id/standings", get(get_league_standings))
         .route("/api/v1/tournaments/:id/start", post(start_tournament))
         .route("/api/v1/tournaments/:id/status", post(update_tournament_status))
         .route("/api/v1/players/:id/profile", get(get_player_profile))
         .route("/api/v1/players/:id/matches", get(get_player_matches))
+        .route("/api/v1/players/:id/scheduled-matches", get(get_player_scheduled_matches))
         .route("/api/v1/players/:id/elo-history", get(get_elo_history))
         .route("/api/v1/players/:id/badges", get(get_player_badges))
         .route("/api/v1/players/:id/h2h/:opponent_id", get(get_h2h_record))
         .route("/api/v1/players/:id/analytics", get(get_player_analytics))
         .route("/api/v1/disputes", post(submit_dispute))
-        .route("/api/v1/seasons/snapshot", post(snapshot_season))
+        // Admin Dispute & Role Management (C-03)
+        .route("/api/v1/admin/disputes", get(get_admin_disputes))
+        .route("/api/v1/admin/disputes/:id/resolve", post(resolve_admin_dispute))
+        .route("/api/v1/clubs/:id/members/:player_id/role", axum::routing::put(update_member_role))
+        // Tournament check-in forfeit (C-04)
+        .route("/api/v1/tournaments/:id/matches/:match_id/claim-forfeit", post(claim_tournament_forfeit))
         .route("/api/v1/admin/feature-flags", post(update_feature_flags));
 
     public
@@ -362,6 +371,10 @@ pub struct OcrSubmitRequest {
     pub player_rating: Option<i32>,
     /// Optional opponent Elo rating (defaults to 1000 if not provided).
     pub opponent_rating: Option<i32>,
+    pub partner_id: Option<Uuid>,
+    pub club_id: Option<Uuid>,
+    /// Optional tournament fixture ID — links this submission to a T_Matches row.
+    pub t_match_id: Option<Uuid>,
 }
 
 #[derive(Serialize)]
@@ -390,8 +403,40 @@ async fn ocr_submit(
         return Err(bad_request("INVALID_SHOT_STATS", "shots_on_target cannot exceed shots_total"));
     }
 
+    let is_duplicate = db::check_screenshot_exists(&state.pool, &payload.screenshot_hash)
+        .await
+        .map_err(|e| internal_error(e))?;
+
+    if is_duplicate {
+        return Err(bad_request("DUPLICATE_SCREENSHOT", "A match with this screenshot hash already exists."));
+    }
+
     let player_rating = payload.player_rating.unwrap_or(1000);
     let opponent_rating = payload.opponent_rating.unwrap_or(1000);
+
+    // --- Opponent Match Confirmation Check ---
+    let pending_match = db::find_pending_opponent_match(
+        &state.pool,
+        auth.user_id,
+        payload.opponent_id,
+        payload.goals_for,
+        payload.goals_against,
+    )
+    .await
+    .map_err(|e| internal_error(e))?;
+
+    if let Some(opponent_match_id) = pending_match {
+        // We found the opponent's match! We should mark theirs as approved.
+        db::approve_match(&state.pool, opponent_match_id)
+            .await
+            .map_err(|e| internal_error(e))?;
+    }
+
+    let verification_status = if pending_match.is_none() {
+        "pending".to_string()
+    } else {
+        "approved".to_string()
+    };
 
     // --- Elo Calculation ---
     let match_type = match payload.match_type.as_str() {
@@ -410,7 +455,8 @@ async fn ocr_submit(
     });
 
     // --- MPS Calculation ---
-    let mps_res = calculate_mps(&MpsInput {
+    let is_coop = payload.partner_id.is_some();
+    let mps_res_opt = calculate_mps(&MpsInput {
         possession:       payload.possession,
         passes_completed: payload.passes_completed,
         passes_attempted: payload.passes_attempted,
@@ -419,15 +465,23 @@ async fn ocr_submit(
         interceptions:    payload.interceptions,
         player_rating,
         opponent_rating,
+        is_coop,
     });
 
     // --- EWMA Form Rating ---
-    let mps_history = db::get_player_mps_history(&state.pool, auth.user_id, 19)
-        .await
-        .unwrap_or_default();
-    let mut history_with_current = mps_history;
-    history_with_current.push(mps_res.mps);
-    let form_rating = calculate_ewma_form(&history_with_current, 0.3);
+    let form_rating = if let Some(ref mps_res) = mps_res_opt {
+        let mps_history = db::get_player_mps_history(&state.pool, auth.user_id, 19)
+            .await
+            .unwrap_or_default();
+        let mut history_with_current = mps_history;
+        history_with_current.push(mps_res.mps);
+        calculate_ewma_form(&history_with_current, 0.3)
+    } else {
+        // If co-op, we don't update MPS history, just keep current form or default
+        db::get_player_current_form(&state.pool, auth.user_id)
+            .await
+            .unwrap_or(50.0)
+    };
 
     // --- Play Style ---
     let pass_acc = if payload.passes_attempted > 0 {
@@ -478,7 +532,8 @@ async fn ocr_submit(
         db::SaveMatchTransactionInput {
             player_id:        auth.user_id,
             opponent_id:      payload.opponent_id,
-            club_id:          None,
+            club_id:          payload.club_id,
+            t_match_id:       payload.t_match_id,
             match_type:       payload.match_type.clone(),
             goals_for:        payload.goals_for,
             goals_against:    payload.goals_against,
@@ -496,15 +551,9 @@ async fn ocr_submit(
                 rating_delta:   elo_res.rating_delta,
                 new_rating:     elo_res.new_rating,
             },
-            mps_result:       crate::domain::mps::MpsResult {
-                mps:               mps_res.mps,
-                possession_score:  mps_res.possession_score,
-                passing_score:     mps_res.passing_score,
-                efficiency_score:  mps_res.efficiency_score,
-                defense_score:     mps_res.defense_score,
-                opponent_coeff:    mps_res.opponent_coeff,
-            },
+            mps_result:       mps_res_opt.clone(),
             form_rating,
+            verification_status,
         },
     )
     .await
@@ -516,7 +565,7 @@ async fn ocr_submit(
         new_skill_rating:      elo_res.new_rating,
         rating_delta:          elo_res.rating_delta,
         form_rating,
-        match_performance_score: mps_res.mps,
+        match_performance_score: mps_res_opt.map(|m| m.mps).unwrap_or(0.0),
         play_style_tag:        play_style.as_str().to_string(),
         insights,
     }))
@@ -545,6 +594,19 @@ async fn confirm_match(
         "match_id": match_id,
         "status": "approved",
         "message": "Match result confirmed successfully"
+    })))
+}
+
+async fn get_pending_matches(
+    State(state): State<Arc<AppState>>,
+    auth: AuthenticatedUser,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ApiErrorResponse>)> {
+    let matches = db::get_pending_matches_db(&state.pool, auth.user_id)
+        .await
+        .map_err(|e| internal_error(e))?;
+
+    Ok(Json(serde_json::json!({
+        "pending_matches": matches
     })))
 }
 
@@ -675,8 +737,11 @@ async fn get_tournament_bracket(
                 "id": m.id,
                 "round_number": m.round_number,
                 "player_1_id": m.player_1_id,
+                "player_1_name": m.player_1_name,
                 "player_2_id": m.player_2_id,
+                "player_2_name": m.player_2_name,
                 "status": m.status,
+                "winner_player_id": m.winner_player_id,
             })
         })
         .collect();
@@ -687,58 +752,7 @@ async fn get_tournament_bracket(
     })))
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Squad Check
-// ─────────────────────────────────────────────────────────────────────────────
 
-#[derive(Deserialize)]
-pub struct SquadCheckRequest {
-    pub team_strength: i32,
-    pub screenshot_url: String,
-    /// Max allowed team strength (e.g. 2900). Validation fails if team_strength > max_strength.
-    pub max_strength: Option<i32>,
-}
-
-#[derive(Serialize)]
-pub struct SquadCheckResponse {
-    pub verification_id: Uuid,
-    pub is_valid: bool,
-    pub message: String,
-}
-
-/// Validates and stores a pre-match squad screenshot for team strength rule enforcement.
-async fn squad_check(
-    State(state): State<Arc<AppState>>,
-    auth: AuthenticatedUser,
-    Path(t_match_id): Path<Uuid>,
-    Json(payload): Json<SquadCheckRequest>,
-) -> Result<Json<SquadCheckResponse>, (StatusCode, Json<ApiErrorResponse>)> {
-    let max = payload.max_strength.unwrap_or(2900);
-    let is_valid = payload.team_strength <= max;
-
-    let verification_id = db::insert_squad_verification(
-        &state.pool,
-        t_match_id,
-        auth.user_id,
-        payload.team_strength,
-        &payload.screenshot_url,
-        is_valid,
-    )
-    .await
-    .map_err(|e| internal_error(e))?;
-
-    let message = if is_valid {
-        format!("Squad strength {} is within the {} limit.", payload.team_strength, max)
-    } else {
-        format!("Squad strength {} exceeds the {} limit. Fixture cannot proceed.", payload.team_strength, max)
-    };
-
-    Ok(Json(SquadCheckResponse {
-        verification_id,
-        is_valid,
-        message,
-    }))
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Head-to-Head Rivalry
@@ -798,9 +812,26 @@ pub struct PlayerAnalyticsResponse {
     pub draws: i64,
     pub losses: i64,
     pub win_rate: f64,
+    pub efootball_game_id: Option<String>,
+    pub preferred_foot: Option<String>,
+    pub jersey_number: Option<i32>,
+    pub system_device: Option<String>,
+    pub facebook: Option<String>,
+    pub blood_group: Option<String>,
+    pub district: Option<String>,
+    pub date_of_birth: Option<String>,
+    pub registrar_joined: Option<String>,
+    pub contract_start: Option<String>,
+    pub contract_end: Option<String>,
+    pub facebook_link: Option<String>,
+    pub email_node: Option<String>,
+    pub phone_line: Option<String>,
+    pub node_state: Option<String>,
+    pub auth_status: Option<String>,
+    pub source_feed: Option<String>,
 }
 
-/// Returns full player analytics including MPS form, play style, and win/loss record.
+/// Returns full player analytics including MPS form, play style, win/loss record, and dossier info.
 async fn get_player_analytics(
     State(state): State<Arc<AppState>>,
     _auth: AuthenticatedUser,
@@ -826,6 +857,23 @@ async fn get_player_analytics(
         draws:          row.draws,
         losses:         row.losses,
         win_rate,
+        efootball_game_id: row.efootball_game_id,
+        preferred_foot:    row.preferred_foot,
+        jersey_number:     row.jersey_number,
+        system_device:     row.system_device,
+        facebook:          row.facebook,
+        blood_group:       row.blood_group,
+        district:          row.district,
+        date_of_birth:     row.date_of_birth.map(|d| d.to_string()),
+        registrar_joined: row.registrar_joined.map(|d| d.to_string()),
+        contract_start:   row.contract_start.map(|d| d.to_string()),
+        contract_end:     row.contract_end.map(|d| d.to_string()),
+        facebook_link:    row.facebook_link,
+        email_node:       row.email_node,
+        phone_line:       row.phone_line,
+        node_state:       row.node_state,
+        auth_status:       row.auth_status,
+        source_feed:       row.source_feed,
     }))
 }
 
@@ -854,7 +902,7 @@ async fn submit_dispute(
     auth: AuthenticatedUser,
     Json(payload): Json<SubmitDisputeRequest>,
 ) -> Result<Json<DisputeResponse>, (StatusCode, Json<ApiErrorResponse>)> {
-    let _ = raise_match_dispute(payload.match_record_id, auth.user_id, payload.reason.clone());
+    let _ = raise_match_dispute(payload.match_record_id, auth.user_id, payload.reason.clone(), None);
 
     let dispute_id = db::save_dispute(
         &state.pool,
@@ -1180,6 +1228,37 @@ async fn get_player_matches(
     })))
 }
 
+async fn get_player_scheduled_matches(
+    State(state): State<Arc<AppState>>,
+    _auth: AuthenticatedUser,
+    Path(player_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ApiErrorResponse>)> {
+    let matches = db::get_player_scheduled_matches(&state.pool, player_id)
+        .await
+        .map_err(|e| internal_error(e))?;
+
+    let result: Vec<serde_json::Value> = matches
+        .into_iter()
+        .map(|m| {
+            serde_json::json!({
+                "id": m.id,
+                "tournament_id": m.tournament_id,
+                "tournament_name": m.tournament_name,
+                "player_1_id": m.player_1_id,
+                "player_1_name": m.player_1_name,
+                "player_2_id": m.player_2_id,
+                "player_2_name": m.player_2_name,
+                "round_number": m.round_number,
+                "status": m.status,
+            })
+        })
+        .collect();
+
+    Ok(Json(serde_json::json!({
+        "matches": result,
+    })))
+}
+
 /// Returns Elo rating history for a player (for chart rendering).
 async fn get_elo_history(
     State(state): State<Arc<AppState>>,
@@ -1385,4 +1464,116 @@ async fn get_league_standings(
         "tournament_id": tournament_id,
         "standings": result,
     })))
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Admin & Governance Routes (C-03, C-04)
+// ─────────────────────────────────────────────────────────────────────────────
+
+async fn get_admin_disputes(
+    State(state): State<Arc<AppState>>,
+    _auth: AuthenticatedUser,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ApiErrorResponse>)> {
+    let disputes = db::get_admin_disputes_db(&state.pool)
+        .await
+        .map_err(|e| internal_error(e))?;
+
+    Ok(Json(serde_json::json!({
+        "disputes": disputes
+    })))
+}
+
+#[derive(serde::Deserialize)]
+struct ResolveDisputeRequest {
+    dismiss: bool,
+    resolution_notes: Option<String>,
+}
+
+async fn resolve_admin_dispute(
+    State(state): State<Arc<AppState>>,
+    auth: AuthenticatedUser,
+    Path(dispute_id): Path<Uuid>,
+    Json(payload): Json<ResolveDisputeRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ApiErrorResponse>)> {
+    let status = if payload.dismiss { "dismissed" } else { "resolved" };
+    
+    sqlx::query(
+        r#"
+        UPDATE Match_Disputes
+        SET status = $1, resolved_by = $2, resolution_notes = $3, resolved_at = NOW()
+        WHERE id = $4
+        "#
+    )
+    .bind(status)
+    .bind(auth.user_id)
+    .bind(payload.resolution_notes)
+    .bind(dispute_id)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| internal_error(e))?;
+
+    Ok(Json(serde_json::json!({
+        "status": "success",
+        "dispute_id": dispute_id,
+        "new_status": status
+    })))
+}
+
+
+
+async fn claim_tournament_forfeit(
+    State(state): State<Arc<AppState>>,
+    _auth: AuthenticatedUser,
+    Path((tournament_id, match_id)): Path<(Uuid, Uuid)>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ApiErrorResponse>)> {
+    sqlx::query(
+        r#"
+        UPDATE T_Matches
+        SET status = 'completed'
+        WHERE id = $1 AND tournament_id = $2
+        "#
+    )
+    .bind(match_id)
+    .bind(tournament_id)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| internal_error(e))?;
+
+    Ok(Json(serde_json::json!({
+        "status": "forfeit_claimed",
+        "match_id": match_id
+    })))
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Club Activity & Seasons Endpoints
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[derive(serde::Deserialize)]
+pub struct ActivityQuery {
+    pub limit: Option<i64>,
+}
+
+async fn get_club_activity(
+    State(state): State<Arc<AppState>>,
+    _auth: AuthenticatedUser,
+    Path(club_id): Path<Uuid>,
+    Query(query): Query<ActivityQuery>,
+) -> Result<Json<Vec<crate::infrastructure::postgres_adapter::ClubActivityRow>>, (StatusCode, Json<ApiErrorResponse>)> {
+    let limit = query.limit.unwrap_or(20);
+    let rows = crate::infrastructure::postgres_adapter::get_club_activity(&state.pool, club_id, limit)
+        .await
+        .map_err(|e| internal_error(e))?;
+    Ok(Json(rows))
+}
+
+async fn get_club_seasons(
+    State(state): State<Arc<AppState>>,
+    _auth: AuthenticatedUser,
+    Path(club_id): Path<Uuid>,
+) -> Result<Json<Vec<crate::infrastructure::postgres_adapter::ClubSeasonRow>>, (StatusCode, Json<ApiErrorResponse>)> {
+    let rows = crate::infrastructure::postgres_adapter::get_club_seasons(&state.pool, club_id)
+        .await
+        .map_err(|e| internal_error(e))?;
+    Ok(Json(rows))
 }

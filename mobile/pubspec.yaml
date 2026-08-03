@@ -15,10 +15,14 @@ dependencies:
   uuid: ^4.3.3
   shared_preferences: ^2.2.3
   sqflite: ^2.3.2
+  sqflite_common_ffi: ^2.3.2
   connectivity_plus: ^6.0.3
   cupertino_icons: ^1.0.6
   google_fonts: ^8.2.0
   flutter_animate: ^4.5.2
+  share_plus: ^13.3.0
+  path_provider: ^2.1.6
+  screenshot: ^3.0.0
 
 dev_dependencies:
   flutter_test:

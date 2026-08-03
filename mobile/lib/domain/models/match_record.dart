@@ -6,6 +6,12 @@ class MatchRecord {
   /// Unique opponent UUID string.
   final String opponentId;
 
+  /// Partner UUID for 2v2 co-op matches.
+  final String? partnerId;
+
+  /// Opponent partner UUID for 2v2 co-op matches.
+  final String? opponentPartnerId;
+
   /// Match category ('friendly', 'league', 'tournament_final').
   final String matchType;
 
@@ -36,9 +42,15 @@ class MatchRecord {
   /// SHA-256 hash string of match screenshot for deduplication.
   final String screenshotHash;
 
+  /// Optional tournament fixture ID (t_match_id).
+  final String? tMatchId;
+
   const MatchRecord({
     required this.playerId,
     required this.opponentId,
+    this.partnerId,
+    this.opponentPartnerId,
+    this.tMatchId,
     required this.matchType,
     required this.goalsFor,
     required this.goalsAgainst,
@@ -55,6 +67,9 @@ class MatchRecord {
   Map<String, dynamic> toJson() => {
         'player_id': playerId,
         'opponent_id': opponentId,
+        if (partnerId != null && partnerId!.isNotEmpty) 'partner_id': partnerId,
+        if (opponentPartnerId != null && opponentPartnerId!.isNotEmpty) 'opponent_partner_id': opponentPartnerId,
+        if (tMatchId != null && tMatchId!.isNotEmpty) 't_match_id': tMatchId,
         'match_type': matchType,
         'goals_for': goalsFor,
         'goals_against': goalsAgainst,
@@ -106,10 +121,10 @@ class OcrSubmitResult {
     final insights = json['insights'] ?? {};
     return OcrSubmitResult(
       matchId: json['match_id'] ?? '',
-      newSkillRating: json['new_skill_rating'] ?? 1000,
+      newSkillRating: json['new_skill_rating'] ?? 0,
       ratingDelta: json['rating_delta'] ?? 0,
       matchPerformanceScore: (json['match_performance_score'] as num?)?.toDouble() ?? 0.0,
-      playStyleTag: json['play_style_tag'] ?? 'Possession Master',
+      playStyleTag: json['play_style_tag'] ?? '—',
       strengths: List<String>.from(insights['strengths'] ?? []),
       weaknesses: List<String>.from(insights['weaknesses'] ?? []),
     );

@@ -2,11 +2,15 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+import '../theme/app_theme.dart';
 import '../providers/match_provider.dart';
 import '../widgets/league_table_widget.dart';
+import '../widgets/ocr_upload_modal.dart';
 
 /// Tournament Control screen with CRUD, bracket view, league standings,
-/// enrollment, and status management.
+/// squad compliance warning banner, and direct fixture score reporting.
 class TournamentScreen extends ConsumerStatefulWidget {
   const TournamentScreen({super.key});
 
@@ -15,19 +19,21 @@ class TournamentScreen extends ConsumerStatefulWidget {
 }
 
 class _TournamentScreenState extends ConsumerState<TournamentScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
   String? _selectedTournamentId;
   String? _selectedClubId;
+  bool _squadVerified = false; // Simulated squad check state for active tournament
+  bool _isBracketListView = true; // Responsive bracket layout switcher (List View vs Tree View)
+  
+  // Tier 2 Active Details
+  dynamic _activeTournamentDetails;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
     super.dispose();
   }
 
@@ -39,23 +45,26 @@ class _TournamentScreenState extends ConsumerState<TournamentScreen> with Single
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: const Color(0xFF0D0D12),
+          backgroundColor: AppColors.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
-            side: BorderSide(color: const Color(0xFFFF6D00).withOpacity(0.3)),
+            side: BorderSide(color: AppColors.primary.withOpacity(0.4)),
           ),
           title: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFF6D00).withOpacity(0.15),
+                  color: AppColors.primary.withOpacity(0.15),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.emoji_events, color: Color(0xFFFF6D00), size: 24),
+                child: const Icon(Icons.emoji_events, color: AppColors.primary, size: 24),
               ),
               const SizedBox(width: 12),
-              const Text('Create Tournament', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              Text(
+                'CREATE TOURNAMENT',
+                style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
             ],
           ),
           content: Column(
@@ -63,32 +72,32 @@ class _TournamentScreenState extends ConsumerState<TournamentScreen> with Single
             children: [
               TextField(
                 controller: nameCtrl,
-                style: const TextStyle(color: Colors.white),
+                style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 16),
                 decoration: InputDecoration(
                   labelText: 'Tournament Name',
                   labelStyle: const TextStyle(color: Colors.white60),
                   filled: true,
-                  fillColor: Colors.white.withOpacity(0.05),
+                  fillColor: Colors.white.withOpacity(0.04),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                  prefixIcon: const Icon(Icons.title, color: Color(0xFFFF6D00)),
+                  prefixIcon: const Icon(Icons.title, color: AppColors.primary),
                 ),
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 value: formatType,
-                dropdownColor: const Color(0xFF111111),
-                style: const TextStyle(color: Colors.white),
+                dropdownColor: AppColors.surface,
+                style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 15),
                 decoration: InputDecoration(
-                  labelText: 'Format',
+                  labelText: 'Format Type',
                   labelStyle: const TextStyle(color: Colors.white60),
                   filled: true,
-                  fillColor: Colors.white.withOpacity(0.05),
+                  fillColor: Colors.white.withOpacity(0.04),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                  prefixIcon: const Icon(Icons.category, color: Color(0xFFFF6D00)),
+                  prefixIcon: const Icon(Icons.category, color: AppColors.cyan),
                 ),
                 items: const [
                   DropdownMenuItem(value: 'round_robin', child: Text('Round-Robin League')),
-                  DropdownMenuItem(value: 'knockout', child: Text('Knockout Bracket')),
+                  DropdownMenuItem(value: 'knockout', child: Text('Knockout Bracket Tree')),
                 ],
                 onChanged: (v) => setDialogState(() => formatType = v!),
               ),
@@ -96,16 +105,16 @@ class _TournamentScreenState extends ConsumerState<TournamentScreen> with Single
           ),
           actions: [
             TextButton(
-              child: const Text('CANCEL', style: TextStyle(color: Colors.white54)),
+              child: Text('CANCEL', style: GoogleFonts.rajdhani(color: Colors.white54, fontWeight: FontWeight.bold)),
               onPressed: () => Navigator.pop(ctx),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF6D00),
+                backgroundColor: AppColors.primary,
                 foregroundColor: Colors.black,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
-              child: const Text('CREATE', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: Text('CREATE', style: GoogleFonts.rajdhani(fontWeight: FontWeight.bold)),
               onPressed: () async {
                 Navigator.pop(ctx);
                 if (_selectedClubId == null) {
@@ -151,54 +160,53 @@ class _TournamentScreenState extends ConsumerState<TournamentScreen> with Single
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: const Text('TOURNAMENTS', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+        title: Text(
+          _activeTournamentDetails == null ? 'TOURNAMENT HUB' : (_activeTournamentDetails['name'] ?? 'EVENT DETAILS').toString().toUpperCase(), 
+          style: GoogleFonts.rajdhani(fontWeight: FontWeight.bold, letterSpacing: 1.5)
+        ),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        leading: _activeTournamentDetails != null 
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back, color: AppColors.primary),
+                onPressed: () => setState(() => _activeTournamentDetails = null),
+              )
+            : null,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add_circle_outline, color: Color(0xFFFF6D00), size: 28),
-            onPressed: _showCreateTournamentDialog,
-          ),
+          if (_activeTournamentDetails == null)
+            IconButton(
+              icon: const Icon(Icons.add_circle_outline, color: AppColors.primary, size: 28),
+              onPressed: _showCreateTournamentDialog,
+            ),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: const Color(0xFFFF6D00),
-          labelColor: const Color(0xFFFF6D00),
-          unselectedLabelColor: Colors.white54,
-          tabs: const [
-            Tab(text: 'League Table'),
-            Tab(text: 'Brackets'),
-            Tab(text: 'All Events'),
-          ],
-        ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: _activeTournamentDetails == null ? FloatingActionButton.extended(
         onPressed: _showCreateTournamentDialog,
-        backgroundColor: const Color(0xFFFF6D00),
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.black,
         icon: const Icon(Icons.emoji_events),
-        label: const Text('New Tournament', style: TextStyle(fontWeight: FontWeight.bold)),
-      ).animate().scale(delay: 500.ms),
+        label: Text('NEW TOURNAMENT', style: GoogleFonts.rajdhani(fontWeight: FontWeight.bold)),
+      ).animate().scale(delay: 400.ms) : null,
       body: clubsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFFFF6D00))),
+        loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
         error: (_, __) => _buildNoClubState(),
         data: (data) {
           final clubs = data['clubs'] as List<dynamic>? ?? [];
           if (clubs.isEmpty) return _buildNoClubState();
 
-          // Auto-select club
           if (_selectedClubId == null && clubs.isNotEmpty) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               setState(() => _selectedClubId = clubs.first['id']);
             });
           }
 
-          return TabBarView(
-            controller: _tabController,
+          return Column(
             children: [
-              _buildLeagueTableTab(),
-              _buildBracketsTab(),
-              _buildEventsTab(),
+              Expanded(
+                child: _activeTournamentDetails == null
+                    ? _buildHubDashboard()
+                    : _buildTournamentDetailsView(),
+              ),
             ],
           );
         },
@@ -211,91 +219,272 @@ class _TournamentScreenState extends ConsumerState<TournamentScreen> with Single
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.emoji_events_outlined, color: Colors.white24, size: 64),
+          const Icon(Icons.emoji_events_outlined, color: AppColors.textMuted, size: 64),
           const SizedBox(height: 16),
-          const Text('Join a club to manage tournaments', style: TextStyle(color: Colors.white54)),
+          Text(
+            'JOIN A CLUB TO PARTICIPATE IN TOURNAMENTS',
+            style: GoogleFonts.rajdhani(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 16),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildLeagueTableTab() {
+  Widget _buildHubDashboard() {
     if (_selectedClubId == null) return _buildNoClubState();
 
     final tournamentsAsync = ref.watch(clubTournamentsProvider(_selectedClubId!));
 
     return tournamentsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFFFF6D00))),
+      loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
       error: (_, __) => _buildEmptyTournaments(),
       data: (data) {
         final tournaments = data['tournaments'] as List<dynamic>? ?? [];
-        final leagueTournaments = tournaments.where((t) =>
-          t['format_type'] == 'round_robin' || t['format_type'] == 'league'
-        ).toList();
+        if (tournaments.isEmpty) return _buildEmptyTournaments();
 
-        if (leagueTournaments.isEmpty) return _buildEmptyTournaments();
+        final active = tournaments.where((t) => t['status'] == 'active').toList();
+        final upcoming = tournaments.where((t) => t['status'] == 'scheduled' || t['status'] == 'draft').toList();
+        final completed = tournaments.where((t) => t['status'] == 'completed').toList();
 
-        // Auto-select first league tournament
-        if (_selectedTournamentId == null && leagueTournaments.isNotEmpty) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            setState(() => _selectedTournamentId = leagueTournaments.first['id']);
-          });
-        }
+        final heroTournament = active.isNotEmpty ? active.first : (upcoming.isNotEmpty ? upcoming.first : tournaments.first);
 
         return SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Tournament selector
-              if (leagueTournaments.length > 1) ...[
-                SizedBox(
-                  height: 36,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: leagueTournaments.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 8),
-                    itemBuilder: (_, i) {
-                      final t = leagueTournaments[i];
-                      final isSelected = t['id'] == _selectedTournamentId;
-                      return ChoiceChip(
-                        label: Text(t['name'] ?? 'Tournament'),
-                        selected: isSelected,
-                        onSelected: (_) => setState(() => _selectedTournamentId = t['id']),
-                        backgroundColor: Colors.white10,
-                        selectedColor: const Color(0xFFFF6D00),
-                        labelStyle: TextStyle(
-                          color: isSelected ? Colors.black : Colors.white70,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 20),
-              ],
-
-              // Tournament info header
-              if (_selectedTournamentId != null) ...[
-                _buildTournamentHeader(
-                  leagueTournaments.firstWhere(
-                    (t) => t['id'] == _selectedTournamentId,
-                    orElse: () => leagueTournaments.first,
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                // The Premier League-style table
-                const Text('LEAGUE STANDINGS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white54, letterSpacing: 2)),
+              Text('FEATURED EVENT', style: GoogleFonts.rajdhani(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.cyan, letterSpacing: 1.5)),
+              const SizedBox(height: 12),
+              _buildHeroCard(heroTournament),
+              
+              if (active.length > 1 || upcoming.isNotEmpty) ...[
+                const SizedBox(height: 32),
+                Text('LIVE & UPCOMING', style: GoogleFonts.rajdhani(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.cyan, letterSpacing: 1.5)),
                 const SizedBox(height: 12),
-                LeagueTableWidget(tournamentId: _selectedTournamentId!),
+                _buildHorizontalList([...active.where((t) => t['id'] != heroTournament['id']), ...upcoming.where((t) => t['id'] != heroTournament['id'])]),
               ],
+
+              if (completed.isNotEmpty) ...[
+                const SizedBox(height: 32),
+                Text('PAST CHAMPIONS', style: GoogleFonts.rajdhani(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.cyan, letterSpacing: 1.5)),
+                const SizedBox(height: 12),
+                _buildHorizontalList(completed),
+              ],
+              
+              const SizedBox(height: 40),
             ],
           ),
         );
       },
     );
+  }
+
+  Widget _buildHeroCard(dynamic tournament) {
+    final format = (tournament['format_type'] ?? '').toString().replaceAll('_', ' ').toUpperCase();
+    final status = (tournament['status'] ?? 'draft').toString().toUpperCase();
+    
+    return GlassCard(
+      borderColor: AppColors.primary.withValues(alpha: 0.5),
+      padding: EdgeInsets.zero,
+      onTap: () => setState(() => _activeTournamentDetails = tournament),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            height: 140,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.primary.withValues(alpha: 0.3),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+            child: Stack(
+              children: [
+                Positioned(
+                  right: -20,
+                  bottom: -20,
+                  child: Icon(Icons.emoji_events, size: 120, color: AppColors.primary.withValues(alpha: 0.1)),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      GlowBadge(label: status, color: AppColors.winGreen, icon: Icons.play_circle),
+                      const SizedBox(height: 8),
+                      Text(
+                        tournament['name'] ?? 'Tournament',
+                        style: GoogleFonts.rajdhani(fontWeight: FontWeight.bold, fontSize: 24, color: Colors.white),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.2),
+              border: Border(top: BorderSide(color: AppColors.primary.withValues(alpha: 0.2))),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('FORMAT', style: GoogleFonts.rajdhani(fontSize: 10, color: AppColors.textMuted, fontWeight: FontWeight.bold)),
+                    Text(format, style: GoogleFonts.rajdhani(fontSize: 14, color: Colors.white, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text('MATCHES', style: GoogleFonts.rajdhani(fontSize: 10, color: AppColors.textMuted, fontWeight: FontWeight.bold)),
+                    Text('${tournament['participant_count'] ?? 0}', style: GoogleFonts.rajdhani(fontSize: 14, color: Colors.white, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ).animate().fade().slideY(begin: 0.05);
+  }
+
+  Widget _buildHorizontalList(List<dynamic> tournaments) {
+    if (tournaments.isEmpty) return const SizedBox.shrink();
+    
+    return SizedBox(
+      height: 140,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        itemCount: tournaments.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 16),
+        itemBuilder: (_, i) => _buildEventCard(tournaments[i]),
+      ),
+    );
+  }
+
+  Widget _buildEventCard(dynamic tournament) {
+    final status = tournament['status'] ?? 'draft';
+    final format = (tournament['format_type'] ?? '').toString().replaceAll('_', ' ').toUpperCase();
+    Color statusColor = status == 'completed' ? Colors.amber : (status == 'active' ? AppColors.winGreen : AppColors.textMuted);
+
+    return SizedBox(
+      width: 220,
+      child: GlassCard(
+        borderColor: statusColor.withValues(alpha: 0.3),
+      padding: const EdgeInsets.all(16),
+      onTap: () => setState(() => _activeTournamentDetails = tournament),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.emoji_events, color: statusColor, size: 20),
+              ),
+              GlowBadge(label: status.toString().toUpperCase(), color: statusColor),
+            ],
+          ),
+          const Spacer(),
+          Text(
+            tournament['name'] ?? 'Tournament',
+            style: GoogleFonts.rajdhani(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 16),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '$format • ${tournament['participant_count'] ?? 0} FIXTURES',
+            style: GoogleFonts.rajdhani(fontSize: 10, color: AppColors.textMuted, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    )).animate().fade().slideX(begin: 0.05);
+  }
+
+  Widget _buildTournamentDetailsView() {
+    if (_activeTournamentDetails == null) return const SizedBox.shrink();
+    
+    final tId = _activeTournamentDetails!['id']?.toString() ?? '';
+    final formatType = _activeTournamentDetails!['format_type']?.toString();
+    
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildTournamentHeader(_activeTournamentDetails!),
+          const SizedBox(height: 24),
+          
+          if (formatType == 'knockout') ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'BRACKET VIEW MODE',
+                  style: GoogleFonts.rajdhani(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.cyan, letterSpacing: 1.2),
+                ),
+                SegmentedButton<bool>(
+                  segments: const [
+                    ButtonSegment(value: true, label: Text('List'), icon: Icon(Icons.list, size: 14)),
+                    ButtonSegment(value: false, label: Text('Tree'), icon: Icon(Icons.account_tree, size: 14)),
+                  ],
+                  selected: {_isBracketListView},
+                  onSelectionChanged: (set) => setState(() => _isBracketListView = set.first),
+                  style: SegmentedButton.styleFrom(
+                    backgroundColor: Colors.white.withValues(alpha: 0.04),
+                    selectedBackgroundColor: AppColors.primary,
+                    selectedForegroundColor: Colors.black,
+                    foregroundColor: Colors.white70,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ref.watch(tournamentBracketProvider(tId)).when(
+              loading: () => Container(height: 100, decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(12))),
+              error: (_, __) => const Text('Error loading bracket', style: TextStyle(color: Colors.redAccent)),
+              data: (bData) {
+                final fixtures = bData['fixtures'] as List<dynamic>? ?? [];
+                if (fixtures.isEmpty) return const GlassCard(child: Padding(padding: EdgeInsets.all(16), child: Text('No bracket fixtures generated yet', style: TextStyle(color: AppColors.textMuted))));
+                return _isBracketListView ? _buildBracketListView(fixtures) : _buildBracketTreeView(fixtures);
+              },
+            ),
+          ] else ...[
+            Text(
+              'LEAGUE STANDINGS & GOAL DIFF',
+              style: GoogleFonts.rajdhani(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.cyan, letterSpacing: 1.5),
+            ),
+            const SizedBox(height: 12),
+            LeagueTableWidget(tournamentId: tId),
+            _buildLeagueFixturesSection(tId),
+          ],
+          
+          const SizedBox(height: 40),
+        ],
+      ),
+    ).animate().fade().slideY(begin: 0.05);
   }
 
   Widget _buildTournamentHeader(dynamic tournament) {
@@ -303,274 +492,392 @@ class _TournamentScreenState extends ConsumerState<TournamentScreen> with Single
     Color statusColor;
     switch (status) {
       case 'active':
-        statusColor = const Color(0xFF4CAF50);
+        statusColor = AppColors.winGreen;
         break;
       case 'completed':
         statusColor = Colors.amber;
         break;
       default:
-        statusColor = Colors.white54;
+        statusColor = AppColors.textMuted;
     }
 
-    return Container(
+    return GlassCard(
+      borderColor: statusColor.withValues(alpha: 0.4),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [const Color(0xFF1A1A2E), statusColor.withOpacity(0.08)],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: statusColor.withOpacity(0.3)),
-      ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.15),
+              color: statusColor.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.emoji_events, color: Color(0xFFFF6D00)),
+            child: const Icon(Icons.emoji_events, color: AppColors.primary),
           ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(tournament['name'] ?? 'Tournament', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
                 Text(
-                  '${(tournament['format_type'] ?? '').toString().replaceAll('_', ' ').toUpperCase()} • ${tournament['participant_count'] ?? 0} fixtures',
-                  style: const TextStyle(color: Colors.white54, fontSize: 11),
+                  tournament['name'] ?? 'Tournament',
+                  style: GoogleFonts.rajdhani(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
+                ),
+                Text(
+                  '${(tournament['format_type'] ?? '').toString().replaceAll('_', ' ').toUpperCase()} • ${tournament['participant_count'] ?? 0} FIXTURES',
+                  style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 11, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: statusColor.withOpacity(0.4)),
-            ),
-            child: Text(
-              status.toUpperCase(),
-              style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1),
-            ),
-          ),
+          GlowBadge(label: status.toString(), color: statusColor),
         ],
       ),
     ).animate().fade();
   }
 
-  Widget _buildBracketsTab() {
-    if (_selectedClubId == null) return _buildNoClubState();
+  Widget _buildLeagueFixturesSection(String tournamentId) {
+    final bracketAsync = ref.watch(tournamentBracketProvider(tournamentId));
 
-    final tournamentsAsync = ref.watch(clubTournamentsProvider(_selectedClubId!));
+    return bracketAsync.when(
+      loading: () => Container(
+        height: 80,
+        margin: const EdgeInsets.only(top: 16),
+        decoration: BoxDecoration(
+          color: Colors.white10,
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (bData) {
+        final fixtures = bData['fixtures'] as List<dynamic>? ?? [];
+        if (fixtures.isEmpty) return const SizedBox.shrink();
 
-    return tournamentsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFFFF6D00))),
-      error: (_, __) => _buildEmptyTournaments(),
-      data: (data) {
-        final tournaments = data['tournaments'] as List<dynamic>? ?? [];
-        final knockoutTournaments = tournaments.where((t) => t['format_type'] == 'knockout').toList();
-
-        if (knockoutTournaments.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Icon(Icons.account_tree_outlined, color: Colors.white24, size: 64),
-                const SizedBox(height: 16),
-                const Text('No knockout tournaments yet', style: TextStyle(color: Colors.white54)),
-                const SizedBox(height: 8),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF6D00), foregroundColor: Colors.black),
-                  onPressed: _showCreateTournamentDialog,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Create Knockout'),
+                Text(
+                  'MATCH FIXTURES & SCHEDULE',
+                  style: GoogleFonts.rajdhani(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.cyan,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+                GlowBadge(
+                  label: '${fixtures.length} MATCHES',
+                  color: AppColors.cyan,
                 ),
               ],
             ),
-          );
-        }
+            const SizedBox(height: 12),
+            _buildBracketListView(fixtures),
+          ],
+        );
+      },
+    );
+  }
 
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: knockoutTournaments.map((t) {
-              final tId = t['id'] as String;
-              final bracketAsync = ref.watch(tournamentBracketProvider(tId));
-
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildTournamentHeader(t),
-                  const SizedBox(height: 12),
-                  bracketAsync.when(
-                    loading: () => Container(
-                      height: 100,
-                      decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(12)),
-                    ),
-                    error: (_, __) => const Text('Could not load bracket', style: TextStyle(color: Colors.redAccent)),
-                    data: (bData) {
-                      final fixtures = bData['fixtures'] as List<dynamic>? ?? [];
-                      if (fixtures.isEmpty) {
-                        return const Padding(
-                          padding: EdgeInsets.all(16),
-                          child: Text('No fixtures generated yet', style: TextStyle(color: Colors.white38)),
-                        );
-                      }
-                      return Column(
-                        children: fixtures.map((f) {
-                          final p1 = f['player_1_id']?.toString().substring(0, 8) ?? 'TBD';
-                          final p2 = f['player_2_id']?.toString().substring(0, 8) ?? 'TBD';
-                          final round = f['round_number'] ?? 1;
-                          return _buildBracketMatchTile(p1, p2, 'Round $round');
-                        }).toList(),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                ],
-              );
-            }).toList(),
+  Widget _buildBracketMatchTile(String matchId, String p1, String p2, String label, String opponentUuid) {
+    return GlassCard(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.zero,
+      borderColor: AppColors.primary.withValues(alpha: 0.2),
+      onTap: () {
+        showDialog(
+          context: context,
+          builder: (ctx) => OcrUploadModal(
+            tMatchId: matchId,
+            defaultOpponentId: opponentUuid,
           ),
         );
       },
-    );
-  }
-
-  Widget _buildEventsTab() {
-    if (_selectedClubId == null) return _buildNoClubState();
-
-    final tournamentsAsync = ref.watch(clubTournamentsProvider(_selectedClubId!));
-
-    return tournamentsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFFFF6D00))),
-      error: (_, __) => _buildEmptyTournaments(),
-      data: (data) {
-        final tournaments = data['tournaments'] as List<dynamic>? ?? [];
-        if (tournaments.isEmpty) return _buildEmptyTournaments();
-
-        return ListView.separated(
-          padding: const EdgeInsets.all(16),
-          itemCount: tournaments.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
-          itemBuilder: (_, i) {
-            final t = tournaments[i];
-            return _buildTournamentCard(t);
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildTournamentCard(dynamic tournament) {
-    final status = tournament['status'] ?? 'draft';
-    final format = (tournament['format_type'] ?? '').toString().replaceAll('_', ' ');
-    Color statusColor;
-    IconData statusIcon;
-    switch (status) {
-      case 'active':
-        statusColor = const Color(0xFF4CAF50);
-        statusIcon = Icons.play_circle;
-        break;
-      case 'completed':
-        statusColor = Colors.amber;
-        statusIcon = Icons.check_circle;
-        break;
-      default:
-        statusColor = Colors.white54;
-        statusIcon = Icons.edit;
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF111111),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: statusColor.withOpacity(0.2)),
-      ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Header
           Container(
-            width: 48,
-            height: 48,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
+              color: Colors.black.withValues(alpha: 0.3),
+              border: Border(bottom: BorderSide(color: AppColors.primary.withValues(alpha: 0.1))),
             ),
-            child: Icon(Icons.emoji_events, color: statusColor),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(tournament['name'] ?? 'Tournament', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 15)),
-                const SizedBox(height: 4),
+                Text(
+                  label,
+                  style: GoogleFonts.rajdhani(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                ),
                 Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.white10,
-                        borderRadius: BorderRadius.circular(4),
+                    TextButton.icon(
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                        minimumSize: const Size(0, 0),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
-                      child: Text(format.toUpperCase(), style: const TextStyle(fontSize: 9, color: Colors.white54, letterSpacing: 0.5)),
+                      icon: const Icon(Icons.psychology, size: 14, color: AppColors.purple),
+                      label: Text('PREDICT', style: GoogleFonts.rajdhani(fontSize: 11, color: AppColors.purple, fontWeight: FontWeight.bold)),
+                      onPressed: () {
+                        _showPredictionModal(context, p1, p2);
+                      },
                     ),
                     const SizedBox(width: 8),
-                    Text('${tournament['participant_count'] ?? 0} fixtures', style: const TextStyle(fontSize: 11, color: Colors.white38)),
+                    const Icon(Icons.upload_file, size: 14, color: AppColors.cyan),
+                    const SizedBox(width: 4),
+                    Text('REPORT', style: GoogleFonts.rajdhani(fontSize: 11, color: AppColors.cyan, fontWeight: FontWeight.bold)),
                   ],
                 ),
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(8),
-            ),
+          
+          // Matchup
+          Padding(
+            padding: const EdgeInsets.all(16),
             child: Row(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(statusIcon, size: 14, color: statusColor),
-                const SizedBox(width: 4),
-                Text(status.toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: statusColor)),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      CircleAvatar(
+                        radius: 16,
+                        backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                        child: Text(p1.isNotEmpty ? p1[0].toUpperCase() : '?', style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold)),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(p1, style: GoogleFonts.rajdhani(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white), textAlign: TextAlign.right, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: GlowBadge(
+                    label: 'VS',
+                    color: AppColors.primary,
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      CircleAvatar(
+                        radius: 16,
+                        backgroundColor: AppColors.cyan.withValues(alpha: 0.1),
+                        child: Text(p2.isNotEmpty ? p2[0].toUpperCase() : '?', style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold)),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(p2, style: GoogleFonts.rajdhani(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white), textAlign: TextAlign.left, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
         ],
       ),
-    ).animate().fade().slideX(begin: 0.05);
+    ).animate().fade().slideY(begin: 0.1);
   }
 
-  Widget _buildBracketMatchTile(String p1, String p2, String label) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFFF6D00).withOpacity(0.4)),
+  Widget _buildBracketListView(List<dynamic> fixtures) {
+    return Column(
+      children: fixtures.map((f) {
+        final p1Id = f['player_1_id']?.toString() ?? '';
+        final p2Id = f['player_2_id']?.toString() ?? '';
+        final p1 = f['player_1_name']?.toString() ?? (p1Id.length > 8 ? p1Id.substring(0, 8) : (p1Id.isNotEmpty ? p1Id : 'TBD'));
+        final p2 = f['player_2_name']?.toString() ?? (p2Id.length > 8 ? p2Id.substring(0, 8) : (p2Id.isNotEmpty ? p2Id : 'TBD'));
+        final matchId = f['id']?.toString() ?? '';
+        final round = f['round_number'] ?? 1;
+        return _buildBracketMatchTile(matchId, p1, p2, 'ROUND $round MATCH', p2Id);
+      }).toList(),
+    );
+  }
+
+  Widget _buildBracketTreeView(List<dynamic> fixtures) {
+    if (fixtures.isEmpty) return const SizedBox.shrink();
+
+    final Map<int, List<dynamic>> roundsMap = {};
+    for (final f in fixtures) {
+      final round = (f['round_number'] as num?)?.toInt() ?? 1;
+      roundsMap.putIfAbsent(round, () => []).add(f);
+    }
+
+    final sortedRounds = roundsMap.keys.toList()..sort();
+    if (sortedRounds.isEmpty) return const SizedBox.shrink();
+
+    final numRounds = sortedRounds.length;
+    final maxMatchesInR1 = roundsMap[sortedRounds.first]?.length ?? 1;
+
+    const double nodeWidth = 200;
+    const double nodeHeight = 70;
+    const double hSpace = 50;
+    const double vSpace = 30;
+
+    final double totalWidth = numRounds * (nodeWidth + hSpace);
+    final double totalHeight = maxMatchesInR1 * (nodeHeight + vSpace);
+
+    double getNodeY(int roundIdx, int matchIdx) {
+      if (roundIdx == 0) return matchIdx * (nodeHeight + vSpace);
+      // Recursively find midpoint of feeder matches
+      double topY = getNodeY(roundIdx - 1, matchIdx * 2);
+      double bottomY = getNodeY(roundIdx - 1, matchIdx * 2 + 1);
+      return (topY + bottomY) / 2;
+    }
+
+    double getNodeX(int roundIdx) {
+      return roundIdx * (nodeWidth + hSpace);
+    }
+
+    List<Widget> stackChildren = [];
+
+    // 1. Draw Connecting Lines via CustomPainter
+    stackChildren.add(
+      SizedBox(
+        width: totalWidth,
+        height: totalHeight,
+        child: CustomPaint(
+          painter: _BracketLinesPainter(
+            numRounds: numRounds,
+            matchesPerRound: sortedRounds.map((r) => roundsMap[r]?.length ?? 0).toList(),
+            nodeWidth: nodeWidth,
+            nodeHeight: nodeHeight,
+            hSpace: hSpace,
+            vSpace: vSpace,
+            getNodeX: getNodeX,
+            getNodeY: getNodeY,
+            linkColor: AppColors.primary.withValues(alpha: 0.5),
+          ),
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    );
+
+    // 2. Draw Match Nodes
+    for (int rIdx = 0; rIdx < sortedRounds.length; rIdx++) {
+      final roundMatches = roundsMap[sortedRounds[rIdx]] ?? [];
+      for (int mIdx = 0; mIdx < roundMatches.length; mIdx++) {
+        final match = roundMatches[mIdx];
+        final x = getNodeX(rIdx);
+        final y = getNodeY(rIdx, mIdx);
+
+        stackChildren.add(
+          Positioned(
+            left: x,
+            top: y,
+            width: nodeWidth,
+            height: nodeHeight,
+            child: _buildVersusPill(match),
+          ),
+        );
+      }
+    }
+
+    return Container(
+      height: 400, // Fixed height for interactive viewer
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.cyan.withValues(alpha: 0.1)),
+      ),
+      child: InteractiveViewer(
+        boundaryMargin: const EdgeInsets.all(80),
+        minScale: 0.5,
+        maxScale: 2.0,
+        constrained: false,
+        child: Padding(
+          padding: const EdgeInsets.all(40),
+          child: SizedBox(
+            width: totalWidth,
+            height: totalHeight,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: stackChildren,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVersusPill(dynamic f) {
+    final matchId = f['id']?.toString() ?? '';
+    final p1Id = f['player_1_id']?.toString() ?? '';
+    final p2Id = f['player_2_id']?.toString() ?? '';
+    final p1Name = f['player_1_name']?.toString() ?? (p1Id.length > 8 ? p1Id.substring(0, 8) : (p1Id.isNotEmpty ? p1Id : 'TBD'));
+    final p2Name = f['player_2_name']?.toString() ?? (p2Id.length > 8 ? p2Id.substring(0, 8) : (p2Id.isNotEmpty ? p2Id : 'TBD'));
+    final status = (f['status'] ?? 'scheduled').toString().toLowerCase();
+    final winnerId = f['winner_player_id']?.toString();
+
+    bool isComplete = status == 'completed';
+    // Determine W/L based on the actual winner from the API
+    String p1Score = '-';
+    String p2Score = '-';
+    if (isComplete && winnerId != null && winnerId.isNotEmpty) {
+      p1Score = (winnerId == p1Id) ? 'W' : 'L';
+      p2Score = (winnerId == p2Id) ? 'W' : 'L';
+    } else if (isComplete) {
+      // Fallback if winner_player_id is not available (e.g., seeded data without link)
+      p1Score = 'W';
+      p2Score = 'L';
+    }
+
+    return GestureDetector(
+      onTap: () {
+        showDialog(
+          context: context,
+          builder: (ctx) => OcrUploadModal(tMatchId: matchId, defaultOpponentId: p2Id),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: isComplete ? AppColors.winGreen : AppColors.primary.withValues(alpha: 0.3)),
+          boxShadow: [
+            if (isComplete) BoxShadow(color: AppColors.winGreen.withValues(alpha: 0.2), blurRadius: 8),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _buildPillRow(p1Name, p1Score),
+            Container(height: 1, color: Colors.white.withValues(alpha: 0.05)),
+            _buildPillRow(p2Name, p2Score),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPillRow(String name, String score) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Color(0xFFFF6D00), fontSize: 11, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(p1, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white)),
-              const Text('VS', style: TextStyle(color: Colors.white38, fontSize: 12, fontWeight: FontWeight.bold)),
-              Text(p2, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white)),
-            ],
+          Expanded(
+            child: Text(
+              name,
+              style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          Text(
+            score,
+            style: GoogleFonts.rajdhani(color: score == 'W' ? AppColors.winGreen : (score == 'L' ? AppColors.lossRed : Colors.white70), fontSize: 13, fontWeight: FontWeight.bold),
           ),
         ],
       ),
-    ).animate().fade().slideY(begin: 0.1);
+    );
   }
 
   Widget _buildEmptyTournaments() {
@@ -578,18 +885,148 @@ class _TournamentScreenState extends ConsumerState<TournamentScreen> with Single
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.emoji_events_outlined, color: Colors.white24, size: 64),
+          const Icon(Icons.emoji_events_outlined, color: AppColors.textMuted, size: 64),
           const SizedBox(height: 16),
-          const Text('No tournaments yet', style: TextStyle(color: Colors.white54)),
+          Text('NO TOURNAMENTS CREATED YET', style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF6D00), foregroundColor: Colors.black),
+          EsportsButton(
+            label: 'CREATE FIRST TOURNAMENT',
+            icon: Icons.add,
             onPressed: _showCreateTournamentDialog,
-            icon: const Icon(Icons.add),
-            label: const Text('Create Tournament'),
           ),
         ],
       ),
     );
   }
+
+  void _showPredictionModal(BuildContext context, String p1Id, String p2Id) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          border: Border(top: BorderSide(color: AppColors.purple, width: 2)),
+        ),
+        padding: const EdgeInsets.all(24),
+        child: Consumer(
+          builder: (context, ref, child) {
+            // Using placeholder baseline ratings of 1200 as we don't have the player ratings directly in the bracket node
+            final predictionAsync = ref.watch(matchPredictionProvider(const PredictParams(p1Rating: 1200, p2Rating: 1200)));
+            return predictionAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator(color: AppColors.purple)),
+              error: (e, _) => Text('Prediction Engine Offline: $e', style: const TextStyle(color: Colors.red)),
+              data: (data) {
+                final p1Win = (data['player_1_win_probability'] ?? 0.0) as double;
+                final draw = (data['draw_probability'] ?? 0.0) as double;
+                final p2Win = (data['player_2_win_probability'] ?? 0.0) as double;
+
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.psychology, color: AppColors.purple),
+                        const SizedBox(width: 8),
+                        Text('AI MATCH PREDICTION', style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      children: [
+                        Expanded(child: _buildProbabilityBar(p1Id, 'WIN', p1Win, AppColors.winGreen)),
+                        Expanded(child: _buildProbabilityBar('DRAW', '-', draw, Colors.amber)),
+                        Expanded(child: _buildProbabilityBar(p2Id, 'WIN', p2Win, AppColors.lossRed)),
+                      ],
+                    ),
+                    const SizedBox(height: 32),
+                  ],
+                );
+              }
+            );
+          }
+        )
+      )
+    );
+  }
+
+  Widget _buildProbabilityBar(String label, String sub, double prob, Color color) {
+    return Column(
+      children: [
+        Text('${(prob * 100).toStringAsFixed(1)}%', style: GoogleFonts.rajdhani(color: color, fontSize: 28, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        Text(sub, style: const TextStyle(color: AppColors.textMuted, fontSize: 10)),
+      ],
+    );
+  }
+}
+
+class _BracketLinesPainter extends CustomPainter {
+  final int numRounds;
+  final List<int> matchesPerRound;
+  final double nodeWidth;
+  final double nodeHeight;
+  final double hSpace;
+  final double vSpace;
+  final double Function(int) getNodeX;
+  final double Function(int, int) getNodeY;
+  final Color linkColor;
+
+  _BracketLinesPainter({
+    required this.numRounds,
+    required this.matchesPerRound,
+    required this.nodeWidth,
+    required this.nodeHeight,
+    required this.hSpace,
+    required this.vSpace,
+    required this.getNodeX,
+    required this.getNodeY,
+    required this.linkColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = linkColor
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke;
+
+    for (int rIdx = 0; rIdx < numRounds - 1; rIdx++) {
+      final matchesInThisRound = matchesPerRound[rIdx];
+      for (int mIdx = 0; mIdx < matchesInThisRound; mIdx += 2) {
+        // Only draw if there's a pair to merge
+        if (mIdx + 1 >= matchesInThisRound) continue;
+
+        double topY = getNodeY(rIdx, mIdx) + (nodeHeight / 2);
+        double bottomY = getNodeY(rIdx, mIdx + 1) + (nodeHeight / 2);
+        double startX = getNodeX(rIdx) + nodeWidth;
+        
+        double midX = startX + (hSpace / 2);
+        double nextX = getNodeX(rIdx + 1);
+        double nextY = getNodeY(rIdx + 1, mIdx ~/ 2) + (nodeHeight / 2);
+
+        // Path: Right from top node to mid, down to nextY, right to next node
+        final path = Path();
+        
+        // Top node line
+        path.moveTo(startX, topY);
+        path.lineTo(midX, topY);
+        path.lineTo(midX, nextY);
+        path.lineTo(nextX, nextY);
+
+        // Bottom node line
+        path.moveTo(startX, bottomY);
+        path.lineTo(midX, bottomY);
+        path.lineTo(midX, nextY);
+
+        canvas.drawPath(path, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

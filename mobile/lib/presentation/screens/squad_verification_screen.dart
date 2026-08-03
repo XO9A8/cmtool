@@ -2,15 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/match_provider.dart';
 
-/// Pre-match squad verification screen to ensure team strength compliance.
-class SquadVerificationScreen extends ConsumerStatefulWidget {
-  const SquadVerificationScreen({super.key});
+import 'package:google_fonts/google_fonts.dart';
+import '../theme/app_theme.dart';
+
+/// Pre-match tournament lobby to ensure team strength compliance before playing.
+class TournamentLobbyScreen extends ConsumerStatefulWidget {
+  const TournamentLobbyScreen({super.key});
 
   @override
-  ConsumerState<SquadVerificationScreen> createState() => _SquadVerificationScreenState();
+  ConsumerState<TournamentLobbyScreen> createState() => _TournamentLobbyScreenState();
 }
 
-class _SquadVerificationScreenState extends ConsumerState<SquadVerificationScreen> {
+class _TournamentLobbyScreenState extends ConsumerState<TournamentLobbyScreen> {
   final _matchIdCtrl = TextEditingController();
   final _teamStrengthCtrl = TextEditingController(text: '2850');
   final _screenshotUrlCtrl = TextEditingController(text: 'https://example.com/squad.png');
@@ -77,10 +80,12 @@ class _SquadVerificationScreenState extends ConsumerState<SquadVerificationScree
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Pre-Match Squad Verification', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-        backgroundColor: Colors.transparent,
+        title: Text('TOURNAMENT LOBBY', style: GoogleFonts.rajdhani(fontWeight: FontWeight.bold, letterSpacing: 1.2, color: Colors.white)),
+        backgroundColor: AppColors.surface,
         elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -91,26 +96,44 @@ class _SquadVerificationScreenState extends ConsumerState<SquadVerificationScree
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFF111111),
+                color: Colors.white.withOpacity(0.04),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.white10),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row(
+                  Row(
                     children: [
-                      Icon(Icons.gavel, color: Color(0xFFFF6D00), size: 20),
-                      SizedBox(width: 8),
-                      Text('Tournament Squad Rule', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      const Icon(Icons.shield, color: AppColors.primary, size: 20),
+                      const SizedBox(width: 8),
+                      Text('Squad Strength Limit', style: GoogleFonts.rajdhani(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Text('Maximum allowed Team Strength: $_maxTeamStrengthLimit',
                       style: const TextStyle(color: Colors.white70, fontSize: 13)),
                   const SizedBox(height: 4),
-                  const Text('Submit your squad details before starting the match to avoid disqualification.',
+                  const Text('Both players must upload and verify their squad before the match can officially begin.',
                       style: TextStyle(color: Colors.white38, fontSize: 11)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            
+            // Opponent Status
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.black26,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.cyan.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.hourglass_empty, color: AppColors.cyan),
+                  const SizedBox(width: 12),
+                  const Text('Waiting for opponent check-in...', style: TextStyle(color: AppColors.cyan, fontSize: 14, fontWeight: FontWeight.bold)),
                 ],
               ),
             ),
@@ -163,7 +186,7 @@ class _SquadVerificationScreenState extends ConsumerState<SquadVerificationScree
               width: double.infinity,
               child: ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFF6D00),
+                  backgroundColor: AppColors.primary,
                   foregroundColor: Colors.black,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -172,8 +195,8 @@ class _SquadVerificationScreenState extends ConsumerState<SquadVerificationScree
                     ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
                     : const Icon(Icons.verified_user),
                 label: Text(
-                  _isSubmitting ? 'VERIFYING...' : 'VERIFY SQUAD RULES',
-                  style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1),
+                  _isSubmitting ? 'VERIFYING...' : 'UPLOAD SQUAD & CHECK-IN',
+                  style: GoogleFonts.rajdhani(fontWeight: FontWeight.bold, letterSpacing: 1, fontSize: 16),
                 ),
                 onPressed: _isSubmitting ? null : _verifySquad,
               ),
@@ -192,17 +215,17 @@ class _SquadVerificationScreenState extends ConsumerState<SquadVerificationScree
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: _isValid
-                      ? const Color(0xFF4CAF50).withOpacity(0.15)
-                      : Colors.redAccent.withOpacity(0.15),
+                      ? AppColors.winGreen.withOpacity(0.15)
+                      : AppColors.lossRed.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                      color: _isValid ? const Color(0xFF4CAF50) : Colors.redAccent),
+                      color: _isValid ? AppColors.winGreen : AppColors.lossRed),
                 ),
                 child: Row(
                   children: [
                     Icon(
                       _isValid ? Icons.check_circle : Icons.cancel,
-                      color: _isValid ? const Color(0xFF4CAF50) : Colors.redAccent,
+                      color: _isValid ? AppColors.winGreen : AppColors.lossRed,
                       size: 28,
                     ),
                     const SizedBox(width: 12),
@@ -211,21 +234,21 @@ class _SquadVerificationScreenState extends ConsumerState<SquadVerificationScree
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            _isValid ? 'SQUAD APPROVED' : 'SQUAD REJECTED',
-                            style: TextStyle(
+                            _isValid ? 'CHECK-IN COMPLETE' : 'SQUAD REJECTED',
+                            style: GoogleFonts.rajdhani(
                               fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              color: _isValid ? const Color(0xFF4CAF50) : Colors.redAccent,
+                              fontSize: 16,
+                              color: _isValid ? AppColors.winGreen : AppColors.lossRed,
                               letterSpacing: 1,
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             _isValid
-                                ? 'Team Strength is compliant. Result recorded.'
+                                ? 'Your squad is compliant. Waiting for opponent...'
                                 : 'Team Strength exceeds the $_maxTeamStrengthLimit limit.',
                             style: TextStyle(
-                              color: _isValid ? const Color(0xFF4CAF50) : Colors.redAccent,
+                              color: _isValid ? AppColors.winGreen : AppColors.lossRed,
                               fontSize: 12,
                             ),
                           ),

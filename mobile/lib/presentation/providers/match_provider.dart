@@ -1,10 +1,10 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../infrastructure/api_client.dart';
 import '../../domain/models/match_record.dart';
-
-
-import 'dart:io';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ApiClient Singleton Provider
@@ -12,7 +12,12 @@ import 'dart:io';
 
 final apiClientProvider = Provider<ApiClient>((ref) {
   final baseUrl = Platform.isAndroid ? 'http://10.0.2.2:3000' : 'http://127.0.0.1:3000';
-  return ApiClient(baseUrl: baseUrl);
+  return ApiClient(
+    baseUrl: baseUrl,
+    onUnauthorized: () {
+      ref.read(authStateProvider.notifier).forceLogout();
+    },
+  );
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -31,8 +36,15 @@ class AuthNotifier extends StateNotifier<String?> {
 
   Future<void> _loadStoredSession() async {
     final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('jwt_token');
     final userId = prefs.getString('user_id');
-    state = userId;
+    if (token != null && token.isNotEmpty && userId != null && userId.isNotEmpty) {
+      state = userId;
+    } else {
+      await prefs.remove('jwt_token');
+      await prefs.remove('user_id');
+      state = null;
+    }
   }
 
   Future<void> login(ApiClient client, String username, String password) async {
@@ -48,6 +60,111 @@ class AuthNotifier extends StateNotifier<String?> {
   Future<void> logout(ApiClient client) async {
     await client.logout();
     state = null;
+  }
+
+  void forceLogout() {
+    state = null;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Profile Preferences Provider
+// ─────────────────────────────────────────────────────────────────────────────
+
+class ProfilePreferences {
+  final String displayName;
+  final String playStyle;
+  final bool isPublic;
+  final String contactEmail;
+  final String preferredFoot;
+
+  const ProfilePreferences({
+    this.displayName = 'Player',
+    this.playStyle = 'Possession Game',
+    this.isPublic = true,
+    this.contactEmail = '',
+    this.preferredFoot = 'Right',
+  });
+
+  ProfilePreferences copyWith({
+    String? displayName,
+    String? playStyle,
+    bool? isPublic,
+    String? contactEmail,
+    String? preferredFoot,
+  }) {
+    return ProfilePreferences(
+      displayName: displayName ?? this.displayName,
+      playStyle: playStyle ?? this.playStyle,
+      isPublic: isPublic ?? this.isPublic,
+      contactEmail: contactEmail ?? this.contactEmail,
+      preferredFoot: preferredFoot ?? this.preferredFoot,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'display_name': displayName,
+        'play_style': playStyle,
+        'is_public': isPublic,
+        'contact_email': contactEmail,
+        'preferred_foot': preferredFoot,
+      };
+
+  factory ProfilePreferences.fromJson(Map<String, dynamic> json) {
+    return ProfilePreferences(
+      displayName: json['display_name']?.toString() ?? 'Player',
+      playStyle: json['play_style']?.toString() ?? 'Possession Game',
+      isPublic: json['is_public'] is bool ? json['is_public'] as bool : true,
+      contactEmail: json['contact_email']?.toString() ?? '',
+      preferredFoot: json['preferred_foot']?.toString() ?? 'Right',
+    );
+  }
+}
+
+final profilePreferencesProvider = StateNotifierProvider<ProfilePreferencesNotifier, ProfilePreferences>((ref) {
+  return ProfilePreferencesNotifier();
+});
+
+class ProfilePreferencesNotifier extends StateNotifier<ProfilePreferences> {
+  static const _storageKey = 'profile_preferences';
+
+  ProfilePreferencesNotifier() : super(const ProfilePreferences()) {
+    _load();
+  }
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_storageKey);
+    if (raw == null || raw.isEmpty) return;
+
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) {
+        state = ProfilePreferences.fromJson(Map<String, dynamic>.from(decoded));
+      }
+    } catch (_) {
+      // Ignore malformed stored preferences and keep the defaults.
+    }
+  }
+
+  Future<void> update({
+    String? displayName,
+    String? playStyle,
+    bool? isPublic,
+    String? contactEmail,
+    String? preferredFoot,
+  }) async {
+    final next = state.copyWith(
+      displayName: displayName,
+      playStyle: playStyle,
+      isPublic: isPublic,
+      contactEmail: contactEmail,
+      preferredFoot: preferredFoot,
+    );
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_storageKey, jsonEncode(next.toJson()));
+    state = next;
   }
 }
 
@@ -79,6 +196,11 @@ final playerProfileProvider = FutureProvider.family<Map<String, dynamic>, String
 final matchHistoryProvider = FutureProvider.family<Map<String, dynamic>, String>((ref, playerId) async {
   final client = ref.watch(apiClientProvider);
   return client.getMatchHistory(playerId);
+});
+
+final playerScheduledMatchesProvider = FutureProvider.family<Map<String, dynamic>, String>((ref, playerId) async {
+  final client = ref.watch(apiClientProvider);
+  return client.getPlayerScheduledMatches(playerId);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -156,6 +278,20 @@ class PredictParams {
     this.p1H2hWins = 0,
     this.p2H2hWins = 0,
   });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PredictParams &&
+          runtimeType == other.runtimeType &&
+          p1Rating == other.p1Rating &&
+          p2Rating == other.p2Rating &&
+          p1H2hWins == other.p1H2hWins &&
+          p2H2hWins == other.p2H2hWins;
+
+  @override
+  int get hashCode =>
+      p1Rating.hashCode ^ p2Rating.hashCode ^ p1H2hWins.hashCode ^ p2H2hWins.hashCode;
 }
 
 final matchPredictionProvider = FutureProvider.family<Map<String, dynamic>, PredictParams>((ref, params) async {
@@ -176,6 +312,17 @@ class H2hParams {
   final String p1Id;
   final String p2Id;
   const H2hParams({required this.p1Id, required this.p2Id});
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is H2hParams &&
+          runtimeType == other.runtimeType &&
+          p1Id == other.p1Id &&
+          p2Id == other.p2Id;
+
+  @override
+  int get hashCode => p1Id.hashCode ^ p2Id.hashCode;
 }
 
 final h2hProvider = FutureProvider.family<Map<String, dynamic>, H2hParams>((ref, params) async {
@@ -223,3 +370,42 @@ final leagueStandingsProvider = FutureProvider.family<Map<String, dynamic>, Stri
   final client = ref.watch(apiClientProvider);
   return client.getLeagueStandings(tournamentId);
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Club Activity Feed Provider
+// ─────────────────────────────────────────────────────────────────────────────
+
+final clubActivityProvider = FutureProvider.family<List<dynamic>, String>((ref, clubId) async {
+  final client = ref.watch(apiClientProvider);
+  return client.getClubActivity(clubId);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Club Seasons Provider
+// ─────────────────────────────────────────────────────────────────────────────
+
+final clubSeasonsProvider = FutureProvider.family<List<dynamic>, String>((ref, clubId) async {
+  final client = ref.watch(apiClientProvider);
+  return client.getClubSeasons(clubId);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Admin Disputes Provider
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Fetches all open match disputes for admin review.
+final adminDisputesProvider = FutureProvider<List<dynamic>>((ref) async {
+  final client = ref.watch(apiClientProvider);
+  return client.getAdminDisputes();
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pending Matches Provider
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Fetches all pending match results requiring verification by the user or official.
+final pendingMatchesProvider = FutureProvider<List<dynamic>>((ref) async {
+  final client = ref.watch(apiClientProvider);
+  return client.getPendingMatches();
+});
+

@@ -38,6 +38,23 @@ CREATE TABLE IF NOT EXISTS Player_Profiles (
     skill_rating INT DEFAULT 1000,
     form_rating NUMERIC(5,2) DEFAULT 50.00,
     play_style VARCHAR(50) DEFAULT 'Unclassified',
+    efootball_game_id VARCHAR(50),
+    preferred_foot VARCHAR(10) DEFAULT 'RIGHT',
+    jersey_number INT DEFAULT 10,
+    system_device VARCHAR(100) DEFAULT 'REDMI NOTE 14 PRO+',
+    facebook VARCHAR(255),
+    blood_group VARCHAR(10) DEFAULT 'O+',
+    district VARCHAR(100) DEFAULT 'DHAKA',
+    date_of_birth DATE DEFAULT '2000-01-01',
+    registrar_joined DATE DEFAULT '2026-07-26',
+    contract_start DATE DEFAULT '2026-07-29',
+    contract_end DATE DEFAULT '2027-01-25',
+    facebook_link VARCHAR(100),
+    email_node VARCHAR(150),
+    phone_line VARCHAR(50),
+    node_state VARCHAR(20) DEFAULT 'ACTIVE',
+    auth_status VARCHAR(20) DEFAULT 'MEMBER',
+    source_feed VARCHAR(100) DEFAULT 'CENTRAL FEDERATION',
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 

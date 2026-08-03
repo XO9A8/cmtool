@@ -21,8 +21,8 @@ The system is designed as a statically typed, ultra-low-cost monolith using Hexa
 Converts temporary eFootball post-match screenshots into a permanent, tamper-resistant digital career.
 
 - **On-Device OCR Extraction**: The Flutter client runs ML Kit to extract match stats (Possession, Passes, Shots on Target, Interceptions, etc.) and packages them into a JSON payload.
-- **OCR Confidence Thresholding**: If ML Kit confidence drops below 85%, the Flutter app presents an interactive bounding-box editing interface for manual verification before sending.
-- **Image Hash Deduplication**: The Flutter client generates a SHA-256 hash of the uploaded screenshot. The backend rejects submissions with duplicate hashes to prevent double-recording matches.
+- **OCR Confidence Thresholding**: If ML Kit confidence drops below 85%, the Flutter app presents a simple text-input correction form with the parsed values, highlighting low-confidence fields in red for easy manual correction before sending.
+- **Logical Match Deduplication**: The backend detects duplicate match submissions by checking for existing records with the exact same `(player_1, player_2, result)` within a 2-hour window. If found, instead of rejecting the second upload, it automatically marks the match as "confirmed" by the opponent.
 - **Validation Gateway**: The Rust backend validates the JSON payload against strict logical rules before saving (e.g., `passes_success` $\le$ `passes_total`, `shots_on_target` $\le$ `shots_total`).
 - **Dual-Player Confirmation Flow**: For tournament or competitive league matches, match uploads enter a `Pending Verification` state until the opponent confirms the result or 24 hours pass without dispute.
 - **Play Style Classifier**: A cron job evaluates a player's last 20 matches. It assigns tags (e.g., "Possession Master" if Average Possession > 60% and Pass Accuracy > 85%).
@@ -54,7 +54,8 @@ $$K = K_{base} \cdot M_{margin} \cdot M_{provisional}$$
 *Co-op (2v2) Elo Calculation*: Team Elo is defined as $R_{team} = \frac{R_{P1} + R_{P2}}{2}$. The resulting rating delta $\Delta R$ is distributed to both team members weighted inversely by their baseline ratings to prevent rating boosting.
 
 #### 2. Match Performance Score (MPS, 0–100)
-Evaluates a single match by comparing extracted stats against the player's historical averages, adjusted for opponent difficulty:
+Evaluates a single match by comparing extracted stats against the player's historical averages, adjusted for opponent difficulty.
+*Note: MPS calculation is disabled for Co-op (2v2) matches, as standard OCR team stats cannot accurately attribute individual possession and passing metrics to a specific player.*
 
 $$\text{MPS} = \min\left(100, \left( w_1 \cdot S_{possession} + w_2 \cdot S_{passing} + w_3 \cdot S_{efficiency} + w_4 \cdot S_{defense} \right) \times C_{opp} \right)$$
 
@@ -78,8 +79,7 @@ An orchestration layer for internal club events and external scrimmages.
 - **Automated Bracket Generator**: Uses the Elo `skill_rating` to seed Knockout tournaments automatically.
 - **Circle Method Scheduler**: Generates balanced fixtures for Round-Robin (League) group stages.
 - **Event-Driven Advancement**: When a player uploads a `Match_Record` linked to an active `t_match_id`, the system automatically advances the Knockout bracket or recalculates `League_Standings`.
-- **Pre-Match Squad Verification**: Screenshot uploads to verify custom squad rules (e.g., Max Team Strength 2900). Automatically checked before allowing fixture submission.
-- **Dispute Resolution Gateway**: Allows players to flag incorrect submissions, placing matches into admin review queue.
+- **Dispute Resolution Gateway**: Allows players to flag incorrect submissions and optionally upload a counter-evidence screenshot. This places the match into an admin review queue featuring a side-by-side dashboard of both claims.
 
 ---
 
@@ -152,16 +152,18 @@ CREATE TABLE Club_Memberships (
     player_id UUID REFERENCES Users(id) ON DELETE CASCADE,
     club_id UUID REFERENCES Clubs(id) ON DELETE CASCADE,
     role VARCHAR(20) DEFAULT 'player', -- 'admin', 'organizer', 'player'
+    skill_rating INT DEFAULT 1000,
+    form_rating NUMERIC(5,2) DEFAULT 50.00,
+    play_style VARCHAR(50) DEFAULT 'Unclassified',
     joined_at TIMESTAMPTZ DEFAULT NOW(),
     PRIMARY KEY (player_id, club_id)
 );
 
--- 3. Player Profiles
+-- 3. Player Profiles (Global Lifetime Stats)
 CREATE TABLE Player_Profiles (
     user_id UUID PRIMARY KEY REFERENCES Users(id) ON DELETE CASCADE,
-    skill_rating INT DEFAULT 1000,
-    form_rating NUMERIC(5,2) DEFAULT 50.00,
-    play_style VARCHAR(50) DEFAULT 'Unclassified',
+    lifetime_matches INT DEFAULT 0,
+    lifetime_wins INT DEFAULT 0,
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -193,6 +195,7 @@ CREATE TABLE T_Matches (
 -- 6. Match Records
 CREATE TABLE Match_Records (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    club_id UUID REFERENCES Clubs(id) ON DELETE CASCADE,
     player_id UUID REFERENCES Users(id) ON DELETE CASCADE,
     opponent_id UUID REFERENCES Users(id) ON DELETE CASCADE,
     partner_id UUID REFERENCES Users(id) ON DELETE SET NULL, -- for 2v2
@@ -247,16 +250,7 @@ CREATE TABLE League_Standings (
     UNIQUE(tournament_id, player_id)
 );
 
--- 9. Squad Verifications
-CREATE TABLE Squad_Verifications (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    t_match_id UUID REFERENCES T_Matches(id) ON DELETE CASCADE,
-    player_id UUID REFERENCES Users(id) ON DELETE CASCADE,
-    team_strength INT NOT NULL,
-    screenshot_url TEXT NOT NULL,
-    is_valid BOOLEAN DEFAULT TRUE,
-    uploaded_at TIMESTAMPTZ DEFAULT NOW()
-);
+
 
 -- 10. Match Disputes
 CREATE TABLE Match_Disputes (
@@ -374,7 +368,7 @@ All API errors return a standard JSON envelope:
 | `POST` | `/api/v1/matches/{id}/confirm` | Dual-player flow: Opponent confirms match result to exit Pending state. |
 | `GET` | `/api/v1/tournaments/{id}/bracket` | Retrieves current bracket structure, fixtures, and standings. |
 | `POST` | `/api/v1/tournaments` | Create a new tournament. |
-| `POST` | `/api/v1/tournaments/{id}/squad-check` | Upload pre-match squad screenshot stats (e.g., Team Strength verification). |
+
 | `GET` | `/api/v1/players/{id}/analytics` | Retrieves MPS breakdown, Form Rating (SMA), and Play Style tags. |
 | `GET` | `/api/v1/leaderboards/{club_id}` | Retrieves club rankings (Elo, Form, Badges). |
 | `POST` | `/api/v1/disputes` | Raise a dispute against a pending or completed match. |

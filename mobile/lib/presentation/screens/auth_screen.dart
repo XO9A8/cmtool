@@ -82,8 +82,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               height: 300,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFF00E5FF).withOpacity(0.15),
-                boxShadow: const [BoxShadow(color: Color(0xFF00E5FF), blurRadius: 100)],
+                color: const Color(0xFF00E5FF).withOpacity(0.10),
+                boxShadow: const [BoxShadow(color: Color(0xFF00E5FF), blurRadius: 60)],
               ),
             ).animate(onPlay: (c) => c.repeat(reverse: true)).scale(duration: 4.seconds, begin: const Offset(0.8, 0.8), end: const Offset(1.2, 1.2)),
           ),
@@ -95,8 +95,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               height: 400,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFFB000FF).withOpacity(0.15),
-                boxShadow: const [BoxShadow(color: Color(0xFFB000FF), blurRadius: 100)],
+                color: const Color(0xFFB000FF).withOpacity(0.10),
+                boxShadow: const [BoxShadow(color: Color(0xFFB000FF), blurRadius: 60)],
               ),
             ).animate(onPlay: (c) => c.repeat(reverse: true)).scale(duration: 5.seconds, begin: const Offset(0.9, 0.9), end: const Offset(1.1, 1.1)),
           ),
@@ -144,7 +144,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   
                   const SizedBox(height: 8),
                   Text(
-                    _isLogin ? 'INITIATE SESSION' : 'REGISTER NEW COMMANDER',
+                    _isLogin ? 'INITIATE SESSION' : 'REGISTER NEW PLAYER',
                     style: const TextStyle(
                       color: Color(0xFF00E5FF),
                       fontSize: 12,
@@ -309,10 +309,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       labelStyle: const TextStyle(color: Colors.white60, fontWeight: FontWeight.w500),
       prefixIcon: Icon(icon, color: const Color(0xFF00E5FF), size: 22),
       filled: true,
-      fillColor: Colors.black.withOpacity(0.2),
+      fillColor: Colors.white.withOpacity(0.05),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+      ),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide.none,
+        borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),

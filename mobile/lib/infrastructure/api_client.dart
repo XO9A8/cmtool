@@ -9,7 +9,9 @@ class ApiClient {
   static const _tokenKey = 'jwt_token';
   static const _userIdKey = 'user_id';
 
-  ApiClient({String baseUrl = 'http://localhost:3000'})
+  final Function()? onUnauthorized;
+
+  ApiClient({String baseUrl = 'http://localhost:3000', this.onUnauthorized})
       : _dio = Dio(BaseOptions(
           baseUrl: baseUrl,
           connectTimeout: const Duration(seconds: 10),
@@ -19,15 +21,50 @@ class ApiClient {
       onRequest: (options, handler) async {
         final prefs = await SharedPreferences.getInstance();
         final token = prefs.getString(_tokenKey);
-        if (token != null) {
+        if (token != null && token.isNotEmpty) {
           options.headers['Authorization'] = 'Bearer $token';
         }
         handler.next(options);
       },
-      onError: (error, handler) {
+      onError: (error, handler) async {
+        if (error.response?.statusCode == 401) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.remove(_tokenKey);
+          await prefs.remove(_userIdKey);
+          onUnauthorized?.call();
+        }
         handler.next(error);
       },
     ));
+  }
+
+  /// Returns a clean, user-friendly error message for API and network exceptions.
+  static String formatErrorMessage(dynamic error) {
+    if (error is DioException) {
+      if (error.response?.statusCode == 401) {
+        return 'Session expired or unauthorized. Please log in again.';
+      }
+      if (error.type == DioExceptionType.connectionTimeout ||
+          error.type == DioExceptionType.receiveTimeout ||
+          error.type == DioExceptionType.connectionError) {
+        return 'Unable to connect to backend server. Check your connection.';
+      }
+      final serverMsg = error.response?.data?['error']?['message'];
+      if (serverMsg != null && serverMsg is String && serverMsg.isNotEmpty) {
+        return serverMsg;
+      }
+    }
+    return error.toString();
+  }
+
+  /// Checks if backend is online and reachable.
+  Future<bool> healthCheck() async {
+    try {
+      final response = await _dio.get('/health');
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -163,6 +200,13 @@ class ApiClient {
     return response.data as Map<String, dynamic>;
   }
 
+  /// Fetches all pending match results requiring verification.
+  Future<List<dynamic>> getPendingMatches() async {
+    final response = await _dio.get('/api/v1/matches/pending');
+    final body = response.data as Map<String, dynamic>;
+    return body['pending_matches'] as List<dynamic>? ?? [];
+  }
+
   /// Queries predicted match win/draw probabilities.
   Future<Map<String, dynamic>> predictMatch({
     required int p1Rating,
@@ -204,6 +248,12 @@ class ApiClient {
       '/api/v1/players/$playerId/matches',
       queryParameters: {'limit': limit, 'offset': offset},
     );
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// Fetches scheduled matches for a player.
+  Future<Map<String, dynamic>> getPlayerScheduledMatches(String playerId) async {
+    final response = await _dio.get('/api/v1/players/$playerId/scheduled-matches');
     return response.data as Map<String, dynamic>;
   }
 
@@ -285,24 +335,6 @@ class ApiClient {
     return response.data as Map<String, dynamic>;
   }
 
-  /// Submits squad screenshot for pre-match strength verification.
-  Future<Map<String, dynamic>> submitSquadCheck({
-    required String tMatchId,
-    required int teamStrength,
-    required String screenshotUrl,
-    int maxStrength = 2900,
-  }) async {
-    final response = await _dio.post(
-      '/api/v1/tournaments/$tMatchId/squad-check',
-      data: {
-        'team_strength': teamStrength,
-        'screenshot_url': screenshotUrl,
-        'max_strength': maxStrength,
-      },
-    );
-    return response.data as Map<String, dynamic>;
-  }
-
   // ─────────────────────────────────────────────────────────────────────────
   // Disputes
   // ─────────────────────────────────────────────────────────────────────────
@@ -315,6 +347,50 @@ class ApiClient {
     final response = await _dio.post('/api/v1/disputes', data: {
       'match_record_id': matchRecordId,
       'reason': reason,
+    });
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// Fetches all open disputes for admin review.
+  Future<List<dynamic>> getAdminDisputes() async {
+    final response = await _dio.get('/api/v1/admin/disputes');
+    final body = response.data as Map<String, dynamic>;
+    return body['disputes'] as List<dynamic>? ?? [];
+  }
+
+  /// Resolves or dismisses a dispute.
+  Future<Map<String, dynamic>> resolveAdminDispute({
+    required String disputeId,
+    required bool dismiss,
+    String? resolutionNotes,
+  }) async {
+    final response = await _dio.post(
+      '/api/v1/admin/disputes/$disputeId/resolve',
+      data: {
+        'dismiss': dismiss,
+        if (resolutionNotes != null) 'resolution_notes': resolutionNotes,
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Activity Feed & Seasons
+  // ─────────────────────────────────────────────────────────────────────────
+
+  Future<List<dynamic>> getClubActivity(String clubId) async {
+    final response = await _dio.get('/api/v1/clubs/$clubId/activity');
+    return response.data as List<dynamic>;
+  }
+
+  Future<List<dynamic>> getClubSeasons(String clubId) async {
+    final response = await _dio.get('/api/v1/clubs/$clubId/seasons');
+    return response.data as List<dynamic>;
+  }
+
+  Future<Map<String, dynamic>> snapshotSeason(String seasonId) async {
+    final response = await _dio.post('/api/v1/seasons/snapshot', data: {
+      'season_id': seasonId,
     });
     return response.data as Map<String, dynamic>;
   }

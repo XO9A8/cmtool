@@ -1,4 +1,9 @@
-import 'package:crypto/crypto.dart';
+import re
+
+with open('lib/presentation/widgets/ocr_upload_modal.dart', 'r') as f:
+    content = f.read()
+
+new_content = """import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -100,7 +105,6 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
       opponentId:        _opponentIdCtrl.text.trim(),
       partnerId:         _is2v2Mode ? _partnerIdCtrl.text.trim() : null,
       opponentPartnerId: _is2v2Mode ? _opponentPartnerIdCtrl.text.trim() : null,
-      tMatchId:          widget.tMatchId,
       matchType:         _selectedMatchType,
       goalsFor:          goalsFor,
       goalsAgainst:      goalsAgainst,
@@ -117,20 +121,12 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
 
     if (!mounted) return;
     final result = ref.read(ocrSubmitProvider);
-    ref.read(ocrSubmitProvider.notifier).reset();
-    ref.invalidate(pendingMatchesProvider);
-    ref.invalidate(matchHistoryProvider(playerId));
-    if (widget.tMatchId != null) {
-      ref.invalidate(tournamentBracketProvider);
-    }
-
-    final nav = Navigator.of(context);
-    nav.pop();
+    Navigator.of(context).pop();
 
     result.when(
       data: (res) {
         if (res == null) return;
-        _showSuccessDialog(context, res);
+        _showSuccessDialog(res);
       },
       loading: () {},
       error: (e, _) => ScaffoldMessenger.of(context).showSnackBar(
@@ -141,10 +137,10 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
       ),
     );
   }
-
-  void _showSuccessDialog(BuildContext dialogContext, dynamic res) {
+  
+  void _showSuccessDialog(dynamic res) {
     showDialog(
-      context: dialogContext,
+      context: context,
       builder: (ctx) => Dialog(
         backgroundColor: Colors.transparent,
         child: GlassCard(
@@ -196,6 +192,7 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
                   ),
                   onPressed: () {
                     Navigator.of(ctx).pop();
+                    ref.read(ocrSubmitProvider.notifier).reset();
                   },
                   child: Text('DONE', style: GoogleFonts.rajdhani(fontWeight: FontWeight.bold, fontSize: 16)),
                 ),
@@ -292,7 +289,7 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
                             ),
                           ],
                         ),
-                      ).animate(onPlay: (controller) => controller.repeat()).shimmer(duration: 2.seconds, color: Colors.amber.withValues(alpha: 0.2)),
+                      ).animate().pulse(duration: 2.seconds),
                       const SizedBox(height: 20),
                     ],
 
@@ -342,7 +339,7 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    _buildStatField(_possessionCtrl, 'POSSESSION %', isLowConfidence, true),
+                    _buildStatField(_possessionCtrl, 'POSSESSION %', isLowConfidence, decimal: true),
                     const SizedBox(height: 12),
                     Row(
                       children: [
@@ -449,3 +446,8 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
     );
   }
 }
+"""
+
+with open('lib/presentation/widgets/ocr_upload_modal.dart', 'w') as f:
+    f.write(new_content)
+print('Redesigned OCR Upload Modal!')

@@ -1,4 +1,9 @@
-import 'package:flutter/material.dart';
+import re
+
+with open('lib/presentation/widgets/league_table_widget.dart', 'r') as f:
+    content = f.read()
+
+new_content = """import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -243,12 +248,10 @@ class LeagueTableWidget extends ConsumerWidget {
   }
 
   Widget _buildSkeleton() {
-    return SizedBox(
+    return GlassCard(
       height: 250,
-      child: GlassCard(
-        padding: EdgeInsets.zero,
-        child: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
-      ),
+      padding: EdgeInsets.zero,
+      child: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
     );
   }
 
@@ -266,3 +269,8 @@ class LeagueTableWidget extends ConsumerWidget {
     );
   }
 }
+"""
+
+with open('lib/presentation/widgets/league_table_widget.dart', 'w') as f:
+    f.write(new_content)
+print('Redesigned LeagueTableWidget!')
