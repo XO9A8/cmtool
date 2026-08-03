@@ -11,6 +11,8 @@ class ApiClient {
 
   final Function()? onUnauthorized;
 
+  String get baseUrl => _dio.options.baseUrl;
+
   ApiClient({String baseUrl = 'http://localhost:3000', this.onUnauthorized})
       : _dio = Dio(BaseOptions(
           baseUrl: baseUrl,
