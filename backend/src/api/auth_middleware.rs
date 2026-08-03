@@ -67,7 +67,10 @@ where
 
         let token = &auth_header[7..];
 
-        let claims = verify_jwt_token(token, JWT_SECRET).map_err(|e| {
+        let jwt_secret = std::env::var("JWT_SECRET")
+            .unwrap_or_else(|_| "default_cmtool_jwt_secret_key_2026".to_string());
+
+        let claims = verify_jwt_token(token, &jwt_secret).map_err(|e| {
             (
                 StatusCode::UNAUTHORIZED,
                 Json(ApiErrorResponse {
