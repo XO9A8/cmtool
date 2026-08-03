@@ -24,3 +24,11 @@ Thumbs.db
 postgres_data/
 *.db
 *.sqlite
+
+# Tooling and Agents
+.agents/
+.graphifyignore
+graphify-out/
+devtools_options.yaml
+**/devtools_options.yaml
+
