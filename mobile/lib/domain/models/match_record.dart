@@ -39,6 +39,14 @@ class MatchRecord {
   /// Defensive interceptions.
   final int interceptions;
 
+  final int fouls;
+  final int offsides;
+  final int corners;
+  final int freeKicks;
+  final int crosses;
+  final int tackles;
+  final int saves;
+
   /// SHA-256 hash string of match screenshot for deduplication.
   final String screenshotHash;
 
@@ -60,6 +68,13 @@ class MatchRecord {
     required this.shotsOnTarget,
     required this.shotsTotal,
     required this.interceptions,
+    this.fouls = 0,
+    this.offsides = 0,
+    this.corners = 0,
+    this.freeKicks = 0,
+    this.crosses = 0,
+    this.tackles = 0,
+    this.saves = 0,
     required this.screenshotHash,
   });
 
@@ -79,6 +94,13 @@ class MatchRecord {
         'shots_on_target': shotsOnTarget,
         'shots_total': shotsTotal,
         'interceptions': interceptions,
+        'fouls': fouls,
+        'offsides': offsides,
+        'corners': corners,
+        'free_kicks': freeKicks,
+        'crosses': crosses,
+        'tackles': tackles,
+        'saves': saves,
         'screenshot_hash': screenshotHash,
       };
 }

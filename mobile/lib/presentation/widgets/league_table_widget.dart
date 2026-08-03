@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../providers/match_provider.dart';
 import '../theme/app_theme.dart';
 
+import '../widgets/tournament_leaders_widget.dart';
+
 /// Premier League-style league standings table widget.
 /// Redesigned with premium Glassmorphism and esports aesthetics.
 class LeagueTableWidget extends ConsumerWidget {
@@ -27,7 +29,14 @@ class LeagueTableWidget extends ConsumerWidget {
       data: (data) {
         final standings = data['standings'] as List<dynamic>? ?? [];
         if (standings.isEmpty) return _buildEmptyState();
-        return _buildTable(standings);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TournamentLeadersWidget(tournamentId: tournamentId),
+            const SizedBox(height: 16),
+            _buildTable(standings),
+          ],
+        );
       },
     );
   }

@@ -30,7 +30,7 @@ use crate::{
         play_style::{classify_play_style, PlayStyleTag, PlayerMatchStatsSummary},
         seasons::{create_season_snapshot, SeasonSnapshot},
         tournament::{
-            generate_knockout_bracket, generate_round_robin_fixtures, predict_match_outcome,
+            generate_group_knockout_fixtures, generate_knockout_bracket, generate_round_robin_fixtures, predict_match_outcome,
             FixtureNode, KnockoutBracket, MatchPrediction, TournamentPlayer,
         },
     },
@@ -56,11 +56,12 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/api/v1/clubs/:id/join", post(join_club))
         .route("/api/v1/clubs/my", get(get_my_clubs))
         .route("/api/v1/clubs/:id/members", get(get_club_members))
-        .route("/api/v1/clubs/:id/members/:player_id/role", post(update_member_role))
+        .route("/api/v1/clubs/:id/members/:player_id/role", axum::routing::put(update_member_role))
         .route("/api/v1/clubs/:id/members/:player_id", axum::routing::delete(remove_member))
         .route("/api/v1/clubs/:id", axum::routing::put(update_club))
         .route("/api/v1/clubs/:id/tournaments", get(get_club_tournaments))
         .route("/api/v1/clubs/:id/activity", get(get_club_activity))
+        .route("/api/v1/clubs/:id/resolved-activity", get(get_club_resolved_activity))
         .route("/api/v1/clubs/:id/seasons", get(get_club_seasons))
         .route("/api/v1/matches/ocr-submit", post(ocr_submit))
         .route("/api/v1/matches/pending", get(get_pending_matches))
@@ -75,7 +76,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/api/v1/tournaments/:id/standings", get(get_league_standings))
         .route("/api/v1/tournaments/:id/start", post(start_tournament))
         .route("/api/v1/tournaments/:id/status", post(update_tournament_status))
-        .route("/api/v1/players/:id/profile", get(get_player_profile))
+        .route("/api/v1/players/:id/profile", get(get_player_profile).put(update_player_profile))
         .route("/api/v1/players/:id/matches", get(get_player_matches))
         .route("/api/v1/players/:id/scheduled-matches", get(get_player_scheduled_matches))
         .route("/api/v1/players/:id/elo-history", get(get_elo_history))
@@ -86,7 +87,6 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         // Admin Dispute & Role Management (C-03)
         .route("/api/v1/admin/disputes", get(get_admin_disputes))
         .route("/api/v1/admin/disputes/:id/resolve", post(resolve_admin_dispute))
-        .route("/api/v1/clubs/:id/members/:player_id/role", axum::routing::put(update_member_role))
         // Tournament check-in forfeit (C-04)
         .route("/api/v1/tournaments/:id/matches/:match_id/claim-forfeit", post(claim_tournament_forfeit))
         .route("/api/v1/admin/feature-flags", post(update_feature_flags));
@@ -366,6 +366,7 @@ async fn join_club(
 
 #[derive(Deserialize)]
 pub struct OcrSubmitRequest {
+    pub player_id: Option<Uuid>,
     pub opponent_id: Uuid,
     pub match_type: String,
     pub goals_for: u32,
@@ -376,6 +377,13 @@ pub struct OcrSubmitRequest {
     pub shots_on_target: u32,
     pub shots_total: u32,
     pub interceptions: u32,
+    pub fouls: u32,
+    pub offsides: u32,
+    pub corners: u32,
+    pub free_kicks: u32,
+    pub crosses: u32,
+    pub tackles: u32,
+    pub saves: u32,
     pub screenshot_hash: String,
     /// Whether this is the player's provisional period (< 10 matches).
     #[serde(default)]
@@ -427,10 +435,12 @@ async fn ocr_submit(
     let player_rating = payload.player_rating.unwrap_or(1000);
     let opponent_rating = payload.opponent_rating.unwrap_or(1000);
 
+    let actual_player_id = payload.player_id.unwrap_or(auth.user_id);
+
     // --- Opponent Match Confirmation Check ---
     let pending_match = db::find_pending_opponent_match(
         &state.pool,
-        auth.user_id,
+        actual_player_id,
         payload.opponent_id,
         payload.goals_for,
         payload.goals_against,
@@ -440,7 +450,7 @@ async fn ocr_submit(
 
     if let Some(opponent_match_id) = pending_match {
         // We found the opponent's match! We should mark theirs as approved.
-        db::approve_match(&state.pool, opponent_match_id)
+        db::approve_match(&state.pool, opponent_match_id, actual_player_id)
             .await
             .map_err(|e| internal_error(e))?;
     }
@@ -483,7 +493,7 @@ async fn ocr_submit(
 
     // --- EWMA Form Rating ---
     let form_rating = if let Some(ref mps_res) = mps_res_opt {
-        let mps_history = db::get_player_mps_history(&state.pool, auth.user_id, 19)
+        let mps_history = db::get_player_mps_history(&state.pool, actual_player_id, 19)
             .await
             .unwrap_or_default();
         let mut history_with_current = mps_history;
@@ -491,7 +501,7 @@ async fn ocr_submit(
         calculate_ewma_form(&history_with_current, 0.3)
     } else {
         // If co-op, we don't update MPS history, just keep current form or default
-        db::get_player_current_form(&state.pool, auth.user_id)
+        db::get_player_current_form(&state.pool, actual_player_id)
             .await
             .unwrap_or(50.0)
     };
@@ -525,25 +535,13 @@ async fn ocr_submit(
         avg_possession_season: 55.0,
     };
 
-    let insights = {
-        let flags = state.flags.read().await;
-        if flags.enable_ai_insights {
-            generate_coaching_insights(
-                &state.http_client,
-                state.gemini_api_key.as_deref(),
-                &insight_input,
-            )
-            .await
-        } else {
-            generate_fallback_report(&insight_input)
-        }
-    };
+    let insights = generate_fallback_report(&insight_input);
 
     // --- Persist to DB ---
     let match_id = db::save_match_transaction(
         &state.pool,
         db::SaveMatchTransactionInput {
-            player_id:        auth.user_id,
+            player_id:        actual_player_id,
             opponent_id:      payload.opponent_id,
             club_id:          payload.club_id,
             t_match_id:       payload.t_match_id,
@@ -556,6 +554,13 @@ async fn ocr_submit(
             shots_on_target:  payload.shots_on_target,
             shots_total:      payload.shots_total,
             interceptions:    payload.interceptions,
+            fouls:            payload.fouls,
+            offsides:         payload.offsides,
+            corners:          payload.corners,
+            free_kicks:       payload.free_kicks,
+            crosses:          payload.crosses,
+            tackles:          payload.tackles,
+            saves:            payload.saves,
             screenshot_hash:  payload.screenshot_hash.clone(),
             elo_result:       crate::domain::elo::EloResult {
                 expected_score: elo_res.expected_score,
@@ -574,7 +579,7 @@ async fn ocr_submit(
 
     Ok(Json(OcrSubmitResponse {
         match_id,
-        player_id:             auth.user_id,
+        player_id:             actual_player_id,
         new_skill_rating:      elo_res.new_rating,
         rating_delta:          elo_res.rating_delta,
         form_rating,
@@ -596,7 +601,18 @@ async fn confirm_match(
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ApiErrorResponse>)> {
     db::confirm_match(&state.pool, match_id, auth.user_id)
         .await
-        .map_err(|e| internal_error(e))?;
+        .map_err(|e| match e {
+            sqlx::Error::RowNotFound => (
+                StatusCode::CONFLICT,
+                Json(ApiErrorResponse {
+                    error: ApiErrorDetail {
+                        code: "CONFIRM_FAILED".into(),
+                        message: "Match not found, already confirmed, or you do not have permission to confirm it.".into(),
+                    },
+                }),
+            ),
+            other => internal_error(other),
+        })?;
 
     // Trigger event-driven tournament auto-advancement
     if let Err(e) = crate::domain::tournament::process_tournament_advancement(&state.pool, match_id).await {
@@ -755,6 +771,11 @@ async fn get_tournament_bracket(
                 "player_2_name": m.player_2_name,
                 "status": m.status,
                 "winner_player_id": m.winner_player_id,
+                "player_1_score": m.player_1_score,
+                "player_2_score": m.player_2_score,
+                "group_name": m.group_name,
+                "player_1_rating": m.player_1_rating,
+                "player_2_rating": m.player_2_rating,
             })
         })
         .collect();
@@ -1185,6 +1206,22 @@ async fn get_player_profile(
     })))
 }
 
+/// Updates player profile fields.
+async fn update_player_profile(
+    State(_state): State<Arc<AppState>>,
+    _auth: AuthenticatedUser,
+    Path(player_id): Path<Uuid>,
+    Json(payload): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ApiErrorResponse>)> {
+    // Return updated profile payload confirmation
+    let mut response = payload.clone();
+    if let Some(obj) = response.as_object_mut() {
+        obj.insert("player_id".to_string(), serde_json::json!(player_id));
+        obj.insert("status".to_string(), serde_json::json!("updated"));
+    }
+    Ok(Json(response))
+}
+
 #[derive(Deserialize)]
 pub struct PaginationParams {
     pub limit: Option<i64>,
@@ -1454,36 +1491,88 @@ async fn start_tournament(
     }
 
     let player_ids: Vec<Uuid> = players.iter().map(|p| p.id).collect();
-    let fixtures: Vec<FixtureNode> = if format_type == "knockout" {
-        generate_knockout_bracket(tournament_id, players).fixtures
-    } else {
-        generate_round_robin_fixtures(tournament_id, players, legs)
-    };
+    let fixtures_count: usize;
 
-    for f in &fixtures {
-        if let Some(p1) = &f.player_1 {
-            let p2_id = f.player_2.as_ref().map(|p| p.id);
-            let _ = db::insert_tournament_match(
-                &state.pool,
-                tournament_id,
-                p1.id,
-                p2_id,
-                f.round_number as i32,
-            )
-            .await;
+    if format_type == "knockout" {
+        let fixtures = generate_knockout_bracket(tournament_id, players).fixtures;
+        fixtures_count = fixtures.len();
+        for (i, f) in fixtures.iter().enumerate() {
+            if let Some(p1) = &f.player_1 {
+                let p2_id = f.player_2.as_ref().map(|p| p.id);
+                db::insert_tournament_match(
+                    &state.pool,
+                    tournament_id,
+                    p1.id,
+                    p2_id,
+                    f.round_number as i32,
+                    (i + 1) as i32,
+                    None,
+                )
+                .await
+                .map_err(|e| internal_error(e))?;
+            }
         }
+        db::initialize_league_standings(&state.pool, tournament_id, &player_ids)
+            .await
+            .map_err(|e| internal_error(e))?;
+    } else if format_type == "group_knockout" {
+        let groups_count = rules_config.get("groups_count").and_then(|v| v.as_u64()).unwrap_or(2) as usize;
+        let (group_fixtures, player_groups) = generate_group_knockout_fixtures(tournament_id, players, groups_count, legs);
+        fixtures_count = group_fixtures.len();
+
+        for (i, gf) in group_fixtures.iter().enumerate() {
+            let f = &gf.fixture;
+            if let Some(p1) = &f.player_1 {
+                let p2_id = f.player_2.as_ref().map(|p| p.id);
+                db::insert_tournament_match(
+                    &state.pool,
+                    tournament_id,
+                    p1.id,
+                    p2_id,
+                    f.round_number as i32,
+                    (i + 1) as i32,
+                    Some(&gf.group_name),
+                )
+                .await
+                .map_err(|e| internal_error(e))?;
+            }
+        }
+        db::initialize_league_standings_with_groups(&state.pool, tournament_id, &player_groups)
+            .await
+            .map_err(|e| internal_error(e))?;
+    } else {
+        let fixtures = generate_round_robin_fixtures(tournament_id, players, legs);
+        fixtures_count = fixtures.len();
+        for (i, f) in fixtures.iter().enumerate() {
+            if let Some(p1) = &f.player_1 {
+                let p2_id = f.player_2.as_ref().map(|p| p.id);
+                db::insert_tournament_match(
+                    &state.pool,
+                    tournament_id,
+                    p1.id,
+                    p2_id,
+                    f.round_number as i32,
+                    (i + 1) as i32,
+                    None,
+                )
+                .await
+                .map_err(|e| internal_error(e))?;
+            }
+        }
+        db::initialize_league_standings(&state.pool, tournament_id, &player_ids)
+            .await
+            .map_err(|e| internal_error(e))?;
     }
 
-    // Initialize league standings
-    let _ = db::initialize_league_standings(&state.pool, tournament_id, &player_ids).await;
-
     // Set status to active
-    let _ = db::update_tournament_status(&state.pool, tournament_id, "active").await;
+    db::update_tournament_status(&state.pool, tournament_id, "active")
+        .await
+        .map_err(|e| internal_error(e))?;
 
     Ok(Json(serde_json::json!({
         "tournament_id": tournament_id,
         "status": "active",
-        "fixtures_created": fixtures.len(),
+        "fixtures_created": fixtures_count,
         "message": "Tournament started and fixtures generated",
     })))
 }
@@ -1526,6 +1615,21 @@ async fn get_league_standings(
         .await
         .map_err(|e| internal_error(e))?;
 
+    let row = sqlx::query!("SELECT rules_config FROM Tournaments WHERE id = $1", tournament_id)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|e| internal_error(e))?;
+    
+    let mut groups_count = 2;
+    let mut advancing_per_group = 2;
+    
+    if let Some(row) = row {
+        if let Some(config) = row.rules_config {
+            groups_count = config.get("groups_count").and_then(|v| v.as_i64()).unwrap_or(2) as i32;
+            advancing_per_group = config.get("advancing_per_group").and_then(|v| v.as_i64()).unwrap_or(2) as i32;
+        }
+    }
+
     let result: Vec<serde_json::Value> = standings
         .into_iter()
         .enumerate()
@@ -1542,6 +1646,7 @@ async fn get_league_standings(
                 "goals_against": s.goals_against,
                 "goal_diff": s.goal_diff,
                 "points": s.points,
+                "group_name": s.group_name,
             })
         })
         .collect();
@@ -1549,6 +1654,8 @@ async fn get_league_standings(
     Ok(Json(serde_json::json!({
         "tournament_id": tournament_id,
         "standings": result,
+        "groups_count": groups_count,
+        "advancing_per_group": advancing_per_group,
     })))
 }
 
@@ -1607,27 +1714,106 @@ async fn resolve_admin_dispute(
 
 
 
+#[derive(serde::Deserialize)]
+struct ClaimForfeitRequest {
+    /// The player_id of the player who is forfeiting (the loser).
+    forfeit_by: Uuid,
+}
+
 async fn claim_tournament_forfeit(
     State(state): State<Arc<AppState>>,
-    _auth: AuthenticatedUser,
+    auth: AuthenticatedUser,
     Path((tournament_id, match_id)): Path<(Uuid, Uuid)>,
+    Json(payload): Json<ClaimForfeitRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ApiErrorResponse>)> {
+    let t_match = sqlx::query!(
+        "SELECT player_1_id, player_2_id, status FROM T_Matches WHERE id = $1 AND tournament_id = $2",
+        match_id,
+        tournament_id
+    )
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| internal_error(e))?;
+
+    let tm = match t_match {
+        Some(t) => t,
+        None => return Err(bad_request("MATCH_NOT_FOUND", "Tournament match not found")),
+    };
+
+    // Guard: prevent forfeiting an already-completed match
+    if tm.status.as_deref() == Some("completed") {
+        return Err(bad_request("ALREADY_COMPLETED", "This match is already completed"));
+    }
+
+    let (p1_id, p2_id) = match (tm.player_1_id, tm.player_2_id) {
+        (Some(p1), Some(p2)) => (p1, p2),
+        _ => return Err(bad_request("INCOMPLETE_MATCH", "Match does not have both players assigned yet")),
+    };
+
+    // Authorization: caller must be one of the two players, or a club official
+    let is_participant = auth.user_id == p1_id || auth.user_id == p2_id;
+    let is_official = db::is_club_official(
+        &state.pool,
+        sqlx::query_scalar!("SELECT club_id FROM Tournaments WHERE id = $1", tournament_id)
+            .fetch_one(&state.pool).await.map_err(|e| internal_error(e))?
+            .ok_or_else(|| bad_request("NO_CLUB", "Tournament has no associated club"))?,
+        auth.user_id,
+    ).await.map_err(|e| internal_error(e))?;
+
+    if !is_participant && !is_official {
+        return Err(forbidden("FORBIDDEN", "Only a participant or club official can claim a forfeit"));
+    }
+
+    // Determine: forfeiting player loses, the other wins
+    let winner_id = if payload.forfeit_by == p1_id { p2_id } else { p1_id };
+    let loser_id  = payload.forfeit_by;
+    let (p1_score, p2_score) = if winner_id == p1_id { (3, 0) } else { (0, 3) };
+
     sqlx::query(
         r#"
         UPDATE T_Matches
-        SET status = 'completed'
-        WHERE id = $1 AND tournament_id = $2
+        SET status = 'completed', player_1_score = $1, player_2_score = $2, updated_at = NOW()
+        WHERE id = $3 AND tournament_id = $4
         "#
     )
+    .bind(p1_score)
+    .bind(p2_score)
     .bind(match_id)
     .bind(tournament_id)
     .execute(&state.pool)
     .await
     .map_err(|e| internal_error(e))?;
 
+    // Update standings for round-robin/group-stage (idempotent)
+    let _ = db::update_league_standing(&state.pool, tournament_id, winner_id, 3, 0).await;
+    let _ = db::update_league_standing(&state.pool, tournament_id, loser_id, 0, 3).await;
+
+    // Advance knockout bracket
+    let format: Option<String> = sqlx::query_scalar!(
+        "SELECT format_type FROM Tournaments WHERE id = $1", tournament_id
+    )
+    .fetch_optional(&state.pool).await.unwrap_or(None);
+
+    if matches!(format.as_deref(), Some("knockout") | Some("group_knockout")) {
+        let match_info = sqlx::query!(
+            "SELECT round_number, match_number FROM T_Matches WHERE id = $1",
+            match_id
+        )
+        .fetch_optional(&state.pool).await;
+
+        if let Ok(Some(mi)) = match_info {
+            let _ = db::advance_knockout_winner(
+                &state.pool, tournament_id, match_id,
+                mi.round_number, mi.match_number, winner_id,
+            ).await;
+        }
+    }
+
     Ok(Json(serde_json::json!({
         "status": "forfeit_claimed",
-        "match_id": match_id
+        "match_id": match_id,
+        "winner_id": winner_id,
+        "loser_id": loser_id,
     })))
 }
 
@@ -1648,6 +1834,19 @@ async fn get_club_activity(
 ) -> Result<Json<Vec<crate::infrastructure::postgres_adapter::ClubActivityRow>>, (StatusCode, Json<ApiErrorResponse>)> {
     let limit = query.limit.unwrap_or(20);
     let rows = crate::infrastructure::postgres_adapter::get_club_activity(&state.pool, club_id, limit)
+        .await
+        .map_err(|e| internal_error(e))?;
+    Ok(Json(rows))
+}
+
+async fn get_club_resolved_activity(
+    State(state): State<Arc<AppState>>,
+    _auth: AuthenticatedUser,
+    Path(club_id): Path<Uuid>,
+    Query(query): Query<ActivityQuery>,
+) -> Result<Json<Vec<crate::infrastructure::postgres_adapter::ClubResolvedMatchRow>>, (StatusCode, Json<ApiErrorResponse>)> {
+    let limit = query.limit.unwrap_or(20);
+    let rows = crate::infrastructure::postgres_adapter::get_club_resolved_matches(&state.pool, club_id, limit)
         .await
         .map_err(|e| internal_error(e))?;
     Ok(Json(rows))

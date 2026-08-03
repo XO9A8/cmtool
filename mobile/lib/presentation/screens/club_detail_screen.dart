@@ -29,13 +29,14 @@ class _ClubDetailScreenState extends ConsumerState<ClubDetailScreen> {
   int _selectedIndex = 0;
 
   // ── label / icon maps for the nav bar ────────────────────────────────────
-  static const _navLabels = ['OVERVIEW', 'ROSTER', 'LEADERBOARD', 'ACTIVITY', 'SEASONS'];
+  static const _navLabels = ['OVERVIEW', 'ROSTER', 'LEADERBOARD', 'ACTIVITY', 'SEASONS', 'RESOLVED'];
   static const _navIcons = [
     Icons.dashboard_outlined,
     Icons.group_outlined,
     Icons.leaderboard_outlined,
     Icons.timeline_outlined,
     Icons.workspace_premium_outlined,
+    Icons.verified_outlined,
   ];
   static const _navIconsFilled = [
     Icons.dashboard,
@@ -43,12 +44,14 @@ class _ClubDetailScreenState extends ConsumerState<ClubDetailScreen> {
     Icons.leaderboard,
     Icons.timeline,
     Icons.workspace_premium,
+    Icons.verified,
   ];
 
   void _refresh() {
     ref.invalidate(clubMembersProvider(widget.clubId));
     ref.invalidate(leaderboardProvider(widget.clubId));
     ref.invalidate(clubActivityProvider(widget.clubId));
+    ref.invalidate(clubResolvedActivityProvider(widget.clubId));
     ref.invalidate(clubSeasonsProvider(widget.clubId));
     ref.invalidate(myClubsProvider);
   }
@@ -276,6 +279,7 @@ class _ClubDetailScreenState extends ConsumerState<ClubDetailScreen> {
         _LeaderboardTab(clubId: widget.clubId),
         _ActivityTab(clubId: widget.clubId),
         _SeasonsTab(clubId: widget.clubId),
+        _ResolvedTab(clubId: widget.clubId),
       ],
     );
   }
@@ -1718,5 +1722,134 @@ String _formatDate(String raw) {
     return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
   } catch (_) {
     return raw.length >= 10 ? raw.substring(0, 10) : raw;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Resolved Tab
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ResolvedTab extends ConsumerWidget {
+  final String clubId;
+  const _ResolvedTab({required this.clubId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final resolvedAsync = ref.watch(clubResolvedActivityProvider(clubId));
+
+    return resolvedAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      error: (e, _) => _errorCard('Failed to load resolved activity: $e'),
+      data: (activity) {
+        if (activity.isEmpty) {
+          return Center(
+            child: Text(
+              'No resolved matches yet.',
+              style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 16),
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: activity.length + 1,
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _sectionLabel('RESOLVED MATCHES', AppColors.winGreen),
+              );
+            }
+            final match = activity[index - 1] as Map<String, dynamic>;
+            final matchType = match['match_type']?.toString().toUpperCase() ?? 'FRIENDLY';
+            final pName = match['player_name'] ?? 'Player 1';
+            final oName = match['opponent_name'] ?? 'Player 2';
+            final gf = match['goals_for']?.toString() ?? '0';
+            final ga = match['goals_against']?.toString() ?? '0';
+            final date = _formatDate(match['created_at']?.toString() ?? '');
+            final verifier = match['verifier_username'] ?? 'Unknown Admin';
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: GlassCard(
+                borderColor: Colors.white10,
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        GlowBadge(
+                          label: matchType,
+                          color: AppColors.cyan,
+                          icon: Icons.sports_soccer,
+                        ),
+                        Text(date, style: const TextStyle(color: AppColors.textMuted, fontSize: 11)),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            pName,
+                            textAlign: TextAlign.right,
+                            style: GoogleFonts.rajdhani(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: Colors.white,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Text(
+                            '$gf - $ga',
+                            style: GoogleFonts.rajdhani(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 20,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            oName,
+                            textAlign: TextAlign.left,
+                            style: GoogleFonts.rajdhani(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: Colors.white,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        const Icon(Icons.verified, color: AppColors.winGreen, size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Verified by $verifier',
+                          style: const TextStyle(color: AppColors.winGreen, fontSize: 11, fontStyle: FontStyle.italic),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 }

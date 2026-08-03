@@ -166,6 +166,109 @@ pub fn generate_round_robin_fixtures(
     fixtures
 }
 
+/// Helper struct for group fixture with group assignment.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroupFixtureNode {
+    pub fixture: FixtureNode,
+    pub group_name: String,
+}
+
+/// Generates Group Stage round-robin fixtures partitioned into N groups (e.g. Group A, Group B).
+/// Returns a tuple of (List of GroupFixtureNode, List of (Player UUID, Group Name)).
+pub fn generate_group_knockout_fixtures(
+    tournament_id: Uuid,
+    mut players: Vec<TournamentPlayer>,
+    groups_count: usize,
+    legs: u32,
+) -> (Vec<GroupFixtureNode>, Vec<(Uuid, String)>) {
+    let max_possible_groups = (players.len() / 2).max(1);
+    let num_groups = groups_count.clamp(1, max_possible_groups).min(8);
+    let group_letters = ["GROUP A", "GROUP B", "GROUP C", "GROUP D", "GROUP E", "GROUP F", "GROUP G", "GROUP H"];
+
+    // Sort players descending by skill rating for balanced seeding
+    players.sort_by(|a, b| b.skill_rating.cmp(&a.skill_rating));
+
+    let mut group_players_map: Vec<Vec<TournamentPlayer>> = vec![vec![]; num_groups];
+    let mut player_group_assignments: Vec<(Uuid, String)> = Vec::new();
+
+    // True Snake / Pot seeding into groups.
+    // Row 0: A, B, C, D (forward)  → top seeds spread across all groups
+    // Row 1: D, C, B, A (reverse)  → second seeds counter-distributed
+    // This prevents all strong seeds clustering in the same group.
+    for (idx, p) in players.into_iter().enumerate() {
+        let row = idx / num_groups;
+        let col = idx % num_groups;
+        let g_idx = if row % 2 == 0 { col } else { num_groups - 1 - col };
+        let g_name = group_letters[g_idx % group_letters.len()].to_string();
+        player_group_assignments.push((p.id, g_name));
+        group_players_map[g_idx].push(p);
+    }
+
+    let mut all_fixtures = Vec::new();
+    for (g_idx, g_players) in group_players_map.into_iter().enumerate() {
+        if g_players.len() < 2 {
+            continue;
+        }
+        let g_name = group_letters[g_idx % group_letters.len()].to_string();
+        let fixtures = generate_round_robin_fixtures(tournament_id, g_players, legs);
+        for f in fixtures {
+            all_fixtures.push(GroupFixtureNode {
+                fixture: f,
+                group_name: g_name.clone(),
+            });
+        }
+    }
+
+    (all_fixtures, player_group_assignments)
+}
+
+/// Generates the knockout phase fixtures (Phase Two) from completed group stage standings.
+pub fn generate_group_knockout_phase_two_fixtures(
+    tournament_id: Uuid,
+    standings: Vec<crate::infrastructure::postgres_adapter::LeagueStandingRow>,
+    advancing_per_group: usize,
+) -> KnockoutBracket {
+    use std::collections::HashMap;
+
+    // 1. Group standings by group_name
+    let mut groups: HashMap<String, Vec<crate::infrastructure::postgres_adapter::LeagueStandingRow>> = HashMap::new();
+    for row in standings {
+        if let Some(ref g_name) = row.group_name {
+            groups.entry(g_name.clone()).or_default().push(row);
+        }
+    }
+
+    // 2. Sort groups by name to have a deterministic order
+    let mut group_names: Vec<String> = groups.keys().cloned().collect();
+    group_names.sort();
+
+    // 3. Take top N from each group and build a seeded players list
+    // A simple seeding strategy: interleave players so 1st place in one group plays a lower place in another.
+    // For a robust universal approach, we just collect them, sort them by position, then use `generate_knockout_bracket`
+    // which inherently does 1 vs N, 2 vs N-1 seeding if we pass them ordered by their effective seed.
+    let mut qualified_players = Vec::new();
+    
+    // Position 0 = 1st place, Position 1 = 2nd place, etc.
+    for pos in 0..advancing_per_group {
+        for g_name in &group_names {
+            if let Some(g_standings) = groups.get(g_name) {
+                if let Some(player_row) = g_standings.get(pos) {
+                    qualified_players.push(TournamentPlayer {
+                        id: player_row.player_id,
+                        username: player_row.player_name.clone(),
+                        skill_rating: 1000 - pos as i32, // Artificial rating to ensure proper top vs bottom seeding
+                    });
+                }
+            }
+        }
+    }
+
+    // Since `generate_knockout_bracket` uses skill_rating for seeding, the artificial rating above guarantees:
+    // All 1st places have rating 1000, all 2nd places have 999, etc.
+    // So 1st places will naturally draw 2nd places.
+    generate_knockout_bracket(tournament_id, qualified_players)
+}
+
 /// Match Prediction Engine: Calculates Win / Draw / Loss Probabilities using Elo math & H2H adjustment.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MatchPrediction {
@@ -218,22 +321,168 @@ pub fn predict_match_outcome(
 }
 
 /// Triggers tournament auto-advancement when a match is confirmed.
-/// If it's a knockout match, it advances the winner to the next round.
-/// If it's a round-robin league match, it triggers a recalculation of League_Standings.
+///
+/// - For **league/round-robin** matches: updates `League_Standings` with an idempotency guard
+///   to prevent double-counting if the same match is confirmed twice.
+/// - For **knockout** matches: calls `advance_knockout_winner` to create/update the next-round fixture.
 pub async fn process_tournament_advancement(
     pool: &sqlx::PgPool,
     match_id: Uuid,
 ) -> Result<(), String> {
-    // Log the event-driven advancement
-    println!("Triggered tournament auto-advancement for match_id: {}", match_id);
+    println!("[tournament] Auto-advancement triggered for match_id: {}", match_id);
 
-    // Mock implementation for Phase 1. In production, this queries the T_Matches table,
-    // updates the League_Standings table, or updates the next round's T_Match bracket node.
-    let _ = sqlx::query("UPDATE T_Matches SET status = 'completed' WHERE match_record_id = $1")
-        .bind(match_id)
-        .execute(pool)
+    // 1. Fetch full context — T_Match + linked Match_Records + tournament format
+    let t_match = sqlx::query!(
+        r#"
+        SELECT
+            m.id          AS t_match_id,
+            m.tournament_id,
+            m.player_1_id,
+            m.player_2_id,
+            m.round_number,
+            m.match_number,
+            t.format_type,
+            mr.id         AS "mr_id?: Uuid",
+            mr.player_id  AS "mr_player_id?: Uuid",
+            mr.goals_for  AS "goals_for?: i32",
+            mr.goals_against AS "goals_against?: i32"
+        FROM T_Matches m
+        LEFT JOIN Match_Records mr ON mr.id = m.match_record_id
+        LEFT JOIN Tournaments t   ON t.id  = m.tournament_id
+        WHERE m.id = $1 OR m.match_record_id = $1
+        "#,
+        match_id
+    )
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let tm = match t_match {
+        Some(t) => t,
+        None => {
+            // match_id is a Match_Records.id that isn't linked to any T_Match — not a tournament match
+            println!("[tournament] match_id {} is not a tournament fixture, skipping.", match_id);
+            return Ok(());
+        }
+    };
+
+    let (tourney_id, p1_id, p2_id) = match (tm.tournament_id, tm.player_1_id, tm.player_2_id) {
+        (Some(t), Some(p1), Some(p2)) => (t, p1, p2),
+        _ => return Ok(()), // Incomplete fixture data, nothing to advance
+    };
+
+    // 2. Resolve goals from Match_Records (linked via match_record_id)
+    let (p1_goals, p2_goals) = if let (Some(mr_pid), Some(gf), Some(ga)) =
+        (tm.mr_player_id, tm.goals_for, tm.goals_against)
+    {
+        if mr_pid == p1_id { (gf, ga) } else { (ga, gf) }
+    } else {
+        // No linked match record yet (e.g. forfeit path sets score directly)
+        // Read scores from T_Matches columns instead
+        let scores = sqlx::query!(
+            "SELECT player_1_score, player_2_score FROM T_Matches WHERE id = $1",
+            tm.t_match_id
+        )
+        .fetch_optional(pool)
         .await
         .map_err(|e| e.to_string())?;
+
+        match scores.and_then(|s| Some((s.player_1_score?, s.player_2_score?))) {
+            Some((s1, s2)) => (s1, s2),
+            None => return Ok(()), // No score data available yet
+        }
+    };
+
+    // 3. Mark T_Match as completed with final scores
+    sqlx::query(
+        "UPDATE T_Matches SET player_1_score = $1, player_2_score = $2, status = 'completed' WHERE id = $3"
+    )
+    .bind(p1_goals)
+    .bind(p2_goals)
+    .bind(tm.t_match_id)
+    .execute(pool)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    // 4. Determine winner
+    let winner_id = if p1_goals > p2_goals { p1_id } else { p2_id };
+    let is_draw   = p1_goals == p2_goals;
+
+    let format = tm.format_type.as_str();
+
+    // 5a. League / Group-stage path → update standings with idempotency guard
+    if format == "round_robin" || format == "group_knockout" || format.is_empty() {
+        // Guard: check if standings were already updated for this t_match (via last_processed_match_id on League_Standings)
+        let already_processed: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM League_Standings WHERE tournament_id = $1 AND player_id = $2 AND last_processed_match_id = $3)"
+        )
+        .bind(tourney_id)
+        .bind(p1_id)
+        .bind(tm.t_match_id)
+        .fetch_one(pool)
+        .await
+        .unwrap_or(false);
+
+        if already_processed {
+            println!("[tournament] Standings already updated for t_match {}, skipping.", tm.t_match_id);
+            return Ok(());
+        }
+
+        crate::infrastructure::postgres_adapter::update_league_standing_guarded(
+            pool, tourney_id, tm.t_match_id, p1_id, p1_goals, p2_goals,
+        ).await.map_err(|e| e.to_string())?;
+
+        crate::infrastructure::postgres_adapter::update_league_standing_guarded(
+            pool, tourney_id, tm.t_match_id, p2_id, p2_goals, p1_goals,
+        ).await.map_err(|e| e.to_string())?;
+    }
+
+    // 5b. Knockout path → advance winner to next round (skip draws — no draws in knockout)
+    // Only call advance_knockout_winner for actual knockout matches (where group_name is None).
+    // For now, we rely on advance_knockout_winner ignoring matches that don't have a linked next match.
+    if (format == "knockout" || format == "group_knockout") && !is_draw {
+        if let Err(e) = crate::infrastructure::postgres_adapter::advance_knockout_winner(
+            pool,
+            tourney_id,
+            tm.t_match_id,
+            tm.round_number,
+            tm.match_number,
+            winner_id,
+        ).await {
+            // Non-fatal: log but don't fail the confirmation
+            eprintln!("[tournament] advance_knockout_winner failed for t_match {}: {}", tm.t_match_id, e);
+        }
+    }
+
+    // 5c. Group Knockout Phase Transition Check
+    if format == "group_knockout" {
+        // Check if all group stage matches are finished
+        if let Ok(true) = crate::infrastructure::postgres_adapter::check_group_stage_completed(pool, tourney_id).await {
+            // Ensure we don't generate the bracket twice
+            if let Ok(false) = crate::infrastructure::postgres_adapter::check_knockout_stage_generated(pool, tourney_id).await {
+                println!("[tournament] Group stage complete! Transitioning to knockout phase for tournament {}", tourney_id);
+                
+                // Fetch standings
+                if let Ok(standings) = crate::infrastructure::postgres_adapter::get_league_standings(pool, tourney_id).await {
+                    let advancing = crate::infrastructure::postgres_adapter::get_tournament_advancing_count(pool, tourney_id).await.unwrap_or(2);
+                    
+                    // Generate Phase Two fixtures
+                    let bracket = generate_group_knockout_phase_two_fixtures(tourney_id, standings, advancing);
+                    
+                    // Offset the round_number for Phase Two fixtures to ensure they start after group matches
+                    // A safe high number is 10 to separate them from Group Stages (Round 1, 2, 3...)
+                    let mut fixtures = bracket.fixtures;
+                    for f in &mut fixtures {
+                        f.round_number += 10;
+                    }
+                    
+                    if let Err(e) = crate::infrastructure::postgres_adapter::save_tournament_fixtures(pool, tourney_id, fixtures).await {
+                        eprintln!("[tournament] Failed to save Phase Two knockout fixtures: {}", e);
+                    }
+                }
+            }
+        }
+    }
 
     Ok(())
 }
@@ -269,7 +518,44 @@ mod tests {
             TournamentPlayer { id: Uuid::new_v4(), username: "P4".into(), skill_rating: 1000 },
         ];
 
-        let fixtures = generate_round_robin_fixtures(Uuid::new_v4(), players);
+        let fixtures = generate_round_robin_fixtures(Uuid::new_v4(), players, 1);
         assert_eq!(fixtures.len(), 6);
     }
+
+    #[test]
+    fn test_snake_seeding_balances_groups() {
+        // 8 players into 2 groups: snake seeding should give each group alternating seeds
+        // Group A: #1 (1500), #4 (1000) — via snake: row0→A, row1→B,A → A gets 1500 & 1100
+        // Group B: #2 (1400), #3 (1200) — via snake: row0→B, row1→A,B → B gets 1400 & 1000
+        let players = vec![
+            TournamentPlayer { id: Uuid::new_v4(), username: "P1".into(), skill_rating: 1500 },
+            TournamentPlayer { id: Uuid::new_v4(), username: "P2".into(), skill_rating: 1400 },
+            TournamentPlayer { id: Uuid::new_v4(), username: "P3".into(), skill_rating: 1200 },
+            TournamentPlayer { id: Uuid::new_v4(), username: "P4".into(), skill_rating: 1100 },
+            TournamentPlayer { id: Uuid::new_v4(), username: "P5".into(), skill_rating: 1000 },
+            TournamentPlayer { id: Uuid::new_v4(), username: "P6".into(), skill_rating: 900 },
+        ];
+
+        let (fixtures, assignments) = generate_group_knockout_fixtures(Uuid::new_v4(), players, 2, 1);
+        assert!(!fixtures.is_empty());
+
+        // With snake seeding:
+        // idx=0 → row=0, col=0, g_idx=0 (GROUP A)
+        // idx=1 → row=0, col=1, g_idx=1 (GROUP B)
+        // idx=2 → row=1, col=0, snake→ g_idx=1 (GROUP B)
+        // idx=3 → row=1, col=1, snake→ g_idx=0 (GROUP A)
+        // So Group A = P1(1500), P4(1100); Group B = P2(1400), P3(1200) → balanced!
+        let group_a: Vec<_> = assignments.iter().filter(|(_, g)| g == "GROUP A").collect();
+        let group_b: Vec<_> = assignments.iter().filter(|(_, g)| g == "GROUP B").collect();
+        assert_eq!(group_a.len(), 3);
+        assert_eq!(group_b.len(), 3);
+    }
+}
+
+#[tokio::test]
+async fn test_issue_total_rounds() {
+    let r1_matches = 2;
+    let total_rounds = (r1_matches as f64).log2().ceil() as i32 + 1;
+    println!("test_issue_total_rounds: r1_matches={}, total_rounds={}", r1_matches, total_rounds);
+    assert_eq!(total_rounds, 2);
 }

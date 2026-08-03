@@ -11,12 +11,18 @@ import '../theme/app_theme.dart';
 
 class OcrUploadModal extends ConsumerStatefulWidget {
   final String? tMatchId;
+  final String? defaultPlayerId;
   final String? defaultOpponentId;
+  final String? defaultPlayerName;
+  final String? defaultOpponentName;
 
   const OcrUploadModal({
     super.key,
     this.tMatchId,
+    this.defaultPlayerId,
     this.defaultOpponentId,
+    this.defaultPlayerName,
+    this.defaultOpponentName,
   });
 
   @override
@@ -35,11 +41,33 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
   final _goalsForCtrl      = TextEditingController(text: '3');
   final _goalsAgainstCtrl  = TextEditingController(text: '1');
   final _possessionCtrl    = TextEditingController(text: '62.5');
+  final _possessionAwayCtrl= TextEditingController(text: '37.5');
   final _passesCompCtrl    = TextEditingController(text: '120');
+  final _passesCompAwayCtrl= TextEditingController(text: '70');
   final _passesAttCtrl     = TextEditingController(text: '140');
+  final _passesAttAwayCtrl = TextEditingController(text: '95');
   final _shotsTargetCtrl   = TextEditingController(text: '5');
+  final _shotsTargetAwayCtrl=TextEditingController(text: '1');
   final _shotsTotalCtrl    = TextEditingController(text: '8');
+  final _shotsTotalAwayCtrl= TextEditingController(text: '3');
   final _interceptionsCtrl = TextEditingController(text: '7');
+  final _interceptionsAwayCtrl = TextEditingController(text: '4');
+  
+  // New eFootball Fields
+  final _foulsCtrl         = TextEditingController(text: '0');
+  final _foulsAwayCtrl     = TextEditingController(text: '2');
+  final _offsidesCtrl      = TextEditingController(text: '0');
+  final _offsidesAwayCtrl  = TextEditingController(text: '1');
+  final _cornersCtrl       = TextEditingController(text: '0');
+  final _cornersAwayCtrl   = TextEditingController(text: '2');
+  final _freeKicksCtrl     = TextEditingController(text: '0');
+  final _freeKicksAwayCtrl = TextEditingController(text: '1');
+  final _crossesCtrl       = TextEditingController(text: '1');
+  final _crossesAwayCtrl   = TextEditingController(text: '2');
+  final _tacklesCtrl       = TextEditingController(text: '5');
+  final _tacklesAwayCtrl   = TextEditingController(text: '8');
+  final _savesCtrl         = TextEditingController(text: '1');
+  final _savesAwayCtrl     = TextEditingController(text: '3');
 
   String? _errorMessage;
 
@@ -59,12 +87,57 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
     _goalsForCtrl.dispose();
     _goalsAgainstCtrl.dispose();
     _possessionCtrl.dispose();
+    _possessionAwayCtrl.dispose();
     _passesCompCtrl.dispose();
+    _passesCompAwayCtrl.dispose();
     _passesAttCtrl.dispose();
+    _passesAttAwayCtrl.dispose();
     _shotsTargetCtrl.dispose();
+    _shotsTargetAwayCtrl.dispose();
     _shotsTotalCtrl.dispose();
+    _shotsTotalAwayCtrl.dispose();
     _interceptionsCtrl.dispose();
+    _interceptionsAwayCtrl.dispose();
+    _foulsCtrl.dispose();
+    _foulsAwayCtrl.dispose();
+    _offsidesCtrl.dispose();
+    _offsidesAwayCtrl.dispose();
+    _cornersCtrl.dispose();
+    _cornersAwayCtrl.dispose();
+    _freeKicksCtrl.dispose();
+    _freeKicksAwayCtrl.dispose();
+    _crossesCtrl.dispose();
+    _crossesAwayCtrl.dispose();
+    _tacklesCtrl.dispose();
+    _tacklesAwayCtrl.dispose();
+    _savesCtrl.dispose();
+    _savesAwayCtrl.dispose();
     super.dispose();
+  }
+
+  void _swapSides() {
+    setState(() {
+      void swap(TextEditingController a, TextEditingController b) {
+        final tmp = a.text;
+        a.text = b.text;
+        b.text = tmp;
+      }
+
+      swap(_goalsForCtrl, _goalsAgainstCtrl);
+      swap(_possessionCtrl, _possessionAwayCtrl);
+      swap(_shotsTotalCtrl, _shotsTotalAwayCtrl);
+      swap(_shotsTargetCtrl, _shotsTargetAwayCtrl);
+      swap(_foulsCtrl, _foulsAwayCtrl);
+      swap(_offsidesCtrl, _offsidesAwayCtrl);
+      swap(_cornersCtrl, _cornersAwayCtrl);
+      swap(_freeKicksCtrl, _freeKicksAwayCtrl);
+      swap(_passesAttCtrl, _passesAttAwayCtrl);
+      swap(_passesCompCtrl, _passesCompAwayCtrl);
+      swap(_crossesCtrl, _crossesAwayCtrl);
+      swap(_interceptionsCtrl, _interceptionsAwayCtrl);
+      swap(_tacklesCtrl, _tacklesAwayCtrl);
+      swap(_savesCtrl, _savesAwayCtrl);
+    });
   }
 
   String _generateHash(String playerId) {
@@ -82,6 +155,14 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
     final shotsTarget  = int.tryParse(_shotsTargetCtrl.text) ?? 0;
     final shotsTotal   = int.tryParse(_shotsTotalCtrl.text) ?? 0;
 
+    final fouls      = int.tryParse(_foulsCtrl.text) ?? 0;
+    final offsides   = int.tryParse(_offsidesCtrl.text) ?? 0;
+    final corners    = int.tryParse(_cornersCtrl.text) ?? 0;
+    final freeKicks  = int.tryParse(_freeKicksCtrl.text) ?? 0;
+    final crosses    = int.tryParse(_crossesCtrl.text) ?? 0;
+    final tackles    = int.tryParse(_tacklesCtrl.text) ?? 0;
+    final saves      = int.tryParse(_savesCtrl.text) ?? 0;
+
     if (passesComp > passesAtt) {
       setState(() => _errorMessage = 'Passes completed cannot exceed passes attempted.');
       return;
@@ -93,7 +174,7 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
 
     setState(() => _errorMessage = null);
 
-    final playerId = await ref.read(apiClientProvider).storedUserId ?? '00000000-0000-0000-0000-000000000000';
+    final playerId = widget.defaultPlayerId ?? await ref.read(apiClientProvider).storedUserId ?? '00000000-0000-0000-0000-000000000000';
 
     final record = MatchRecord(
       playerId:          playerId,
@@ -110,6 +191,13 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
       shotsOnTarget:     shotsTarget,
       shotsTotal:        shotsTotal,
       interceptions:     int.tryParse(_interceptionsCtrl.text) ?? 0,
+      fouls:             fouls,
+      offsides:          offsides,
+      corners:           corners,
+      freeKicks:         freeKicks,
+      crosses:           crosses,
+      tackles:           tackles,
+      saves:             saves,
       screenshotHash:    _generateHash(playerId),
     );
 
@@ -272,30 +360,6 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (isLowConfidence) ...[
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.amber.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.edit_note, color: Colors.amber, size: 22),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                'OCR Confidence < 85%. Bounding-box review active: Please verify extracted statistics before submitting.',
-                                style: TextStyle(fontSize: 12, color: Colors.amber.shade200, height: 1.3),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ).animate(onPlay: (controller) => controller.repeat()).shimmer(duration: 2.seconds, color: Colors.amber.withValues(alpha: 0.2)),
-                      const SizedBox(height: 20),
-                    ],
-
                     // Format Toggle
                     Center(
                       child: SegmentedButton<bool>(
@@ -315,52 +379,192 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
                     ),
                     const SizedBox(height: 20),
 
-                    // Versus Profile Grid
-                    Text('MATCH PARTICIPANTS', style: GoogleFonts.rajdhani(color: AppColors.cyan, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.5)),
-                    const SizedBox(height: 12),
-                    _buildParticipantField(_opponentIdCtrl, 'Opponent UUID', Icons.person_search, AppColors.lossRed),
-                    if (_is2v2Mode) ...[
-                      const SizedBox(height: 12),
-                      Row(
+                    // Match Participants Display (Usernames display & Swap sides)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('MATCH PARTICIPANTS', style: GoogleFonts.rajdhani(color: AppColors.cyan, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.5)),
+                        InkWell(
+                          onTap: _swapSides,
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AppColors.cyan.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: AppColors.cyan.withValues(alpha: 0.4)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.swap_horiz, color: AppColors.cyan, size: 16),
+                                const SizedBox(width: 4),
+                                Text('SWAP SIDES', style: GoogleFonts.rajdhani(color: AppColors.cyan, fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 1.0)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.cyan.withValues(alpha: 0.25)),
+                      ),
+                      child: Row(
                         children: [
-                          Expanded(child: _buildParticipantField(_partnerIdCtrl, 'Your Partner UUID', Icons.group, AppColors.winGreen)),
-                          const SizedBox(width: 12),
-                          Expanded(child: _buildParticipantField(_opponentPartnerIdCtrl, 'Opponent Partner UUID', Icons.group_outlined, AppColors.lossRed)),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('HOME PLAYER', style: GoogleFonts.rajdhani(color: AppColors.winGreen, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                                const SizedBox(height: 2),
+                                Text(
+                                  widget.defaultPlayerName ?? (widget.defaultPlayerId != null && widget.defaultPlayerId!.length > 8 ? widget.defaultPlayerId!.substring(0, 8) : 'Home Player'),
+                                  style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          InkWell(
+                            onTap: _swapSides,
+                            borderRadius: BorderRadius.circular(6),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: AppColors.primary.withValues(alpha: 0.5)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text('VS', style: GoogleFonts.rajdhani(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 14)),
+                                  const SizedBox(width: 4),
+                                  const Icon(Icons.swap_horiz, color: AppColors.primary, size: 14),
+                                ],
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text('AWAY PLAYER', style: GoogleFonts.rajdhani(color: AppColors.lossRed, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                                const SizedBox(height: 2),
+                                Text(
+                                  widget.defaultOpponentName ?? (widget.defaultOpponentId != null && widget.defaultOpponentId!.length > 8 ? widget.defaultOpponentId!.substring(0, 8) : 'Opponent'),
+                                  style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
-                    ],
+                    ),
 
                     const SizedBox(height: 24),
-                    Text('MATCH STATISTICS', style: GoogleFonts.rajdhani(color: AppColors.cyan, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.5)),
-                    const SizedBox(height: 12),
-                    
-                    Row(
-                      children: [
-                        Expanded(child: _buildStatField(_goalsForCtrl, 'GOALS FOR', isLowConfidence)),
-                        const SizedBox(width: 12),
-                        Expanded(child: _buildStatField(_goalsAgainstCtrl, 'GOALS AGAINST', isLowConfidence)),
-                      ],
+
+                    // eFootball Style Stats Board
+                    Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF000080), // Deep blue background like eFootball
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.yellow, width: 2),
+                      ),
+                      child: Column(
+                        children: [
+                          // Header (Scores)
+                          Container(
+                            color: Colors.yellow,
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    widget.defaultPlayerName ?? 'HOME',
+                                    textAlign: TextAlign.right,
+                                    style: GoogleFonts.rajdhani(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                SizedBox(
+                                  width: 36,
+                                  child: TextField(controller: _goalsForCtrl, textAlign: TextAlign.center, keyboardType: TextInputType.number, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black), decoration: const InputDecoration(filled: true, fillColor: Colors.white, isDense: true, contentPadding: EdgeInsets.symmetric(vertical: 4))),
+                                ),
+                                const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('=', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 22))),
+                                SizedBox(
+                                  width: 36,
+                                  child: TextField(controller: _goalsAgainstCtrl, textAlign: TextAlign.center, keyboardType: TextInputType.number, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black), decoration: const InputDecoration(filled: true, fillColor: Colors.white, isDense: true, contentPadding: EdgeInsets.symmetric(vertical: 4))),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    widget.defaultOpponentName ?? 'AWAY',
+                                    textAlign: TextAlign.left,
+                                    style: GoogleFonts.rajdhani(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            color: Colors.yellow,
+                            width: double.infinity,
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text('Full Time', textAlign: TextAlign.center, style: GoogleFonts.rajdhani(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 12)),
+                                const SizedBox(width: 12),
+                                InkWell(
+                                  onTap: _swapSides,
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.swap_horiz, color: Colors.yellow, size: 13),
+                                        const SizedBox(width: 3),
+                                        Text('SWAP SIDES', style: GoogleFonts.rajdhani(color: Colors.yellow, fontWeight: FontWeight.bold, fontSize: 10)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          _buildEfootballRow('Possession', _possessionCtrl, _possessionAwayCtrl, isPercent: true),
+                          _buildEfootballRow('Total Shots', _shotsTotalCtrl, _shotsTotalAwayCtrl),
+                          _buildEfootballRow('Shots on Target', _shotsTargetCtrl, _shotsTargetAwayCtrl),
+                          _buildEfootballRow('Fouls', _foulsCtrl, _foulsAwayCtrl),
+                          _buildEfootballRow('Offsides', _offsidesCtrl, _offsidesAwayCtrl),
+                          _buildEfootballRow('Corner Kicks', _cornersCtrl, _cornersAwayCtrl),
+                          _buildEfootballRow('Free Kicks', _freeKicksCtrl, _freeKicksAwayCtrl),
+                          _buildEfootballRow('Passes', _passesAttCtrl, _passesAttAwayCtrl),
+                          _buildEfootballRow('Successful Passes', _passesCompCtrl, _passesCompAwayCtrl),
+                          _buildEfootballRow('Crosses', _crossesCtrl, _crossesAwayCtrl),
+                          _buildEfootballRow('Interceptions', _interceptionsCtrl, _interceptionsAwayCtrl),
+                          _buildEfootballRow('Tackles', _tacklesCtrl, _tacklesAwayCtrl),
+                          _buildEfootballRow('Saves', _savesCtrl, _savesAwayCtrl),
+                          const SizedBox(height: 8),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 12),
-                    _buildStatField(_possessionCtrl, 'POSSESSION %', isLowConfidence, true),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(child: _buildStatField(_passesCompCtrl, 'PASSES COMP')),
-                        const SizedBox(width: 12),
-                        Expanded(child: _buildStatField(_passesAttCtrl, 'PASSES ATT')),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(child: _buildStatField(_shotsTargetCtrl, 'SHOTS ON TARGET')),
-                        const SizedBox(width: 12),
-                        Expanded(child: _buildStatField(_shotsTotalCtrl, 'TOTAL SHOTS')),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _buildStatField(_interceptionsCtrl, 'INTERCEPTIONS'),
 
                     if (_errorMessage != null) ...[
                       const SizedBox(height: 16),
@@ -405,43 +609,55 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
     );
   }
 
-  Widget _buildParticipantField(TextEditingController ctrl, String label, IconData icon, Color color) {
-    return TextField(
-      controller: ctrl,
-      style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 14),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(color: Colors.white60),
-        filled: true,
-        fillColor: color.withValues(alpha: 0.05),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: color.withValues(alpha: 0.3))),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: color.withValues(alpha: 0.2))),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: color)),
-        prefixIcon: Icon(icon, color: color),
-      ),
-    );
-  }
-
-  Widget _buildStatField(TextEditingController ctrl, String label, [bool highlight = false, bool decimal = false]) {
+  Widget _buildEfootballRow(String label, TextEditingController leftCtrl, TextEditingController rightCtrl, {bool isPercent = false}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: highlight ? Colors.amber.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: highlight ? Colors.amber.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.1)),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: Colors.white24, width: 1)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
         children: [
-          Text(label, style: GoogleFonts.rajdhani(color: highlight ? Colors.amber : AppColors.textMuted, fontSize: 10, fontWeight: FontWeight.bold)),
-          TextField(
-            controller: ctrl,
-            keyboardType: decimal ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.number,
-            style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
-            decoration: const InputDecoration(
-              isDense: true,
-              contentPadding: EdgeInsets.zero,
-              border: InputBorder.none,
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IntrinsicWidth(
+                  child: TextField(
+                    controller: leftCtrl,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                    keyboardType: isPercent ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.number,
+                    decoration: const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.zero),
+                  ),
+                ),
+                if (isPercent) Text('%', style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.rajdhani(color: Colors.yellow, fontSize: 15, fontWeight: FontWeight.bold),
+            ),
+          ),
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IntrinsicWidth(
+                  child: TextField(
+                    controller: rightCtrl,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                    keyboardType: isPercent ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.number,
+                    decoration: const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.zero),
+                  ),
+                ),
+                if (isPercent) Text('%', style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              ],
             ),
           ),
         ],

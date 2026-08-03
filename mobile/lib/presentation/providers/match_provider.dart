@@ -77,6 +77,15 @@ class ProfilePreferences {
   final bool isPublic;
   final String contactEmail;
   final String preferredFoot;
+  final String gameId;
+  final String jerseyNumber;
+  final String systemDevice;
+  final String facebook;
+  final String facebookLink;
+  final String phoneLine;
+  final String district;
+  final String dateOfBirth;
+  final String bio;
 
   const ProfilePreferences({
     this.displayName = 'Player',
@@ -84,6 +93,15 @@ class ProfilePreferences {
     this.isPublic = true,
     this.contactEmail = '',
     this.preferredFoot = 'Right',
+    this.gameId = '',
+    this.jerseyNumber = '',
+    this.systemDevice = 'PlayStation 5',
+    this.facebook = '',
+    this.facebookLink = '',
+    this.phoneLine = '',
+    this.district = '',
+    this.dateOfBirth = '',
+    this.bio = '',
   });
 
   ProfilePreferences copyWith({
@@ -92,6 +110,15 @@ class ProfilePreferences {
     bool? isPublic,
     String? contactEmail,
     String? preferredFoot,
+    String? gameId,
+    String? jerseyNumber,
+    String? systemDevice,
+    String? facebook,
+    String? facebookLink,
+    String? phoneLine,
+    String? district,
+    String? dateOfBirth,
+    String? bio,
   }) {
     return ProfilePreferences(
       displayName: displayName ?? this.displayName,
@@ -99,6 +126,15 @@ class ProfilePreferences {
       isPublic: isPublic ?? this.isPublic,
       contactEmail: contactEmail ?? this.contactEmail,
       preferredFoot: preferredFoot ?? this.preferredFoot,
+      gameId: gameId ?? this.gameId,
+      jerseyNumber: jerseyNumber ?? this.jerseyNumber,
+      systemDevice: systemDevice ?? this.systemDevice,
+      facebook: facebook ?? this.facebook,
+      facebookLink: facebookLink ?? this.facebookLink,
+      phoneLine: phoneLine ?? this.phoneLine,
+      district: district ?? this.district,
+      dateOfBirth: dateOfBirth ?? this.dateOfBirth,
+      bio: bio ?? this.bio,
     );
   }
 
@@ -108,6 +144,15 @@ class ProfilePreferences {
         'is_public': isPublic,
         'contact_email': contactEmail,
         'preferred_foot': preferredFoot,
+        'game_id': gameId,
+        'jersey_number': jerseyNumber,
+        'system_device': systemDevice,
+        'facebook': facebook,
+        'facebook_link': facebookLink,
+        'phone_line': phoneLine,
+        'district': district,
+        'date_of_birth': dateOfBirth,
+        'bio': bio,
       };
 
   factory ProfilePreferences.fromJson(Map<String, dynamic> json) {
@@ -117,6 +162,15 @@ class ProfilePreferences {
       isPublic: json['is_public'] is bool ? json['is_public'] as bool : true,
       contactEmail: json['contact_email']?.toString() ?? '',
       preferredFoot: json['preferred_foot']?.toString() ?? 'Right',
+      gameId: json['game_id']?.toString() ?? '',
+      jerseyNumber: json['jersey_number']?.toString() ?? '',
+      systemDevice: json['system_device']?.toString() ?? 'PlayStation 5',
+      facebook: json['facebook']?.toString() ?? '',
+      facebookLink: json['facebook_link']?.toString() ?? '',
+      phoneLine: json['phone_line']?.toString() ?? '',
+      district: json['district']?.toString() ?? '',
+      dateOfBirth: json['date_of_birth']?.toString() ?? '',
+      bio: json['bio']?.toString() ?? '',
     );
   }
 }
@@ -153,6 +207,15 @@ class ProfilePreferencesNotifier extends StateNotifier<ProfilePreferences> {
     bool? isPublic,
     String? contactEmail,
     String? preferredFoot,
+    String? gameId,
+    String? jerseyNumber,
+    String? systemDevice,
+    String? facebook,
+    String? facebookLink,
+    String? phoneLine,
+    String? district,
+    String? dateOfBirth,
+    String? bio,
   }) async {
     final next = state.copyWith(
       displayName: displayName,
@@ -160,6 +223,15 @@ class ProfilePreferencesNotifier extends StateNotifier<ProfilePreferences> {
       isPublic: isPublic,
       contactEmail: contactEmail,
       preferredFoot: preferredFoot,
+      gameId: gameId,
+      jerseyNumber: jerseyNumber,
+      systemDevice: systemDevice,
+      facebook: facebook,
+      facebookLink: facebookLink,
+      phoneLine: phoneLine,
+      district: district,
+      dateOfBirth: dateOfBirth,
+      bio: bio,
     );
 
     final prefs = await SharedPreferences.getInstance();
@@ -377,7 +449,12 @@ final leagueStandingsProvider = FutureProvider.family<Map<String, dynamic>, Stri
 
 final clubActivityProvider = FutureProvider.family<List<dynamic>, String>((ref, clubId) async {
   final client = ref.watch(apiClientProvider);
-  return client.getClubActivity(clubId);
+  return await client.getClubActivity(clubId);
+});
+
+final clubResolvedActivityProvider = FutureProvider.family<List<dynamic>, String>((ref, clubId) async {
+  final client = ref.watch(apiClientProvider);
+  return await client.getClubResolvedActivity(clubId);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

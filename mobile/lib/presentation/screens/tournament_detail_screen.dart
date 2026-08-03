@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -7,7 +8,11 @@ import '../theme/app_theme.dart';
 import '../providers/match_provider.dart';
 import '../../infrastructure/api_client.dart';
 import '../widgets/league_table_widget.dart';
+import '../widgets/group_standings_widget.dart';
+import '../widgets/forfeit_claim_modal.dart';
 import '../widgets/ocr_upload_modal.dart';
+
+import '../widgets/tournament_leaders_widget.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Bracket lines painter (moved from tournament_screen.dart)
@@ -104,11 +109,23 @@ class _TournamentDetailScreenState extends ConsumerState<TournamentDetailScreen>
   int _fixtureView = 0;
   // Track mutable status locally so admin actions update the UI
   late String _currentStatus;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     _currentStatus = widget.status;
+    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (_currentStatus == 'active') {
+        _refresh();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
   }
 
   bool get _isKnockout => widget.formatType == 'knockout';
@@ -353,23 +370,39 @@ class _FixturesTab extends ConsumerStatefulWidget {
 class _FixturesTabState extends ConsumerState<_FixturesTab> {
   int? _selectedRound;
   String? _selectedPlayerId;
+  String? _selectedGroup;
   String _selectedStatus = 'all';
+  bool _isFilterExpanded = false;
 
   bool get _hasActiveFilters =>
-      _selectedRound != null || _selectedPlayerId != null || _selectedStatus != 'all';
+      _selectedRound != null || _selectedPlayerId != null || _selectedGroup != null || _selectedStatus != 'all';
 
   void _clearFilters() {
     setState(() {
       _selectedRound = null;
       _selectedPlayerId = null;
+      _selectedGroup = null;
       _selectedStatus = 'all';
     });
+  }
+
+  String _getRoundLabel(int r, int totalRounds) {
+    // For round-robin or group_knockout group stages, it's MATCH DAY.
+    // We treat rounds as Knockout if format is 'knockout' or if it's the last few rounds of group_knockout.
+    // Since we don't have a strict separator yet, we'll try to guess if it's a final.
+    if (widget.formatType == 'knockout' || (widget.formatType == 'group_knockout' && r >= 10)) {
+      if (r == totalRounds && totalRounds > 0) return 'FINAL';
+      if (r == totalRounds - 1 && totalRounds > 1) return 'SEMI-FINAL';
+      if (r == totalRounds - 2 && totalRounds > 2) return 'QUARTER-FINAL';
+      return 'ROUND $r';
+    }
+    return 'MATCH DAY $r';
   }
 
   @override
   Widget build(BuildContext context) {
     final bracketAsync = ref.watch(tournamentBracketProvider(widget.tournamentId));
-    final isKnockout = widget.formatType == 'knockout';
+    final isKnockout = widget.formatType == 'knockout' || widget.formatType == 'group_knockout';
 
     return bracketAsync.when(
       loading: () => _buildLoading(),
@@ -378,6 +411,7 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
         final fixtures = (data['fixtures'] as List<dynamic>? ?? []);
         if (fixtures.isEmpty) {
           return SingleChildScrollView(
+            primary: false,
             padding: const EdgeInsets.all(16),
             child: _buildEmptyFixtures(),
           );
@@ -405,11 +439,23 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
           }
         }
 
+        final groups = fixtures
+            .map((f) => f['group_name']?.toString())
+            .where((g) => g != null && g.isNotEmpty)
+            .cast<String>()
+            .toSet()
+            .toList()
+          ..sort();
+
         // Filter fixtures
         final filteredFixtures = fixtures.where((f) {
           if (_selectedRound != null) {
             final r = (f['round_number'] as num?)?.toInt() ?? 0;
             if (r != _selectedRound) return false;
+          }
+          if (_selectedGroup != null) {
+            final g = f['group_name']?.toString();
+            if (g != _selectedGroup) return false;
           }
           if (_selectedPlayerId != null) {
             final p1 = f['player_1_id']?.toString();
@@ -424,6 +470,7 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
         }).toList();
 
         return SingleChildScrollView(
+          primary: false,
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -435,15 +482,17 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
               ],
 
               // Filter controls card
-              _buildFilterCard(rounds, playersMap, fixtures.length, filteredFixtures.length),
+              _buildFilterCard(rounds, groups, playersMap, fixtures.length, filteredFixtures.length, rounds.isNotEmpty ? rounds.last : 0),
               const SizedBox(height: 16),
 
               if (filteredFixtures.isEmpty)
                 _buildFilterEmptyState()
               else if (isKnockout && widget.fixtureView == 1)
-                _buildBracketTreeView(context, filteredFixtures)
+                _buildBracketTreeView(context, widget.formatType == 'group_knockout' 
+                    ? filteredFixtures.where((f) => ((f['round_number'] as num?)?.toInt() ?? 1) >= 10).toList() 
+                    : filteredFixtures)
               else
-                _buildFixtureList(context, filteredFixtures),
+                _buildFixtureList(context, filteredFixtures, rounds.isNotEmpty ? rounds.last : 0),
             ],
           ),
         );
@@ -451,117 +500,144 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
     );
   }
 
-  Widget _buildFilterCard(List<int> rounds, Map<String, String> playersMap, int totalCount, int filteredCount) {
+  Widget _buildFilterCard(List<int> rounds, List<String> groups, Map<String, String> playersMap, int totalCount, int filteredCount, int totalRounds) {
+    // Generate active filter summary string
+    final List<String> activeSummary = [];
+    if (_selectedGroup != null) activeSummary.add(_selectedGroup!.toUpperCase());
+    if (_selectedRound != null) activeSummary.add(_getRoundLabel(_selectedRound!, totalRounds));
+    if (_selectedStatus != 'all') activeSummary.add(_selectedStatus.toUpperCase());
+    if (_selectedPlayerId != null && playersMap.containsKey(_selectedPlayerId)) {
+      activeSummary.add(playersMap[_selectedPlayerId]!);
+    }
+
     return GlassCard(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       borderColor: AppColors.primary.withValues(alpha: 0.3),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(Icons.tune, color: AppColors.primary, size: 16),
+          // ── Header Toggle Row ──
+          GestureDetector(
+            onTap: () => setState(() => _isFilterExpanded = !_isFilterExpanded),
+            behavior: HitTestBehavior.opaque,
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  const SizedBox(width: 10),
-                  Text(
-                    'FILTER MATCHES',
-                    style: GoogleFonts.rajdhani(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
-                    ),
+                  child: const Icon(Icons.tune, color: AppColors.primary, size: 16),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'FILTER',
+                  style: GoogleFonts.orbitron(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.0,
                   ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceLight,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
+                ),
+                const SizedBox(width: 8),
+                if (_hasActiveFilters) ...[
+                  Expanded(
                     child: Text(
-                      '$filteredCount of $totalCount',
+                      activeSummary.join(' • '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.rajdhani(
                         color: AppColors.cyan,
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
-                ],
-              ),
-              if (_hasActiveFilters)
-                GestureDetector(
-                  onTap: _clearFilters,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.lossRed.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.lossRed.withValues(alpha: 0.35)),
+                ] else ...[
+                  Text(
+                    '($filteredCount matches)',
+                    style: GoogleFonts.rajdhani(
+                      color: AppColors.textMuted,
+                      fontSize: 12,
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.close, color: AppColors.lossRed, size: 12),
-                        const SizedBox(width: 4),
-                        Text(
-                          'CLEAR',
-                          style: GoogleFonts.rajdhani(
-                            color: AppColors.lossRed,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
+                  ),
+                  const Spacer(),
+                ],
+                if (_hasActiveFilters)
+                  GestureDetector(
+                    onTap: _clearFilters,
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.lossRed.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.lossRed.withValues(alpha: 0.3)),
+                      ),
+                      child: Text(
+                        'RESET',
+                        style: GoogleFonts.rajdhani(
+                          color: AppColors.lossRed,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
                         ),
-                      ],
+                      ),
                     ),
                   ),
+                Icon(
+                  _isFilterExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                  color: AppColors.textMuted,
+                  size: 20,
                 ),
-            ],
-          ),
-          const SizedBox(height: 14),
-
-          // 1. Status Filter Segmented Row
-          Text(
-            'STATUS',
-            style: GoogleFonts.rajdhani(
-              color: AppColors.textMuted,
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.0,
+              ],
             ),
           ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Expanded(
-                child: _statusTabChip('ALL', 'all', Icons.grid_view_sharp),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _statusTabChip('SCHEDULED', 'scheduled', Icons.schedule),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _statusTabChip('COMPLETED', 'completed', Icons.check_circle_outline),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
 
-          // 2. Round Chips Row
-          if (rounds.length > 1) ...[
+          // ── Collapsible Body ──
+          if (_isFilterExpanded) ...[
+            const SizedBox(height: 12),
+            const Divider(color: Colors.white10, height: 1),
+            const SizedBox(height: 12),
+
+            // 1. Group Filter Chips Row
+            if (groups.isNotEmpty) ...[
+              Text(
+                'GROUP / STAGE',
+                style: GoogleFonts.rajdhani(
+                  color: AppColors.textMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.0,
+                ),
+              ),
+              const SizedBox(height: 6),
+              SizedBox(
+                height: 32,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    _filterChip(
+                      label: 'ALL GROUPS',
+                      selected: _selectedGroup == null,
+                      onTap: () => setState(() => _selectedGroup = null),
+                    ),
+                    ...groups.map((g) {
+                      return _filterChip(
+                        label: g.toUpperCase(),
+                        selected: _selectedGroup == g,
+                        onTap: () => setState(() => _selectedGroup = g),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+
+            // 2. Status Filter Segmented Row
             Text(
-              'ROUNDS',
+              'STATUS',
               style: GoogleFonts.rajdhani(
                 color: AppColors.textMuted,
                 fontSize: 11,
@@ -570,61 +646,91 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
               ),
             ),
             const SizedBox(height: 6),
-            SizedBox(
-              height: 34,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: [
-                  _filterChip(
-                    label: 'ALL ROUNDS',
-                    selected: _selectedRound == null,
-                    onTap: () => setState(() => _selectedRound = null),
-                  ),
-                  ...rounds.map((r) {
-                    return _filterChip(
-                      label: 'ROUND $r',
-                      selected: _selectedRound == r,
-                      onTap: () => setState(() => _selectedRound = r),
-                    );
-                  }),
-                ],
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: _statusTabChip('ALL', 'all', Icons.grid_view_sharp),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _statusTabChip('SCHEDULED', 'scheduled', Icons.schedule),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _statusTabChip('COMPLETED', 'completed', Icons.check_circle_outline),
+                ),
+              ],
             ),
-            const SizedBox(height: 14),
-          ],
+            const SizedBox(height: 10),
 
-          // 3. Player Filter Horizontal Avatar Chips
-          if (playersMap.isNotEmpty) ...[
-            Text(
-              'PLAYER',
-              style: GoogleFonts.rajdhani(
-                color: AppColors.textMuted,
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.0,
+            // 3. Round Chips Row
+            if (rounds.length > 1) ...[
+              Text(
+                'ROUNDS',
+                style: GoogleFonts.rajdhani(
+                  color: AppColors.textMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.0,
+                ),
               ),
-            ),
-            const SizedBox(height: 6),
-            SizedBox(
-              height: 36,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: [
-                  _playerChip(
-                    id: null,
-                    name: 'ALL PLAYERS',
-                    selected: _selectedPlayerId == null,
-                  ),
-                  ...playersMap.entries.map((entry) {
-                    return _playerChip(
-                      id: entry.key,
-                      name: entry.value,
-                      selected: _selectedPlayerId == entry.key,
-                    );
-                  }),
-                ],
+              const SizedBox(height: 6),
+              SizedBox(
+                height: 32,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    _filterChip(
+                      label: 'ALL ROUNDS',
+                      selected: _selectedRound == null,
+                      onTap: () => setState(() => _selectedRound = null),
+                    ),
+                    ...rounds.map((r) {
+                      return _filterChip(
+                        label: _getRoundLabel(r, totalRounds),
+                        selected: _selectedRound == r,
+                        onTap: () => setState(() => _selectedRound = r),
+                      );
+                    }),
+                  ],
+                ),
               ),
-            ),
+              const SizedBox(height: 10),
+            ],
+
+            // 4. Player Filter Horizontal Avatar Chips
+            if (playersMap.isNotEmpty) ...[
+              Text(
+                'PLAYER',
+                style: GoogleFonts.rajdhani(
+                  color: AppColors.textMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.0,
+                ),
+              ),
+              const SizedBox(height: 6),
+              SizedBox(
+                height: 34,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    _playerChip(
+                      id: null,
+                      name: 'ALL PLAYERS',
+                      selected: _selectedPlayerId == null,
+                    ),
+                    ...playersMap.entries.map((entry) {
+                      return _playerChip(
+                        id: entry.key,
+                        name: entry.value,
+                        selected: _selectedPlayerId == entry.key,
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ],
           ],
         ],
       ),
@@ -809,7 +915,7 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
     );
   }
 
-  Widget _buildFixtureList(BuildContext context, List<dynamic> fixtures) {
+  Widget _buildFixtureList(BuildContext context, List<dynamic> fixtures, int totalRounds) {
     final sorted = [...fixtures]..sort((a, b) {
         final rA = (a['round_number'] as num?)?.toInt() ?? 0;
         final rB = (b['round_number'] as num?)?.toInt() ?? 0;
@@ -822,13 +928,20 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
           fixture: e.value,
           tournamentId: widget.tournamentId,
           delay: e.key * 60,
+          totalRounds: totalRounds,
+          formatType: widget.formatType,
         ).animate().fade(duration: 300.ms, delay: Duration(milliseconds: e.key * 60)).slideY(begin: 0.06, duration: 300.ms, delay: Duration(milliseconds: e.key * 60));
       }).toList(),
     );
   }
 
   Widget _buildBracketTreeView(BuildContext context, List<dynamic> fixtures) {
-    if (fixtures.isEmpty) return const SizedBox.shrink();
+    if (fixtures.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 40),
+        child: _buildFilterEmptyState(),
+      );
+    }
 
     final Map<int, List<dynamic>> roundsMap = {};
     for (final f in fixtures) {
@@ -994,12 +1107,26 @@ class _MatchFixtureTile extends ConsumerWidget {
   final dynamic fixture;
   final String tournamentId;
   final int delay;
+  final int totalRounds;
+  final String formatType;
 
   const _MatchFixtureTile({
     required this.fixture,
     required this.tournamentId,
     required this.delay,
+    required this.totalRounds,
+    required this.formatType,
   });
+
+  String _getRoundLabel(int r, int totalRounds) {
+    if (formatType == 'knockout' || (formatType == 'group_knockout' && r >= 10)) {
+      if (r == totalRounds && totalRounds > 0) return 'FINAL';
+      if (r == totalRounds - 1 && totalRounds > 1) return 'SEMI-FINAL';
+      if (r == totalRounds - 2 && totalRounds > 2) return 'QUARTER-FINAL';
+      return 'ROUND $r MATCH';
+    }
+    return 'MATCH DAY $r';
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1018,6 +1145,23 @@ class _MatchFixtureTile extends ConsumerWidget {
     final p1IsWinner = isCompleted && winnerId != null && winnerId == p1Id;
     final p2IsWinner = isCompleted && winnerId != null && winnerId == p2Id;
 
+    final p1Score = fixture['player_1_score'] as num?;
+    final p2Score = fixture['player_2_score'] as num?;
+
+    final groupName = fixture['group_name']?.toString();
+    final roundLabel = _getRoundLabel(round, totalRounds);
+    final isGroupMatch = formatType == 'round_robin' || (formatType == 'group_knockout' && round < 10);
+    
+    // Check if the user asked to add date and deadline:
+    // e.g. " • 11:59 PM"
+    // Since backend might not have deadline, we just hardcode the requested string if it's a group match, or always?
+    // User: "and whats the lable round 1 instead say match day also include date and deadline of 11:59 pm"
+    final dateStr = ' • 11:59 PM'; // Hardcoded deadline for now as requested
+    
+    final headerText = groupName != null && groupName.isNotEmpty && isGroupMatch
+        ? '$groupName • $roundLabel$dateStr'
+        : '$roundLabel$dateStr';
+
     return GlassCard(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(0),
@@ -1031,17 +1175,17 @@ class _MatchFixtureTile extends ConsumerWidget {
             child: Row(
               children: [
                 Text(
-                  'ROUND $round MATCH',
+                  headerText,
                   style: GoogleFonts.rajdhani(
-                    color: AppColors.textMuted,
+                    color: groupName != null && groupName.isNotEmpty ? AppColors.cyan : AppColors.textMuted,
                     fontSize: 12,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.bold,
                     letterSpacing: 1.4,
                   ),
                 ),
                 if (isCompleted) ...[
                   const SizedBox(width: 8),
-                  GlowBadge(label: 'COMPLETED', color: AppColors.winGreen),
+                  const GlowBadge(label: 'COMPLETED', color: AppColors.winGreen),
                 ],
                 const Spacer(),
                 // Predict button
@@ -1049,7 +1193,11 @@ class _MatchFixtureTile extends ConsumerWidget {
                   icon: Icons.psychology,
                   label: 'PREDICT',
                   color: AppColors.purple,
-                  onTap: () => _showPredictionSheet(context, p1Name, p2Name),
+                  onTap: () {
+                    final p1Rating = (fixture['player_1_rating'] as num?)?.toInt() ?? 1000;
+                    final p2Rating = (fixture['player_2_rating'] as num?)?.toInt() ?? 1000;
+                    _showPredictionSheet(context, p1Name, p2Name, p1Rating, p2Rating);
+                  },
                 ),
                 const SizedBox(width: 6),
                 // Report button
@@ -1061,10 +1209,32 @@ class _MatchFixtureTile extends ConsumerWidget {
                     context: context,
                     builder: (_) => OcrUploadModal(
                       tMatchId: matchId,
+                      defaultPlayerId: p1Id,
                       defaultOpponentId: p2Id,
+                      defaultPlayerName: p1Name,
+                      defaultOpponentName: p2Name,
                     ),
                   ),
                 ),
+                if (!isCompleted) ...[
+                  const SizedBox(width: 6),
+                  _IconActionButton(
+                    icon: Icons.gavel,
+                    label: 'FORFEIT',
+                    color: AppColors.lossRed,
+                    onTap: () => showDialog(
+                      context: context,
+                      builder: (_) => ForfeitClaimModal(
+                        tournamentId: tournamentId,
+                        matchId: matchId,
+                        player1Id: p1Id,
+                        player2Id: p2Id,
+                        player1Name: p1Name,
+                        player2Name: p2Name,
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -1075,7 +1245,7 @@ class _MatchFixtureTile extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: isCompleted
-                ? _buildResultRow(p1Name, p2Name, p1IsWinner, p2IsWinner, winnerId == null)
+                ? _buildResultRow(p1Name, p2Name, p1IsWinner, p2IsWinner, winnerId == null, p1Score: p1Score, p2Score: p2Score)
                 : _buildVsRow(p1Name, p2Name),
           ),
         ],
@@ -1111,11 +1281,13 @@ class _MatchFixtureTile extends ConsumerWidget {
     );
   }
 
-  Widget _buildResultRow(String p1Name, String p2Name, bool p1Won, bool p2Won, bool isDraw) {
+  Widget _buildResultRow(String p1Name, String p2Name, bool p1Won, bool p2Won, bool isDraw, {num? p1Score, num? p2Score}) {
     Color p1Color = isDraw ? Colors.amber : (p1Won ? AppColors.winGreen : AppColors.lossRed);
     Color p2Color = isDraw ? Colors.amber : (p2Won ? AppColors.winGreen : AppColors.lossRed);
-    String p1Result = isDraw ? 'D' : (p1Won ? 'W' : 'L');
-    String p2Result = isDraw ? 'D' : (p2Won ? 'W' : 'L');
+
+    final scoreDisplay = (p1Score != null && p2Score != null)
+        ? '${p1Score.toInt()} – ${p2Score.toInt()}'
+        : (p1Won ? 'W – L' : (p2Won ? 'L – W' : 'D – D'));
 
     return Row(
       children: [
@@ -1125,7 +1297,7 @@ class _MatchFixtureTile extends ConsumerWidget {
           child: Column(
             children: [
               Text(
-                '$p1Result – $p2Result',
+                scoreDisplay,
                 style: GoogleFonts.orbitron(
                   color: Colors.white,
                   fontSize: 16,
@@ -1145,12 +1317,12 @@ class _MatchFixtureTile extends ConsumerWidget {
     );
   }
 
-  void _showPredictionSheet(BuildContext context, String p1Name, String p2Name) {
+  void _showPredictionSheet(BuildContext context, String p1Name, String p2Name, int p1Rating, int p2Rating) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (ctx) => _PredictionSheet(p1Name: p1Name, p2Name: p2Name),
+      builder: (ctx) => _PredictionSheet(p1Name: p1Name, p2Name: p2Name, p1Rating: p1Rating, p2Rating: p2Rating),
     );
   }
 }
@@ -1301,14 +1473,20 @@ class _BracketVersusPill extends ConsumerWidget {
       p1Score = (winnerId == p1Id) ? 'W' : 'L';
       p2Score = (winnerId == p2Id) ? 'W' : 'L';
     } else if (isComplete) {
-      p1Score = 'W';
-      p2Score = 'L';
+      p1Score = 'D';
+      p2Score = 'D';
     }
 
     return GestureDetector(
       onTap: () => showDialog(
         context: context,
-        builder: (_) => OcrUploadModal(tMatchId: matchId, defaultOpponentId: p2Id),
+        builder: (_) => OcrUploadModal(
+          tMatchId: matchId,
+          defaultPlayerId: p1Id,
+          defaultOpponentId: p2Id,
+          defaultPlayerName: p1Name,
+          defaultOpponentName: p2Name,
+        ),
       ),
       child: Container(
         decoration: BoxDecoration(
@@ -1388,21 +1566,38 @@ class _StandingsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isKnockout = formatType == 'knockout';
+    final isDirectKnockout = formatType == 'knockout';
+    final isGroupKnockout = formatType == 'group_knockout';
 
-    if (isKnockout) {
+    if (isGroupKnockout) {
       return SingleChildScrollView(
+        primary: false,
+        padding: const EdgeInsets.all(16),
+        child: GroupStandingsWidget(
+          tournamentId: tournamentId,
+        )
+            .animate()
+            .fade(duration: 350.ms)
+            .slideY(begin: 0.06, duration: 350.ms),
+      );
+    }
+
+    if (isDirectKnockout) {
+      return SingleChildScrollView(
+        primary: false,
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
+            TournamentLeadersWidget(tournamentId: tournamentId),
+            const SizedBox(height: 16),
             GlassCard(
               borderColor: AppColors.cyan.withValues(alpha: 0.25),
               child: Column(
                 children: [
-                  Icon(Icons.account_tree, color: AppColors.cyan, size: 40),
+                  const Icon(Icons.account_tree, color: AppColors.cyan, size: 40),
                   const SizedBox(height: 16),
                   Text(
-                    'BRACKET FORMAT',
+                    'DIRECT KNOCKOUT BRACKET',
                     style: GoogleFonts.orbitron(
                       color: Colors.white,
                       fontSize: 18,
@@ -1411,7 +1606,7 @@ class _StandingsTab extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Knockout tournaments use bracket progression rather than standings. View the bracket in the Fixtures tab.',
+                    'Direct knockout tournaments use bracket progression rather than standings tables. View the bracket in the Fixtures tab.',
                     style: GoogleFonts.rajdhani(
                       color: AppColors.textMuted,
                       fontSize: 14,
@@ -1421,9 +1616,9 @@ class _StandingsTab extends StatelessWidget {
                   ),
                   const SizedBox(height: 20),
                   EsportsButton(
-                    label: 'GO TO FIXTURES',
+                    label: 'GO TO FIXTURES & BRACKET',
                     icon: Icons.calendar_month,
-                    gradient: [AppColors.cyan, AppColors.purple],
+                    gradient: const [AppColors.cyan, AppColors.purple],
                     onPressed: onGoToFixtures,
                   ),
                 ],
@@ -1435,6 +1630,7 @@ class _StandingsTab extends StatelessWidget {
     }
 
     return SingleChildScrollView(
+      primary: false,
       padding: const EdgeInsets.all(16),
       child: LeagueTableWidget(tournamentId: tournamentId)
           .animate()
@@ -1609,6 +1805,7 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
     final isDoubleRoundRobin = !isKnockout && participantCount != null && participantCount > 1 && maxRounds >= (participantCount - 1) * 2;
 
     return SingleChildScrollView(
+      primary: false,
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1637,7 +1834,9 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            isKnockout ? 'Knockout Tournament' : 'League Tournament',
+                            widget.formatType == 'group_knockout'
+                                ? 'Group Stage + Knockout Tournament'
+                                : (isKnockout ? 'Direct Knockout Tournament' : 'League Round-Robin Tournament'),
                             style: GoogleFonts.rajdhani(
                               color: AppColors.textMuted,
                               fontSize: 13,
@@ -1998,12 +2197,14 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
 class _PredictionSheet extends ConsumerWidget {
   final String p1Name;
   final String p2Name;
+  final int p1Rating;
+  final int p2Rating;
 
-  const _PredictionSheet({required this.p1Name, required this.p2Name});
+  const _PredictionSheet({required this.p1Name, required this.p2Name, required this.p1Rating, required this.p2Rating});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    const params = PredictParams(p1Rating: 1200, p2Rating: 1200);
+    final params = PredictParams(p1Rating: p1Rating, p2Rating: p2Rating);
     final predAsync = ref.watch(matchPredictionProvider(params));
 
     return Container(

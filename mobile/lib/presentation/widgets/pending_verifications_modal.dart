@@ -62,86 +62,177 @@ class PendingVerificationsModal extends ConsumerWidget {
                   );
                 }
 
-                return Column(
-                  children: pendingMatches.map((matchData) {
-                    final match = matchData as Map<String, dynamic>;
-                    final matchId = match['id']?.toString() ?? '';
-                    final playerName = match['player_name']?.toString() ?? 'Player';
-                    final goalsFor = match['goals_for']?.toString() ?? '0';
-                    final goalsAgainst = match['goals_against']?.toString() ?? '0';
-                    final possession = match['possession'] != null ? '${match['possession']}%' : '—';
-                    final createdAt = match['created_at']?.toString() ?? '';
-                    final matchType = match['match_type']?.toString() ?? 'Match';
+                return Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: pendingMatches.map((matchData) {
+                        final match = matchData as Map<String, dynamic>;
+                        final matchId = match['id']?.toString() ?? '';
+                        final playerName = match['player_name']?.toString() ?? 'Player';
+                        final opponentName = match['opponent_name']?.toString() ?? 'Opponent';
+                        final goalsFor = match['goals_for']?.toString() ?? '0';
+                        final goalsAgainst = match['goals_against']?.toString() ?? '0';
+                        final possessionVal = match['possession'];
+                        final possession = possessionVal != null ? '$possessionVal%' : '—';
+                        final matchType = match['match_type']?.toString() ?? 'Match';
 
-                    return Container(
-                      padding: const EdgeInsets.all(12),
-                      margin: const EdgeInsets.only(bottom: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.04),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Submitted by $playerName',
-                                style: GoogleFonts.rajdhani(fontWeight: FontWeight.bold, color: AppColors.primary, fontSize: 14),
-                              ),
-                              Text(
-                                createdAt.length > 10 ? createdAt.substring(0, 10) : createdAt,
-                                style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
-                              ),
-                            ],
+                        final tournamentName = match['tournament_name']?.toString();
+                        final roundNumber = match['round_number'];
+                        final groupName = match['group_name']?.toString();
+
+                        String headerContext = '';
+                        if (tournamentName != null && tournamentName.isNotEmpty) {
+                          headerContext = tournamentName.toUpperCase();
+                          if (groupName != null && groupName.isNotEmpty) {
+                            headerContext += ' • $groupName';
+                          }
+                          if (roundNumber != null) {
+                            headerContext += ' • ROUND $roundNumber';
+                          }
+                        } else {
+                          headerContext = '${matchType.toUpperCase()} MATCH';
+                        }
+
+                        return Container(
+                          padding: const EdgeInsets.all(12),
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.04),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
                           ),
-                          const SizedBox(height: 8),
-                          Row(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Score:', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                              const SizedBox(width: 6),
-                              Text('$goalsFor - $goalsAgainst', style: GoogleFonts.rajdhani(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-                              const Spacer(),
-                              Text('Possession: $possession', style: const TextStyle(color: AppColors.textMuted, fontSize: 11)),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Text('Type: $matchType', style: const TextStyle(color: Colors.amber, fontSize: 11)),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.winGreen,
-                                    foregroundColor: Colors.black,
-                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                              // Tournament & Stage Banner
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      headerContext,
+                                      style: GoogleFonts.rajdhani(
+                                        color: AppColors.cyan,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                        letterSpacing: 1.2,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
-                                  icon: const Icon(Icons.check, size: 16),
-                                  label: Text('CONFIRM RESULT', style: GoogleFonts.rajdhani(fontWeight: FontWeight.bold, fontSize: 12)),
-                                  onPressed: () => _confirmMatch(context, ref, matchId, playerName),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      matchType.toUpperCase(),
+                                      style: GoogleFonts.rajdhani(color: AppColors.primary, fontSize: 10, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+
+                              // Versus Matchup Box
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.3),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            playerName,
+                                            style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const Text('Submitter', style: TextStyle(color: Colors.white38, fontSize: 10)),
+                                        ],
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.winGreen.withValues(alpha: 0.2),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        '$goalsFor – $goalsAgainst',
+                                        style: GoogleFonts.orbitron(color: AppColors.winGreen, fontWeight: FontWeight.bold, fontSize: 14),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                        children: [
+                                          Text(
+                                            opponentName,
+                                            style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const Text('Opponent', style: TextStyle(color: Colors.white38, fontSize: 10)),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  style: OutlinedButton.styleFrom(
-                                    side: const BorderSide(color: AppColors.lossRed),
-                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                              const SizedBox(height: 8),
+
+                              Row(
+                                children: [
+                                  Text(
+                                    'POSSESSION: $possession',
+                                    style: GoogleFonts.rajdhani(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold),
                                   ),
-                                  icon: const Icon(Icons.flag_outlined, color: AppColors.lossRed, size: 16),
-                                  label: Text('DISPUTE', style: GoogleFonts.rajdhani(color: AppColors.lossRed, fontWeight: FontWeight.bold, fontSize: 12)),
-                                  onPressed: () => _disputeMatch(context, ref, matchId, playerName),
-                                ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: AppColors.winGreen,
+                                        side: const BorderSide(color: AppColors.winGreen),
+                                        padding: const EdgeInsets.symmetric(vertical: 8),
+                                      ),
+                                      icon: const Icon(Icons.check, size: 14),
+                                      label: Text('CONFIRM', style: GoogleFonts.rajdhani(fontWeight: FontWeight.bold, fontSize: 12)),
+                                      onPressed: () => _confirmMatch(context, ref, matchId, '$playerName vs $opponentName'),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: AppColors.lossRed,
+                                        side: const BorderSide(color: AppColors.lossRed),
+                                        padding: const EdgeInsets.symmetric(vertical: 8),
+                                      ),
+                                      icon: const Icon(Icons.flag_outlined, size: 14),
+                                      label: Text('DISPUTE', style: GoogleFonts.rajdhani(color: AppColors.lossRed, fontWeight: FontWeight.bold, fontSize: 12)),
+                                      onPressed: () => _disputeMatch(context, ref, matchId, '$playerName vs $opponentName'),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
+                        );
+                      }).toList(),
+                    ),
+                  ),
                 );
               },
             ),
@@ -157,7 +248,6 @@ class PendingVerificationsModal extends ConsumerWidget {
       await client.confirmMatch(matchId);
       ref.invalidate(pendingMatchesProvider);
       if (context.mounted) {
-        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Match result with $playerName confirmed!'),
@@ -229,7 +319,6 @@ class PendingVerificationsModal extends ConsumerWidget {
                 ref.invalidate(pendingMatchesProvider);
                 ref.invalidate(adminDisputesProvider);
                 if (context.mounted) {
-                  Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Match with $playerName disputed. Case logged for admin review.'),

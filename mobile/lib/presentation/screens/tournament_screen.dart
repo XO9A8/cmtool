@@ -288,6 +288,12 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
   final _nameCtrl = TextEditingController();
   String _formatType = 'round_robin';
   int _legs = 1; // 1 = single round-robin, 2 = double round-robin
+  int _groupsCount = 2; // 2, 4, or 8 groups
+  int _advancingPerGroup = 2; // Top 1 or Top 2 advance
+  int _knockoutLegs = 1; // 1 = Single leg, 2 = Two legs (home & away)
+  bool _hasThirdPlaceMatch = true; // 3rd place playoff
+  String _seedingType = 'elo'; // 'elo' or 'random'
+  bool _singleFinalMatch = true; // Single match for Final even if earlier rounds are 2 legs
   final Set<String> _selectedPlayerIds = {};
   bool _initializedMembers = false;
   bool _isLoading = false;
@@ -330,6 +336,12 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
         formatType: _formatType,
         rulesConfig: {
           'legs': _legs,
+          'groups_count': _groupsCount,
+          'advancing_per_group': _advancingPerGroup,
+          'knockout_legs': _knockoutLegs,
+          'has_third_place_match': _hasThirdPlaceMatch,
+          'seeding_type': _seedingType,
+          'single_final_match': _singleFinalMatch,
           'participant_ids': _selectedPlayerIds.toList(),
         },
       );
@@ -347,15 +359,18 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
 
   @override
   Widget build(BuildContext context) {
-    final membersAsync = ref.watch(clubMembersProvider(widget.clubId));
-
-    membersAsync.whenData((data) {
-      if (!_initializedMembers) {
+    ref.listen(clubMembersProvider(widget.clubId), (prev, next) {
+      if (!_initializedMembers && next.hasValue) {
+        final data = next.value as Map<String, dynamic>? ?? {};
         final members = (data['members'] as List<dynamic>? ?? []);
-        _selectedPlayerIds.addAll(members.map((m) => m['user_id']?.toString() ?? '').where((id) => id.isNotEmpty));
-        _initializedMembers = true;
+        setState(() {
+          _selectedPlayerIds.addAll(members.map((m) => m['user_id']?.toString() ?? '').where((id) => id.isNotEmpty));
+          _initializedMembers = true;
+        });
       }
     });
+
+    final membersAsync = ref.watch(clubMembersProvider(widget.clubId));
 
     return Container(
       constraints: BoxConstraints(
@@ -451,7 +466,7 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
                   children: [
                     Expanded(
                       child: _FormatChip(
-                        label: 'LEAGUE',
+                        label: 'LEAGUE (ROUND ROBIN)',
                         icon: Icons.swap_horiz,
                         selected: _formatType == 'round_robin',
                         onTap: () => setState(() => _formatType = 'round_robin'),
@@ -460,17 +475,274 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
                     const SizedBox(width: 12),
                     Expanded(
                       child: _FormatChip(
-                        label: 'KNOCKOUT',
+                        label: 'KNOCKOUT TOURNAMENT',
                         icon: Icons.account_tree,
-                        selected: _formatType == 'knockout',
-                        onTap: () => setState(() => _formatType = 'knockout'),
+                        selected: _formatType == 'knockout' || _formatType == 'group_knockout',
+                        onTap: () => setState(() {
+                          if (_formatType == 'round_robin') {
+                            _formatType = 'knockout'; // default to direct knockout
+                          }
+                        }),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 18),
 
-                // Encounters (Legs) selection
+                // Knockout Sub-options
+                if (_formatType == 'knockout' || _formatType == 'group_knockout') ...[
+                  Text(
+                    'KNOCKOUT STAGE STRUCTURE',
+                    style: GoogleFonts.rajdhani(
+                      color: AppColors.textMuted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _FormatChip(
+                          label: 'DIRECT KNOCKOUT',
+                          icon: Icons.flash_on,
+                          selected: _formatType == 'knockout',
+                          onTap: () => setState(() => _formatType = 'knockout'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _FormatChip(
+                          label: 'GROUP FIRST + KNOCKOUT',
+                          icon: Icons.grid_view,
+                          selected: _formatType == 'group_knockout',
+                          onTap: () => setState(() => _formatType = 'group_knockout'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+
+                  // Group stage settings if group_knockout is selected
+                  if (_formatType == 'group_knockout') ...[
+                    Text(
+                      'NUMBER OF GROUPS',
+                      style: GoogleFonts.rajdhani(
+                        color: AppColors.textMuted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _FormatChip(
+                            label: '2 GROUPS',
+                            icon: Icons.filter_2,
+                            selected: _groupsCount == 2,
+                            onTap: () => setState(() => _groupsCount = 2),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _FormatChip(
+                            label: '4 GROUPS',
+                            icon: Icons.filter_4,
+                            selected: _groupsCount == 4,
+                            onTap: () => setState(() => _groupsCount = 4),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _FormatChip(
+                            label: '8 GROUPS',
+                            icon: Icons.filter_8,
+                            selected: _groupsCount == 8,
+                            onTap: () => setState(() => _groupsCount = 8),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+
+                    Text(
+                      'ADVANCING PER GROUP',
+                      style: GoogleFonts.rajdhani(
+                        color: AppColors.textMuted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _FormatChip(
+                            label: 'TOP 1 (WINNER ONLY)',
+                            icon: Icons.looks_one,
+                            selected: _advancingPerGroup == 1,
+                            onTap: () => setState(() => _advancingPerGroup = 1),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _FormatChip(
+                            label: 'TOP 2 ADVANCE',
+                            icon: Icons.looks_two,
+                            selected: _advancingPerGroup == 2,
+                            onTap: () => setState(() => _advancingPerGroup = 2),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                  ],
+
+                  // Knockout legs / round format
+                  Text(
+                    'KNOCKOUT MATCH LEGS',
+                    style: GoogleFonts.rajdhani(
+                      color: AppColors.textMuted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _FormatChip(
+                          label: 'SINGLE MATCH (1x)',
+                          icon: Icons.filter_1,
+                          selected: _knockoutLegs == 1,
+                          onTap: () => setState(() => _knockoutLegs = 1),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _FormatChip(
+                          label: 'TWO LEGS (HOME & AWAY)',
+                          icon: Icons.repeat,
+                          selected: _knockoutLegs == 2,
+                          onTap: () => setState(() => _knockoutLegs = 2),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+
+                  // Seeding Strategy Selection
+                  Text(
+                    'BRACKET SEEDING STRATEGY',
+                    style: GoogleFonts.rajdhani(
+                      color: AppColors.textMuted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _FormatChip(
+                          label: 'ELO SEEDED (1 vs N)',
+                          icon: Icons.military_tech,
+                          selected: _seedingType == 'elo',
+                          onTap: () => setState(() => _seedingType = 'elo'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _FormatChip(
+                          label: 'RANDOM DRAW',
+                          icon: Icons.shuffle,
+                          selected: _seedingType == 'random',
+                          onTap: () => setState(() => _seedingType = 'random'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+
+                  // 3rd Place Match Toggle
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '3RD PLACE PLAYOFF MATCH',
+                            style: GoogleFonts.rajdhani(
+                              color: AppColors.textMuted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 1.5,
+                            ),
+                          ),
+                          Text(
+                            'Match between semi-final losers for bronze',
+                            style: GoogleFonts.rajdhani(
+                              color: AppColors.textMuted.withValues(alpha: 0.7),
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Switch.adaptive(
+                        value: _hasThirdPlaceMatch,
+                        activeColor: AppColors.primary,
+                        onChanged: (val) => setState(() => _hasThirdPlaceMatch = val),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Single Match Final Toggle (if 2 legs selected)
+                  if (_knockoutLegs == 2) ...[
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'SINGLE MATCH FINAL',
+                              style: GoogleFonts.rajdhani(
+                                color: AppColors.textMuted,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 1.5,
+                              ),
+                            ),
+                            Text(
+                              'Neutral venue single match for the final',
+                              style: GoogleFonts.rajdhani(
+                                color: AppColors.textMuted.withValues(alpha: 0.7),
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Switch.adaptive(
+                          value: _singleFinalMatch,
+                          activeColor: AppColors.primary,
+                          onChanged: (val) => setState(() => _singleFinalMatch = val),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+                  const SizedBox(height: 4),
+                ],
+
+                // Encounters (Legs) selection for League
                 if (_formatType == 'round_robin') ...[
                   Text(
                     'MATCH ENCOUNTERS',

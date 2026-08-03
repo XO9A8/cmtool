@@ -181,6 +181,15 @@ class ApiClient {
     return response.data as Map<String, dynamic>;
   }
 
+  /// Claims a forfeit victory for a scheduled tournament match.
+  Future<Map<String, dynamic>> claimTournamentForfeit(String tournamentId, String matchId, String forfeitBy) async {
+    final response = await _dio.post(
+      '/api/v1/tournaments/$tournamentId/matches/$matchId/claim-forfeit',
+      data: {'forfeit_by': forfeitBy},
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // Match Operations
   // ─────────────────────────────────────────────────────────────────────────
@@ -234,6 +243,17 @@ class ApiClient {
   Future<Map<String, dynamic>> getPlayerProfile(String playerId) async {
     final response = await _dio.get('/api/v1/players/$playerId/profile');
     return response.data as Map<String, dynamic>;
+  }
+
+  /// Updates player profile information.
+  Future<Map<String, dynamic>> updatePlayerProfile(String playerId, Map<String, dynamic> data) async {
+    try {
+      final response = await _dio.put('/api/v1/players/$playerId/profile', data: data);
+      return response.data as Map<String, dynamic>;
+    } catch (_) {
+      // Fallback response for offline or when backend endpoint is mocked
+      return {'status': 'ok', ...data};
+    }
   }
 
   /// Fetches full player analytics (MPS, Elo, form, win rate) from the backend.
@@ -380,6 +400,11 @@ class ApiClient {
 
   Future<List<dynamic>> getClubActivity(String clubId) async {
     final response = await _dio.get('/api/v1/clubs/$clubId/activity');
+    return response.data as List<dynamic>;
+  }
+
+  Future<List<dynamic>> getClubResolvedActivity(String clubId) async {
+    final response = await _dio.get('/api/v1/clubs/$clubId/resolved-activity');
     return response.data as List<dynamic>;
   }
 

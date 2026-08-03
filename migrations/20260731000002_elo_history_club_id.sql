@@ -16,4 +16,4 @@ CREATE INDEX IF NOT EXISTS idx_elo_history_club ON Elo_History(club_id, recorded
 ALTER TABLE Tournaments DROP CONSTRAINT IF EXISTS tournaments_format_type_check;
 
 ALTER TABLE Tournaments ADD CONSTRAINT tournaments_format_type_check
-CHECK (format_type IN ('knockout', 'round_robin', 'league'));
+CHECK (format_type IN ('knockout', 'round_robin', 'league', 'group_knockout'));
