@@ -465,10 +465,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             fontSize: 14,
                           ),
                         ),
-                        const Text(
-                          'http://127.0.0.1:3000 (Backend API v1)',
-                          style: TextStyle(fontSize: 11, color: AppColors.textMuted),
-                        ),
+                        Consumer(builder: (context, ref, _) {
+                          return Text(
+                            '${ref.read(apiClientProvider).baseUrl} (Backend API v1)',
+                            style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                          );
+                        }),
                       ],
                     ),
                   ),
