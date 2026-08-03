@@ -1,17 +1,16 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../theme/app_theme.dart';
 import '../providers/match_provider.dart';
-import '../../infrastructure/api_client.dart';
+import 'club_detail_screen.dart';
 
-/// Redesigned Esports Club Command Hub with 4 sub-views:
-/// 1. Roster & 1v1 Challenge Launcher
-/// 2. Top Club Leaderboard (with H2H comparison modals)
-/// 3. Match Activity Feed
-/// 4. Seasons Archive
+/// Club Hub landing page — lists the user's clubs as rich cards,
+/// supports search, and exposes a FAB for creating / joining clubs.
 class ClubsScreen extends ConsumerStatefulWidget {
   const ClubsScreen({super.key});
 
@@ -19,126 +18,42 @@ class ClubsScreen extends ConsumerStatefulWidget {
   ConsumerState<ClubsScreen> createState() => _ClubsScreenState();
 }
 
-class _ClubsScreenState extends ConsumerState<ClubsScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
-  final _clubNameCtrl   = TextEditingController();
-  final _inviteCodeCtrl = TextEditingController();
-  bool _creating = false;
-  String? _createResult;
-  bool _createError = false;
-
-  final _joinCodeCtrl = TextEditingController();
-  bool _joining = false;
-  String? _joinResult;
-  bool _joinError = false;
-
-  String? _selectedClubId;
-  int _clubViewMode = 0; // 0 = Roster & Challenges, 1 = Leaderboard, 2 = Activity, 3 = Seasons
+class _ClubsScreenState extends ConsumerState<ClubsScreen> {
+  final _searchCtrl = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _searchCtrl.addListener(() {
+      setState(() => _searchQuery = _searchCtrl.text.toLowerCase().trim());
+    });
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
-    _clubNameCtrl.dispose();
-    _inviteCodeCtrl.dispose();
-    _joinCodeCtrl.dispose();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _createClub() async {
-    if (_clubNameCtrl.text.trim().isEmpty || _inviteCodeCtrl.text.trim().isEmpty) {
-      setState(() { _createResult = 'Name & Invite Code required.'; _createError = true; });
-      return;
-    }
-    setState(() { _creating = true; _createResult = null; });
-    try {
-      final client = ref.read(apiClientProvider);
-      final res = await client.createClub(_clubNameCtrl.text.trim(), _inviteCodeCtrl.text.trim());
-      setState(() {
-        _createResult = '✅ Club Created! ID: ${res['club_id']}';
-        _createError = false;
-      });
-      ref.invalidate(myClubsProvider);
-    } catch (e) {
-      setState(() { _createResult = 'Failed: $e'; _createError = true; });
-    } finally {
-      setState(() => _creating = false);
-    }
-  }
+  // ─────────────────────────────────────────────────────────────────────────
+  // FAB bottom sheet
+  // ─────────────────────────────────────────────────────────────────────────
 
-  Future<void> _joinClub() async {
-    if (_joinCodeCtrl.text.trim().isEmpty) {
-      setState(() { _joinResult = 'Invite code required.'; _joinError = true; });
-      return;
-    }
-    setState(() { _joining = true; _joinResult = null; });
-    try {
-      final client = ref.read(apiClientProvider);
-      await client.joinClub(_joinCodeCtrl.text.trim());
-      setState(() {
-        _joinResult = '✅ Successfully joined club!';
-        _joinError = false;
-      });
-      ref.invalidate(myClubsProvider);
-    } catch (e) {
-      setState(() { _joinResult = 'Failed: $e'; _joinError = true; });
-    } finally {
-      setState(() => _joining = false);
-    }
-  }
-
-  void _showRoleDialog(String clubId, String playerId, String currentRole) {
-    showDialog(
+  void _openAddClubSheet() {
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: AppColors.primary.withValues(alpha: 0.3)),
-        ),
-        title: Text('CHANGE MEMBER ROLE', style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: ['admin', 'organizer', 'player'].map((role) {
-            final isCurrent = currentRole == role;
-            return ListTile(
-              leading: Icon(
-                role == 'admin' ? Icons.star : (role == 'organizer' ? Icons.engineering : Icons.person),
-                color: isCurrent ? AppColors.primary : Colors.white54,
-              ),
-              title: Text(
-                role.toUpperCase(),
-                style: GoogleFonts.rajdhani(
-                  color: isCurrent ? AppColors.primary : Colors.white,
-                  fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-                ),
-              ),
-              onTap: () async {
-                Navigator.pop(ctx);
-                try {
-                  final client = ref.read(apiClientProvider);
-                  await client.updateMemberRole(clubId, playerId, role);
-                  ref.invalidate(clubMembersProvider(clubId));
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Failed to update role: $e')),
-                    );
-                  }
-                }
-              },
-            );
-          }).toList(),
-        ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _AddClubSheet(
+        onDone: () => ref.invalidate(myClubsProvider),
       ),
     );
   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Build
+  // ─────────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -146,66 +61,299 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> with SingleTickerProv
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        title: Text(
-          'CLUB COMMAND & ROSTER',
-          style: GoogleFonts.rajdhani(fontWeight: FontWeight.bold, letterSpacing: 1.5, color: Colors.white),
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: AppColors.primary,
-          indicatorWeight: 3,
-          labelColor: AppColors.primary,
-          unselectedLabelColor: AppColors.textMuted,
-          labelStyle: GoogleFonts.rajdhani(fontWeight: FontWeight.bold, fontSize: 13),
-          tabs: const [
-            Tab(text: 'MY CLUBS'),
-            Tab(text: 'CREATE CLUB'),
-            Tab(text: 'JOIN CLUB'),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _openAddClubSheet,
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.black,
+        elevation: 8,
+        child: const Icon(Icons.add, size: 28),
+      ),
+      body: RefreshIndicator(
+        color: AppColors.primary,
+        backgroundColor: AppColors.surface,
+        onRefresh: () async => ref.invalidate(myClubsProvider),
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            // ── Hero Header ──────────────────────────────────────────────
+            SliverToBoxAdapter(child: _buildHeroHeader()),
+
+            // ── Search Bar ───────────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: _buildSearchBar(),
+              ),
+            ),
+
+            // ── Section label ────────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.shield, size: 16, color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      'MY CLUBS',
+                      style: GoogleFonts.rajdhani(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 2,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // ── Club List ────────────────────────────────────────────────
+            _buildClubList(clubsAsync),
+
+            // Bottom padding for FAB clearance
+            const SliverToBoxAdapter(child: SizedBox(height: 100)),
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Hero Header
+  // ─────────────────────────────────────────────────────────────────────────
+
+  Widget _buildHeroHeader() {
+    return Container(
+      height: 180,
+      margin: const EdgeInsets.only(bottom: 20),
+      child: Stack(
+        fit: StackFit.expand,
         children: [
-          _buildMyClubsTab(clubsAsync),
-          _buildCreateClubTab(),
-          _buildJoinClubTab(),
+          // Background gradient
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF1A0A00), Color(0xFF0D0D1A), AppColors.background],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+            ),
+          ),
+          // Neon glow circle
+          Positioned(
+            right: -30,
+            top: -30,
+            child: Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.primary.withValues(alpha: 0.08),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                    blurRadius: 60,
+                    spreadRadius: 20,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            left: -20,
+            bottom: -20,
+            child: Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.purple.withValues(alpha: 0.06),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.purple.withValues(alpha: 0.1),
+                    blurRadius: 40,
+                    spreadRadius: 10,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Content
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Shield icon
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      gradient: const LinearGradient(
+                        colors: [AppColors.primary, Color(0xFFFF9E00)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.4),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(Icons.shield, color: Colors.black, size: 34),
+                  )
+                      .animate()
+                      .scale(duration: 400.ms, curve: Curves.easeOutBack),
+                  const SizedBox(width: 18),
+                  // Title block
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ShaderMask(
+                          shaderCallback: (b) => const LinearGradient(
+                            colors: [AppColors.primary, Color(0xFFFF9E00)],
+                          ).createShader(b),
+                          child: Text(
+                            'CLUB HUB',
+                            style: GoogleFonts.rajdhani(
+                              fontSize: 36,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 3,
+                              color: Colors.white,
+                            ),
+                          ),
+                        )
+                            .animate()
+                            .fadeIn(duration: 500.ms)
+                            .slideX(begin: -0.2, duration: 400.ms),
+                        Text(
+                          'MANAGE YOUR SQUADS',
+                          style: GoogleFonts.rajdhani(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 2.5,
+                            color: AppColors.textMuted,
+                          ),
+                        )
+                            .animate()
+                            .fadeIn(delay: 150.ms, duration: 400.ms),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildMyClubsTab(AsyncValue<Map<String, dynamic>> clubsAsync) {
+  // ─────────────────────────────────────────────────────────────────────────
+  // Search Bar
+  // ─────────────────────────────────────────────────────────────────────────
+
+  Widget _buildSearchBar() {
+    return Container(
+      height: 48,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+          child: TextField(
+            controller: _searchCtrl,
+            style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 15),
+            decoration: InputDecoration(
+              hintText: 'Search clubs...',
+              hintStyle: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 15),
+              prefixIcon: const Icon(Icons.search, color: AppColors.textMuted, size: 20),
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, color: AppColors.textMuted, size: 18),
+                      onPressed: () {
+                        _searchCtrl.clear();
+                      },
+                    )
+                  : null,
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Club List
+  // ─────────────────────────────────────────────────────────────────────────
+
+  Widget _buildClubList(AsyncValue<Map<String, dynamic>> clubsAsync) {
     return clubsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
-      error: (e, _) => GlassCard(
-        margin: const EdgeInsets.all(16),
-        child: Text('Failed to load clubs: $e', style: const TextStyle(color: Colors.redAccent)),
+      loading: () => SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (_, i) => _shimmerCard(i),
+          childCount: 3,
+        ),
+      ),
+      error: (e, _) => SliverToBoxAdapter(
+        child: GlassCard(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          borderColor: AppColors.lossRed.withValues(alpha: 0.4),
+          child: Row(
+            children: [
+              const Icon(Icons.error_outline, color: AppColors.lossRed),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Failed to load clubs: $e',
+                  style: GoogleFonts.rajdhani(color: AppColors.lossRed),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
       data: (data) {
-        final clubs = data['clubs'] as List<dynamic>? ?? [];
+        final allClubs = data['clubs'] as List<dynamic>? ?? [];
+        final clubs = _searchQuery.isEmpty
+            ? allClubs
+            : allClubs.where((c) {
+                final name = (c['name'] ?? '').toString().toLowerCase();
+                return name.contains(_searchQuery);
+              }).toList();
+
+        if (allClubs.isEmpty) {
+          return SliverFillRemaining(
+            hasScrollBody: false,
+            child: _buildEmptyState(),
+          );
+        }
 
         if (clubs.isEmpty) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32),
+          return SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.shield_outlined, size: 64, color: AppColors.textMuted),
-                  const SizedBox(height: 16),
+                  const Icon(Icons.search_off, size: 48, color: AppColors.textMuted),
+                  const SizedBox(height: 12),
                   Text(
-                    'NO CLUBS JOINED YET',
-                    style: GoogleFonts.rajdhani(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Create a new club or join one with an invite code to command your squad.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: AppColors.textMuted),
+                    'No clubs match "$_searchQuery"',
+                    style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 16),
                   ),
                 ],
               ),
@@ -213,630 +361,608 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> with SingleTickerProv
           );
         }
 
-        if (_selectedClubId == null && clubs.isNotEmpty) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            setState(() => _selectedClubId = clubs.first['id']);
-          });
-        }
-
-        return RefreshIndicator(
-          color: AppColors.primary,
-          onRefresh: () async {
-            ref.invalidate(myClubsProvider);
-            if (_selectedClubId != null) {
-              ref.invalidate(clubMembersProvider(_selectedClubId!));
-              ref.invalidate(leaderboardProvider(_selectedClubId!));
-            }
-          },
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Horizontal Club Selector Chips
-                SizedBox(
-                  height: 44,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: clubs.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 10),
-                    itemBuilder: (ctx, i) {
-                      final c = clubs[i];
-                      final isSelected = c['id'] == _selectedClubId;
-                      return ChoiceChip(
-                        label: Text(c['name'] ?? 'Club'),
-                        selected: isSelected,
-                        onSelected: (_) => setState(() => _selectedClubId = c['id']),
-                        backgroundColor: Colors.white.withValues(alpha: 0.05),
-                        selectedColor: AppColors.primary,
-                        labelStyle: GoogleFonts.rajdhani(
-                          color: isSelected ? Colors.black : Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                // 4 Sub-Tabs: ROSTER, LEADERBOARD, ACTIVITY, SEASONS
-                if (_selectedClubId != null) ...[
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _buildViewModeChip(0, 'ROSTER & 1v1', AppColors.cyan),
-                        const SizedBox(width: 8),
-                        _buildViewModeChip(1, 'LEADERBOARD', Colors.amber),
-                        const SizedBox(width: 8),
-                        _buildViewModeChip(2, 'ACTIVITY', AppColors.primary),
-                        const SizedBox(width: 8),
-                        _buildViewModeChip(3, 'SEASONS', AppColors.purple),
-                      ],
+        return SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (ctx, i) {
+              final club = clubs[i];
+              return _ClubCard(
+                club: club,
+                index: i,
+                onTap: () => Navigator.push(
+                  ctx,
+                  MaterialPageRoute(
+                    builder: (_) => ClubDetailScreen(
+                      clubId: club['id']?.toString() ?? '',
+                      clubName: club['name']?.toString() ?? 'Club',
                     ),
                   ),
-                  const SizedBox(height: 20),
-
-                  if (_clubViewMode == 0) ...[
-                    // Challenge Online Commanders Component
-                    _buildH2hChallengeWidget(),
-                    const SizedBox(height: 24),
-
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'SQUAD ROSTER & ROLES',
-                          style: GoogleFonts.rajdhani(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.cyan,
-                            letterSpacing: 1.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _buildMembersList(_selectedClubId!),
-                  ] else if (_clubViewMode == 1) ...[
-                    _buildLeaderboardTab(_selectedClubId!),
-                  ] else if (_clubViewMode == 2) ...[
-                    _buildActivityFeed(_selectedClubId!),
-                  ] else if (_clubViewMode == 3) ...[
-                    _buildSeasonsArchive(_selectedClubId!),
-                  ],
-                ],
-              ],
-            ),
+                ).then((_) => ref.invalidate(myClubsProvider)),
+              );
+            },
+            childCount: clubs.length,
           ),
         );
       },
     );
   }
 
-  Widget _buildViewModeChip(int index, String label, Color color) {
-    final isSelected = _clubViewMode == index;
-    return ChoiceChip(
-      label: Text(label),
-      selected: isSelected,
-      onSelected: (_) => setState(() => _clubViewMode = index),
-      backgroundColor: Colors.white.withValues(alpha: 0.05),
-      selectedColor: color,
-      labelStyle: GoogleFonts.rajdhani(
-        color: isSelected ? Colors.black : Colors.white,
-        fontWeight: FontWeight.bold,
-        fontSize: 12,
+  // ─────────────────────────────────────────────────────────────────────────
+  // Empty State
+  // ─────────────────────────────────────────────────────────────────────────
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.shield_outlined, size: 80, color: AppColors.textMuted)
+                .animate(onPlay: (c) => c.repeat(reverse: true))
+                .scaleXY(end: 1.08, duration: 1600.ms, curve: Curves.easeInOut),
+            const SizedBox(height: 24),
+            Text(
+              'NO CLUBS YET',
+              style: GoogleFonts.rajdhani(
+                fontSize: 24,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 2,
+                color: Colors.white,
+              ),
+            ).animate().fadeIn(delay: 100.ms),
+            const SizedBox(height: 10),
+            Text(
+              'Create a new club or join one with\nan invite code to command your squad.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.rajdhani(
+                fontSize: 15,
+                color: AppColors.textMuted,
+              ),
+            ).animate().fadeIn(delay: 200.ms),
+            const SizedBox(height: 32),
+            EsportsButton(
+              label: 'CREATE OR JOIN',
+              icon: Icons.add,
+              onPressed: _openAddClubSheet,
+            ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.3),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildH2hChallengeWidget() {
-    if (_selectedClubId == null) return const SizedBox.shrink();
-    final membersAsync = ref.watch(clubMembersProvider(_selectedClubId!));
+  // ─────────────────────────────────────────────────────────────────────────
+  // Shimmer placeholder
+  // ─────────────────────────────────────────────────────────────────────────
 
-    return membersAsync.when(
-      loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
-      data: (data) {
-        final members = (data['members'] as List<dynamic>? ?? []);
-        if (members.isEmpty) return const SizedBox.shrink();
+  Widget _shimmerCard(int i) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: Container(
+        height: 148,
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white10),
+        ),
+      ),
+    ).animate(delay: Duration(milliseconds: i * 80)).fadeIn().shimmer(
+          duration: 900.ms,
+          color: Colors.white.withValues(alpha: 0.04),
+        );
+  }
+}
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'CHALLENGE ONLINE PLAYERS',
-              style: GoogleFonts.rajdhani(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.cyan, letterSpacing: 1.5),
+// ─────────────────────────────────────────────────────────────────────────────
+// Club Card Widget
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ClubCard extends StatelessWidget {
+  final Map<String, dynamic> club;
+  final int index;
+  final VoidCallback onTap;
+
+  const _ClubCard({
+    required this.club,
+    required this.index,
+    required this.onTap,
+  });
+
+  Color get _roleColor {
+    final role = (club['user_role'] ?? club['role'] ?? 'player').toString().toLowerCase();
+    if (role == 'admin') return AppColors.primary;
+    if (role == 'organizer') return AppColors.purple;
+    return AppColors.cyan;
+  }
+
+  String get _roleLabel {
+    return (club['user_role'] ?? club['role'] ?? 'PLAYER').toString().toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final name = club['name']?.toString() ?? 'Club';
+    final memberCount = club['member_count'] ?? club['members_count'] ?? 0;
+    final wins = club['activity_count'] ?? club['wins'] ?? 0;
+    final inviteCode = club['invite_code']?.toString() ?? '—';
+
+    return GlassCard(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      padding: const EdgeInsets.all(18),
+      borderColor: _roleColor.withValues(alpha: 0.2),
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Top row: name + role badge ────────────────────────────────
+          Row(
+            children: [
+              // Shield icon
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  color: _roleColor.withValues(alpha: 0.12),
+                  border: Border.all(color: _roleColor.withValues(alpha: 0.3)),
+                ),
+                child: Icon(Icons.shield, color: _roleColor, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: GoogleFonts.rajdhani(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        letterSpacing: 0.5,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    GlowBadge(label: _roleLabel, color: _roleColor),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_forward_ios, color: Colors.white24, size: 16),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+          const Divider(color: Colors.white10, height: 1),
+          const SizedBox(height: 14),
+
+          // ── Stats row ─────────────────────────────────────────────────
+          Row(
+            children: [
+              _StatChip(
+                icon: Icons.group,
+                label: '$memberCount',
+                sublabel: 'MEMBERS',
+                color: AppColors.cyan,
+              ),
+              const SizedBox(width: 10),
+              _StatChip(
+                icon: Icons.emoji_events,
+                label: '$wins',
+                sublabel: 'WINS',
+                color: AppColors.winGreen,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _InviteCodeChip(code: inviteCode),
+              ),
+            ],
+          ),
+        ],
+      ),
+    )
+        .animate(delay: Duration(milliseconds: 60 + index * 70))
+        .fadeIn(duration: 400.ms)
+        .slideY(begin: 0.18, duration: 350.ms, curve: Curves.easeOut);
+  }
+}
+
+class _StatChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String sublabel;
+  final Color color;
+
+  const _StatChip({
+    required this.icon,
+    required this.label,
+    required this.sublabel,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: GoogleFonts.rajdhani(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                  height: 1,
+                ),
+              ),
+              Text(
+                sublabel,
+                style: GoogleFonts.rajdhani(
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textMuted,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InviteCodeChip extends StatelessWidget {
+  final String code;
+
+  const _InviteCodeChip({required this.code});
+
+  void _copy(BuildContext context) {
+    Clipboard.setData(ClipboardData(text: code));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Invite code copied!',
+          style: GoogleFonts.rajdhani(fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: AppColors.surface,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.purple.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.purple.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.vpn_key, size: 13, color: AppColors.purple),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              code,
+              style: GoogleFonts.rajdhani(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: AppColors.purple,
+                letterSpacing: 0.5,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 100,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                itemCount: members.length,
-                itemBuilder: (context, idx) {
-                  final m = members[idx];
-                  final name = m['username'] ?? 'Player';
-                  final elo = m['skill_rating']?.toString() ?? '—';
+          ),
+          GestureDetector(
+            onTap: () => _copy(context),
+            child: const Icon(Icons.copy, size: 14, color: AppColors.purple),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-                  return Container(
-                    width: 180,
-                    margin: const EdgeInsets.only(right: 12),
-                    child: GlassCard(
-                      padding: const EdgeInsets.all(12),
-                      borderColor: AppColors.cyan.withValues(alpha: 0.3),
+// ─────────────────────────────────────────────────────────────────────────────
+// Add Club Bottom Sheet  (Create + Join tabs)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _AddClubSheet extends ConsumerStatefulWidget {
+  final VoidCallback onDone;
+
+  const _AddClubSheet({required this.onDone});
+
+  @override
+  ConsumerState<_AddClubSheet> createState() => _AddClubSheetState();
+}
+
+class _AddClubSheetState extends ConsumerState<_AddClubSheet>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tc;
+
+  // Create
+  final _nameCtrl = TextEditingController();
+  final _codeCtrl = TextEditingController();
+  bool _creating = false;
+  String? _createMsg;
+  bool _createErr = false;
+
+  // Join
+  final _joinCtrl = TextEditingController();
+  bool _joining = false;
+  String? _joinMsg;
+  bool _joinErr = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _tc = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tc.dispose();
+    _nameCtrl.dispose();
+    _codeCtrl.dispose();
+    _joinCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _create() async {
+    if (_nameCtrl.text.trim().isEmpty || _codeCtrl.text.trim().isEmpty) {
+      setState(() {
+        _createMsg = 'Club name & invite code are required.';
+        _createErr = true;
+      });
+      return;
+    }
+    setState(() {
+      _creating = true;
+      _createMsg = null;
+    });
+    try {
+      final client = ref.read(apiClientProvider);
+      final res = await client.createClub(
+        _nameCtrl.text.trim(),
+        _codeCtrl.text.trim(),
+      );
+      widget.onDone();
+      setState(() {
+        _createMsg = 'Club created! ID: ${res['club_id']}';
+        _createErr = false;
+      });
+      _nameCtrl.clear();
+      _codeCtrl.clear();
+    } catch (e) {
+      setState(() {
+        _createMsg = 'Error: $e';
+        _createErr = true;
+      });
+    } finally {
+      setState(() => _creating = false);
+    }
+  }
+
+  Future<void> _join() async {
+    if (_joinCtrl.text.trim().isEmpty) {
+      setState(() {
+        _joinMsg = 'Invite code is required.';
+        _joinErr = true;
+      });
+      return;
+    }
+    setState(() {
+      _joining = true;
+      _joinMsg = null;
+    });
+    try {
+      await ref.read(apiClientProvider).joinClub(_joinCtrl.text.trim());
+      widget.onDone();
+      setState(() {
+        _joinMsg = 'Successfully joined club!';
+        _joinErr = false;
+      });
+      _joinCtrl.clear();
+    } catch (e) {
+      setState(() {
+        _joinMsg = 'Error: $e';
+        _joinErr = true;
+      });
+    } finally {
+      setState(() => _joining = false);
+    }
+  }
+
+  InputDecoration _field(String label, IconData icon) => InputDecoration(
+        labelText: label,
+        labelStyle: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 14),
+        prefixIcon: Icon(icon, color: AppColors.textMuted, size: 20),
+        filled: true,
+        fillColor: Colors.white.withValues(alpha: 0.05),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.primary),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
+          decoration: BoxDecoration(
+            color: AppColors.surface.withValues(alpha: 0.96),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Handle
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Title
+              Text(
+                'ADD A CLUB',
+                style: GoogleFonts.rajdhani(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Tabs
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: TabBar(
+                  controller: _tc,
+                  indicator: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    gradient: const LinearGradient(
+                      colors: [AppColors.primary, Color(0xFFFF9E00)],
+                    ),
+                  ),
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  dividerColor: Colors.transparent,
+                  labelColor: Colors.black,
+                  unselectedLabelColor: AppColors.textMuted,
+                  labelStyle: GoogleFonts.rajdhani(fontWeight: FontWeight.bold, fontSize: 14),
+                  tabs: const [
+                    Tab(text: 'CREATE'),
+                    Tab(text: 'JOIN'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Tab content
+              SizedBox(
+                height: 230,
+                child: TabBarView(
+                  controller: _tc,
+                  children: [
+                    // CREATE
+                    SingleChildScrollView(
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  name,
-                                  style: GoogleFonts.rajdhani(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              GlowBadge(label: elo, color: AppColors.primary),
-                            ],
+                          TextField(
+                            controller: _nameCtrl,
+                            style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 15),
+                            decoration: _field('Club Name', Icons.shield),
                           ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _codeCtrl,
+                            style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 15),
+                            decoration: _field('Invite Code', Icons.vpn_key),
+                          ),
+                          const SizedBox(height: 16),
                           SizedBox(
                             width: double.infinity,
-                            child: OutlinedButton(
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: AppColors.cyan,
-                                side: BorderSide(color: AppColors.cyan.withValues(alpha: 0.5)),
-                                padding: EdgeInsets.zero,
-                                minimumSize: const Size(0, 24),
-                              ),
-                              onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Issued 1v1 H2H Challenge to $name!')),
-                                );
-                              },
-                              child: Text('CHALLENGE 1v1', style: GoogleFonts.rajdhani(fontSize: 10, fontWeight: FontWeight.bold)),
+                            child: EsportsButton(
+                              label: 'CREATE CLUB',
+                              icon: Icons.shield,
+                              isLoading: _creating,
+                              onPressed: _creating ? null : _create,
                             ),
                           ),
+                          if (_createMsg != null) ...[
+                            const SizedBox(height: 10),
+                            Text(
+                              _createMsg!,
+                              style: GoogleFonts.rajdhani(
+                                color: _createErr ? AppColors.lossRed : AppColors.winGreen,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
-                  );
-                },
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
 
-  Widget _buildLeaderboardTab(String clubId) {
-    final leaderboardAsync = ref.watch(leaderboardProvider(clubId));
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'CLUB ELO LEADERBOARD',
-              style: GoogleFonts.rajdhani(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.5,
-                color: Colors.amber,
-              ),
-            ),
-            Text(
-              'Tap player for H2H',
-              style: GoogleFonts.rajdhani(
-                fontSize: 12,
-                color: AppColors.textMuted,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        leaderboardAsync.when(
-          loading: () => Column(
-            children: List.generate(
-              3,
-              (_) => Container(
-                height: 54,
-                margin: const EdgeInsets.only(bottom: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white10,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ),
-          error: (err, _) => GlassCard(
-            child: Text(
-              'Could not load leaderboard: ${ApiClient.formatErrorMessage(err)}',
-              style: const TextStyle(color: Colors.redAccent),
-            ),
-          ),
-          data: (players) {
-            if (players.isEmpty) {
-              return const GlassCard(
-                child: Center(
-                  child: Text(
-                    'No ranked players in this club yet.',
-                    style: TextStyle(color: AppColors.textMuted),
-                  ),
-                ),
-              );
-            }
-            return Column(
-              children: players.asMap().entries.map((entry) {
-                final rank = entry.key + 1;
-                final p = entry.value;
-                final String pid = p['player_id']?.toString() ?? 'Player';
-                final String displayId = pid.length > 8 ? pid.substring(0, 8) : pid;
-                final String name = p['player_name'] ?? p['username'] ?? 'Player $displayId';
-                final String playStyle = p['play_style'] ?? '—';
-
-                Color rankColor;
-                if (rank == 1) {
-                  rankColor = const Color(0xFFFFD700); // Gold
-                } else if (rank == 2) {
-                  rankColor = const Color(0xFFC0C0C0); // Silver
-                } else if (rank == 3) {
-                  rankColor = const Color(0xFFCD7F32); // Bronze
-                } else {
-                  rankColor = Colors.white70;
-                }
-
-                return GlassCard(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  borderColor: rank == 1 ? rankColor.withValues(alpha: 0.4) : null,
-                  onTap: () {
-                    _showPlayerH2hBottomSheet(name, p['skill_rating'] ?? 0);
-                  },
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 32,
-                        height: 32,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: rank <= 3 ? rankColor.withValues(alpha: 0.15) : Colors.transparent,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: rankColor.withValues(alpha: 0.5)),
-                        ),
-                        child: Text(
-                          '#$rank',
-                          style: GoogleFonts.rajdhani(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                            color: rankColor,
+                    // JOIN
+                    SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          TextField(
+                            controller: _joinCtrl,
+                            style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 15),
+                            decoration: _field('Invite Code', Icons.vpn_key),
                           ),
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            child: EsportsButton(
+                              label: 'JOIN CLUB',
+                              icon: Icons.group_add,
+                              isLoading: _joining,
+                              gradient: const [AppColors.cyan, Color(0xFF00B0FF)],
+                              onPressed: _joining ? null : _join,
+                            ),
+                          ),
+                          if (_joinMsg != null) ...[
+                            const SizedBox(height: 10),
                             Text(
-                              name,
+                              _joinMsg!,
                               style: GoogleFonts.rajdhani(
+                                color: _joinErr ? AppColors.lossRed : AppColors.winGreen,
                                 fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                                color: Colors.white,
+                                fontSize: 13,
                               ),
                             ),
-                            Text(
-                              '$playStyle • Form: ${(p['form_rating'] as num?)?.toStringAsFixed(1) ?? '—'}',
-                              style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
-                            ),
                           ],
-                        ),
+                        ],
                       ),
-                      StatPill(
-                        label: 'RATING',
-                        value: '${p['skill_rating'] ?? '—'}',
-                        color: AppColors.primary,
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            );
-          },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
-      ],
-    ).animate().fade();
-  }
-
-  void _showPlayerH2hBottomSheet(String playerName, dynamic rating) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => GlassCard(
-        borderColor: AppColors.cyan,
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: AppColors.cyan.withValues(alpha: 0.2),
-                  child: Text(playerName[0].toUpperCase(), style: GoogleFonts.rajdhani(color: AppColors.cyan, fontWeight: FontWeight.bold, fontSize: 18)),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(playerName, style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                      Text('Rating: $rating ELO', style: GoogleFonts.rajdhani(color: AppColors.cyan, fontSize: 13, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.cyan,
-                      side: const BorderSide(color: AppColors.cyan),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    icon: const Icon(Icons.compare_arrows, size: 16),
-                    label: Text('H2H COMPARISON', style: GoogleFonts.rajdhani(fontWeight: FontWeight.bold)),
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActivityFeed(String clubId) {
-    final activityAsync = ref.watch(clubActivityProvider(clubId));
-    return activityAsync.when(
-      loading: () => const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator(color: AppColors.primary))),
-      error: (e, _) => Text('Error: $e', style: const TextStyle(color: Colors.red)),
-      data: (data) {
-        if (data.isEmpty) return const GlassCard(child: Text('No activity found.', style: TextStyle(color: AppColors.textMuted)));
-        return Column(
-          children: data.map((match) {
-            final pName = match['player_name'] ?? 'Unknown';
-            final oName = match['opponent_name'] ?? 'Unknown';
-            final gf = match['goals_for'] ?? 0;
-            final ga = match['goals_against'] ?? 0;
-            final isWin = gf > ga;
-            return GlassCard(
-              margin: const EdgeInsets.only(bottom: 8),
-              borderColor: isWin ? AppColors.winGreen.withValues(alpha: 0.3) : AppColors.lossRed.withValues(alpha: 0.3),
-              child: ListTile(
-                title: Text('$pName vs $oName', style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-                subtitle: Text('Score: $gf - $ga', style: const TextStyle(color: AppColors.textMuted)),
-                trailing: Text(match['match_type']?.toString().toUpperCase() ?? 'MATCH', style: const TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold)),
-              ),
-            );
-          }).toList(),
-        );
-      },
-    );
-  }
-
-  Widget _buildSeasonsArchive(String clubId) {
-    final seasonsAsync = ref.watch(clubSeasonsProvider(clubId));
-    return seasonsAsync.when(
-      loading: () => const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator(color: AppColors.purple))),
-      error: (e, _) => Text('Error: $e', style: const TextStyle(color: Colors.red)),
-      data: (data) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.purple,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              icon: const Icon(Icons.archive, color: Colors.white),
-              label: Text('END CURRENT SEASON (Admin)', style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold)),
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Not implemented in UI yet.')));
-              },
-            ),
-            const SizedBox(height: 16),
-            if (data.isEmpty) const GlassCard(child: Text('No past seasons recorded.', style: TextStyle(color: AppColors.textMuted))),
-            ...data.map((season) {
-              final sName = season['name'] ?? 'Season';
-              final start = season['start_date'] ?? '';
-              final end = season['end_date'] ?? 'Ongoing';
-              return GlassCard(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  title: Text(sName, style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-                  subtitle: Text('$start to $end', style: const TextStyle(color: AppColors.textMuted)),
-                  trailing: const Icon(Icons.chevron_right, color: Colors.white54),
-                ),
-              );
-            }).toList(),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildMembersList(String clubId) {
-    final membersAsync = ref.watch(clubMembersProvider(clubId));
-
-    return membersAsync.when(
-      loading: () => const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator(color: AppColors.primary))),
-      error: (e, _) => GlassCard(
-        child: Text('Failed to load roster: $e', style: const TextStyle(color: Colors.redAccent)),
-      ),
-      data: (data) {
-        final members = data['members'] as List<dynamic>? ?? [];
-        if (members.isEmpty) {
-          return const GlassCard(
-            child: Text('No members found in this club.', style: TextStyle(color: AppColors.textMuted)),
-          );
-        }
-
-        return Column(
-          children: members.map((m) {
-            final role = m['role'] ?? 'player';
-            final username = m['username'] ?? 'Unknown Player';
-            final pid = m['user_id'] ?? '';
-            final rating = m['skill_rating'] ?? 0;
-
-            Color roleColor;
-            if (role == 'admin') roleColor = AppColors.primary;
-            else if (role == 'organizer') roleColor = AppColors.purple;
-            else roleColor = AppColors.cyan;
-
-            return GlassCard(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: roleColor.withValues(alpha: 0.15),
-                    child: Icon(
-                      role == 'admin' ? Icons.star : (role == 'organizer' ? Icons.engineering : Icons.person),
-                      color: roleColor,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          username,
-                          style: GoogleFonts.rajdhani(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
-                        ),
-                        Text(
-                          'Rating: $rating • ${role.toUpperCase()}',
-                          style: TextStyle(fontSize: 12, color: roleColor, fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.more_vert, color: Colors.white54),
-                    onPressed: () => _showRoleDialog(clubId, pid, role),
-                  ),
-                ],
-              ),
-            );
-          }).toList(),
-        );
-      },
-    );
-  }
-
-  Widget _buildCreateClubTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('CREATE A NEW CLUB', style: GoogleFonts.rajdhani(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _clubNameCtrl,
-            style: const TextStyle(color: Colors.white),
-            decoration: InputDecoration(
-              labelText: 'Club Name',
-              labelStyle: const TextStyle(color: Colors.white54),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              filled: true,
-              fillColor: Colors.white.withValues(alpha: 0.04),
-            ),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _inviteCodeCtrl,
-            style: const TextStyle(color: Colors.white),
-            decoration: InputDecoration(
-              labelText: 'Invite Code',
-              labelStyle: const TextStyle(color: Colors.white54),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              filled: true,
-              fillColor: Colors.white.withValues(alpha: 0.04),
-            ),
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            child: EsportsButton(
-              label: _creating ? 'CREATING...' : 'CREATE CLUB',
-              icon: Icons.shield,
-              isLoading: _creating,
-              onPressed: _creating ? () {} : _createClub,
-            ),
-          ),
-          if (_createResult != null) ...[
-            const SizedBox(height: 16),
-            Text(_createResult!, style: TextStyle(color: _createError ? AppColors.lossRed : AppColors.winGreen, fontWeight: FontWeight.bold)),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildJoinClubTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('JOIN AN EXISTING CLUB', style: GoogleFonts.rajdhani(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _joinCodeCtrl,
-            style: const TextStyle(color: Colors.white),
-            decoration: InputDecoration(
-              labelText: 'Invite Code',
-              labelStyle: const TextStyle(color: Colors.white54),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              filled: true,
-              fillColor: Colors.white.withValues(alpha: 0.04),
-            ),
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            child: EsportsButton(
-              label: _joining ? 'JOINING...' : 'JOIN CLUB',
-              icon: Icons.group_add,
-              isLoading: _joining,
-              gradient: const [AppColors.cyan, Color(0xFF00B0FF)],
-              onPressed: _joining ? () {} : _joinClub,
-            ),
-          ),
-          if (_joinResult != null) ...[
-            const SizedBox(height: 16),
-            Text(_joinResult!, style: TextStyle(color: _joinError ? AppColors.lossRed : AppColors.winGreen, fontWeight: FontWeight.bold)),
-          ],
-        ],
       ),
     );
   }
