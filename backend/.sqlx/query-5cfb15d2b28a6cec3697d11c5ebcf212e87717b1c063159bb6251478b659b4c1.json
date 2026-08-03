@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT player_1_id, player_2_id, status FROM T_Matches WHERE id = $1 AND tournament_id = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "player_1_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "player_2_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "status",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "5cfb15d2b28a6cec3697d11c5ebcf212e87717b1c063159bb6251478b659b4c1"
+}

@@ -1,0 +1,82 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            m.id          AS t_match_id,\n            m.tournament_id,\n            m.player_1_id,\n            m.player_2_id,\n            m.round_number,\n            m.match_number,\n            t.format_type,\n            mr.id         AS \"mr_id?: Uuid\",\n            mr.player_id  AS \"mr_player_id?: Uuid\",\n            mr.goals_for  AS \"goals_for?: i32\",\n            mr.goals_against AS \"goals_against?: i32\"\n        FROM T_Matches m\n        LEFT JOIN Match_Records mr ON mr.id = m.match_record_id\n        LEFT JOIN Tournaments t   ON t.id  = m.tournament_id\n        WHERE m.id = $1 OR m.match_record_id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "t_match_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "tournament_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "player_1_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "player_2_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "round_number",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "match_number",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "format_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "mr_id?: Uuid",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 8,
+        "name": "mr_player_id?: Uuid",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 9,
+        "name": "goals_for?: i32",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 10,
+        "name": "goals_against?: i32",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "b7f0ee32443e6c732a9e7f7f6d53aa4ad7a4c3f5596e1a5b4f761d3253ff7fe5"
+}

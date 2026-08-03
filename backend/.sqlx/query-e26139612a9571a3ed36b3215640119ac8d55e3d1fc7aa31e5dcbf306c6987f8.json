@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT round_number, match_number FROM T_Matches WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "round_number",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "match_number",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "e26139612a9571a3ed36b3215640119ac8d55e3d1fc7aa31e5dcbf306c6987f8"
+}

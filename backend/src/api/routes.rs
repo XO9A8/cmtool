@@ -46,12 +46,11 @@ use crate::{
 pub fn create_router(state: Arc<AppState>) -> Router {
     // Public endpoints (no auth required)
     let public = Router::new()
-        .route("/health", get(health_check))
-        .route("/api/v1/auth/register", post(register_user))
-        .route("/api/v1/auth/login", post(login_user));
+        .route("/health", get(health_check));
 
     // Protected endpoints (require valid JWT via AuthenticatedUser extractor)
     let protected = Router::new()
+        .route("/api/v1/auth/sync", post(sync_user))
         .route("/api/v1/clubs", post(create_club))
         .route("/api/v1/clubs/:id/join", post(join_club))
         .route("/api/v1/clubs/my", get(get_my_clubs))
@@ -163,115 +162,30 @@ async fn health_check() -> (StatusCode, &'static str) {
     (StatusCode::OK, "eFootball Management API v1 OK")
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Auth Endpoints (Public)
-// ─────────────────────────────────────────────────────────────────────────────
-
 #[derive(Deserialize)]
-pub struct AuthRegisterRequest {
+pub struct SyncUserRequest {
     pub username: String,
-    pub password: String,
 }
 
 #[derive(Serialize)]
-pub struct AuthRegisterResponse {
+pub struct SyncUserResponse {
     pub user_id: Uuid,
     pub username: String,
-    pub token: String,
 }
 
-/// Registers a new user: hashes password with Argon2id, stores user + profile in DB, issues JWT.
-async fn register_user(
+/// Syncs a Supabase authenticated user to the local database, ensuring they have a Player Profile.
+async fn sync_user(
     State(state): State<Arc<AppState>>,
-    Json(payload): Json<AuthRegisterRequest>,
-) -> Result<Json<AuthRegisterResponse>, (StatusCode, Json<ApiErrorResponse>)> {
-    if payload.username.trim().is_empty() || payload.password.len() < 6 {
-        return Err(bad_request(
-            "INVALID_CREDENTIALS",
-            "Username cannot be empty and password must be at least 6 characters",
-        ));
-    }
-
-    let password_hash = hash_password(&payload.password)
-        .map_err(|e| internal_error(e))?;
-
-    let user_id = Uuid::new_v4();
-
-    // Persist user + player profile
-    db::create_user(&state.pool, user_id, &payload.username, &password_hash)
+    auth: AuthenticatedUser,
+    Json(payload): Json<SyncUserRequest>,
+) -> Result<Json<SyncUserResponse>, (StatusCode, Json<ApiErrorResponse>)> {
+    db::upsert_supabase_user(&state.pool, auth.user_id, &payload.username)
         .await
-        .map_err(|e| {
-            if e.to_string().contains("unique constraint") {
-                bad_request("USERNAME_TAKEN", "Username is already taken")
-            } else {
-                internal_error(e.to_string())
-            }
-        })?;
+        .map_err(|e| internal_error(e.to_string()))?;
 
-    let token = create_jwt_token(user_id, &payload.username, &state.jwt_secret)
-        .map_err(|e| internal_error(e))?;
-
-    Ok(Json(AuthRegisterResponse {
-        user_id,
+    Ok(Json(SyncUserResponse {
+        user_id: auth.user_id,
         username: payload.username,
-        token,
-    }))
-}
-
-#[derive(Deserialize)]
-pub struct AuthLoginRequest {
-    pub username: String,
-    pub password: String,
-}
-
-#[derive(Serialize)]
-pub struct AuthLoginResponse {
-    pub user_id: Uuid,
-    pub username: String,
-    pub token: String,
-}
-
-/// Authenticates user credentials and issues a signed JWT token.
-/// NOTE: In production wire this to a real user lookup with stored hash.
-async fn login_user(
-    State(state): State<Arc<AppState>>,
-    Json(payload): Json<AuthLoginRequest>,
-) -> Result<Json<AuthLoginResponse>, (StatusCode, Json<ApiErrorResponse>)> {
-    
-    let user_record = db::get_user_by_username(&state.pool, &payload.username)
-        .await
-        .map_err(|_| internal_error("Database query failed"))?
-        .ok_or_else(|| {
-            (
-                StatusCode::UNAUTHORIZED,
-                Json(ApiErrorResponse {
-                    error: ApiErrorDetail {
-                        code: "UNAUTHORIZED".into(),
-                        message: "Invalid username or password".into(),
-                    },
-                }),
-            )
-        })?;
-
-    if !verify_password(&payload.password, &user_record.password_hash) {
-        return Err((
-            StatusCode::UNAUTHORIZED,
-            Json(ApiErrorResponse {
-                error: ApiErrorDetail {
-                    code: "UNAUTHORIZED".into(),
-                    message: "Invalid username or password".into(),
-                },
-            }),
-        ));
-    }
-
-    let token = create_jwt_token(user_record.id, &payload.username, &state.jwt_secret)
-        .map_err(|e| internal_error(e))?;
-
-    Ok(Json(AuthLoginResponse {
-        user_id: user_record.id,
-        username: payload.username,
-        token,
     }))
 }
 

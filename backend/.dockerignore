@@ -1,0 +1,8 @@
+target/
+.git/
+.env
+.dockerignore
+graphify-out/
+docs/
+flutter/
+mobile/

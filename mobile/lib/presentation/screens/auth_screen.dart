@@ -47,9 +47,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         await auth.register(client, username, password);
       }
     } on DioException catch (e) {
+      if (!mounted) return;
       final msg = e.response?.data?['error']?['message'] ?? 'Network Error ($e)';
       setState(() => _errorMessage = msg);
     } catch (e) {
+      if (!mounted) return;
       setState(() => _errorMessage = e.toString());
     } finally {
       if (mounted) setState(() => _loading = false);

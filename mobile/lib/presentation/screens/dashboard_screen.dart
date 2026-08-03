@@ -375,8 +375,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   // ── 1. Hero Banner ────────────────────────────────────────────────────────
 
   Widget _buildHeroBanner(String userId) {
-    final initial =
-        userId.isNotEmpty ? userId[0].toUpperCase() : 'U';
+    final profilePrefs = ref.watch(profilePreferencesProvider);
+    final avatarData = getAvatarById(profilePrefs.safeAvatarGraphic);
 
     return Container(
       width: double.infinity,
@@ -449,29 +449,29 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       builder: (_) => const PlayerProfileScreen()),
                 ),
                 child: Container(
+                  width: 48,
+                  height: 48,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: AppColors.primary.withValues(alpha: 0.7),
-                      width: 2,
+                    gradient: LinearGradient(
+                      colors: avatarData.gradient,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.25),
+                        color: avatarData.gradient.first.withValues(alpha: 0.4),
                         blurRadius: 12,
-                        spreadRadius: 2,
+                        spreadRadius: 1,
                       ),
                     ],
                   ),
-                  child: CircleAvatar(
-                    radius: 24,
-                    backgroundColor: AppColors.surfaceLight,
-                    child: Text(
-                      initial,
-                      style: GoogleFonts.orbitron(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                        color: AppColors.primary,
+                  child: Padding(
+                    padding: const EdgeInsets.all(2.0),
+                    child: CircleAvatar(
+                      backgroundColor: AppColors.background,
+                      child: Icon(
+                        avatarData.icon,
+                        color: Colors.white,
+                        size: 22,
                       ),
                     ),
                   ),

@@ -71,34 +71,11 @@ class ApiClient {
   // Auth
   // ─────────────────────────────────────────────────────────────────────────
 
-  /// Registers a new user and stores the returned JWT token + user_id.
-  Future<Map<String, dynamic>> registerUser(String username, String password) async {
-    final response = await _dio.post('/api/v1/auth/register', data: {
+  /// Syncs the Supabase user to the backend
+  Future<void> syncSupabaseUser(String username) async {
+    await _dio.post('/api/v1/auth/sync', data: {
       'username': username,
-      'password': password,
     });
-    await _persistSession(response.data);
-    return response.data as Map<String, dynamic>;
-  }
-
-  /// Logs in a user and stores the returned JWT token + user_id.
-  Future<Map<String, dynamic>> loginUser(String username, String password) async {
-    final response = await _dio.post('/api/v1/auth/login', data: {
-      'username': username,
-      'password': password,
-    });
-    await _persistSession(response.data);
-    return response.data as Map<String, dynamic>;
-  }
-
-  Future<void> _persistSession(dynamic data) async {
-    final prefs = await SharedPreferences.getInstance();
-    if (data['token'] != null) {
-      await prefs.setString(_tokenKey, data['token'] as String);
-    }
-    if (data['user_id'] != null) {
-      await prefs.setString(_userIdKey, data['user_id'].toString());
-    }
   }
 
   Future<void> logout() async {

@@ -912,26 +912,32 @@ pub async fn get_tournament_bracket(
 // User Registration
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Inserts a new user + initial player profile in a single transaction. Returns the new user UUID.
-pub async fn create_user(
+/// Upserts a user and their player profile from Supabase.
+pub async fn upsert_supabase_user(
     pool: &PgPool,
     user_id: Uuid,
     username: &str,
-    password_hash: &str,
 ) -> Result<Uuid, sqlx::Error> {
     let mut tx = pool.begin().await?;
 
-    sqlx::query(r#"INSERT INTO Users (id, username, password_hash) VALUES ($1, $2, $3)"#)
-        .bind(user_id)
-        .bind(username)
-        .bind(password_hash)
-        .execute(&mut *tx)
-        .await?;
+    sqlx::query(r#"
+        INSERT INTO Users (id, username, password_hash)
+        VALUES ($1, $2, 'supabase_managed')
+        ON CONFLICT (id) DO NOTHING
+    "#)
+    .bind(user_id)
+    .bind(username)
+    .execute(&mut *tx)
+    .await?;
 
-    sqlx::query(r#"INSERT INTO Player_Profiles (user_id) VALUES ($1)"#)
-        .bind(user_id)
-        .execute(&mut *tx)
-        .await?;
+    sqlx::query(r#"
+        INSERT INTO Player_Profiles (user_id)
+        VALUES ($1)
+        ON CONFLICT (user_id) DO NOTHING
+    "#)
+    .bind(user_id)
+    .execute(&mut *tx)
+    .await?;
 
     tx.commit().await?;
     Ok(user_id)

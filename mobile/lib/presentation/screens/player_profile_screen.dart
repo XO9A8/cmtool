@@ -12,10 +12,109 @@ import '../theme/app_theme.dart';
 import '../providers/match_provider.dart';
 import '../widgets/mps_radar_chart.dart';
 
+/// Predefined Avatar Graphic item
+class PredefinedAvatar {
+  final String id;
+  final String name;
+  final IconData icon;
+  final List<Color> gradient;
+
+  const PredefinedAvatar({
+    required this.id,
+    required this.name,
+    required this.icon,
+    required this.gradient,
+  });
+}
+
+const List<PredefinedAvatar> predefinedAvatars = [
+  PredefinedAvatar(
+    id: 'striker',
+    name: 'Striker Ace',
+    icon: Icons.sports_soccer,
+    gradient: [Color(0xFFFF6D00), Color(0xFFFFD700)],
+  ),
+  PredefinedAvatar(
+    id: 'inferno',
+    name: 'Inferno Flame',
+    icon: Icons.local_fire_department,
+    gradient: [Color(0xFFFF1744), Color(0xFFFF9100)],
+  ),
+  PredefinedAvatar(
+    id: 'lightning',
+    name: 'Cyber Bolt',
+    icon: Icons.bolt,
+    gradient: [Color(0xFF00E5FF), Color(0xFFFFEA00)],
+  ),
+  PredefinedAvatar(
+    id: 'defender',
+    name: 'Iron Shield',
+    icon: Icons.shield,
+    gradient: [Color(0xFF2979FF), Color(0xFFB000FF)],
+  ),
+  PredefinedAvatar(
+    id: 'crown',
+    name: 'Golden Crown',
+    icon: Icons.workspace_premium,
+    gradient: [Color(0xFFFFD700), Color(0xFFFFAB00)],
+  ),
+  PredefinedAvatar(
+    id: 'star',
+    name: 'Mystic Star',
+    icon: Icons.auto_awesome,
+    gradient: [Color(0xFFE040FB), Color(0xFF7C4DFF)],
+  ),
+  PredefinedAvatar(
+    id: 'commander',
+    name: 'Honor Badge',
+    icon: Icons.military_tech,
+    gradient: [Color(0xFF00E676), Color(0xFF00B0FF)],
+  ),
+  PredefinedAvatar(
+    id: 'tactician',
+    name: 'Mastermind',
+    icon: Icons.psychology,
+    gradient: [Color(0xFF00B8D4), Color(0xFF64FFDA)],
+  ),
+  PredefinedAvatar(
+    id: 'fortress',
+    name: 'Titan Fortress',
+    icon: Icons.fort,
+    gradient: [Color(0xFF607D8B), Color(0xFFCFD8DC)],
+  ),
+  PredefinedAvatar(
+    id: 'mecha',
+    name: 'Mecha Cyber',
+    icon: Icons.smart_toy,
+    gradient: [Color(0xFF00E676), Color(0xFF00E5FF)],
+  ),
+  PredefinedAvatar(
+    id: 'shadow',
+    name: 'Shadow Dragon',
+    icon: Icons.pest_control_rodent,
+    gradient: [Color(0xFFB000FF), Color(0xFFFF1744)],
+  ),
+  PredefinedAvatar(
+    id: 'apex',
+    name: 'Apex Racer',
+    icon: Icons.sports_motorsports,
+    gradient: [Color(0xFFFF3D00), Color(0xFFFFC400)],
+  ),
+];
+
+PredefinedAvatar getAvatarById(String? id) {
+  return predefinedAvatars.firstWhere(
+    (a) => a.id == id,
+    orElse: () => predefinedAvatars.first,
+  );
+}
+
 /// Full Player Profile screen with reimagined esports styling, interactive dossier,
 /// career analytics, match history timeline, badges, and editable user profile.
 class PlayerProfileScreen extends ConsumerStatefulWidget {
-  const PlayerProfileScreen({super.key});
+  final String? playerId;
+
+  const PlayerProfileScreen({super.key, this.playerId});
 
   @override
   ConsumerState<PlayerProfileScreen> createState() => _PlayerProfileScreenState();
@@ -26,10 +125,15 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final userId = ref.watch(authStateProvider) ?? '';
-    final profileAsync = ref.watch(playerProfileProvider(userId));
-    final eloAsync = ref.watch(eloHistoryProvider(userId));
-    final matchesAsync = ref.watch(matchHistoryProvider(userId));
+    final currentUserId = ref.watch(authStateProvider) ?? '';
+    final targetUserId = (widget.playerId != null && widget.playerId!.isNotEmpty)
+        ? widget.playerId!
+        : currentUserId;
+    final isOwnProfile = (targetUserId == currentUserId);
+
+    final profileAsync = ref.watch(playerProfileProvider(targetUserId));
+    final eloAsync = ref.watch(eloHistoryProvider(targetUserId));
+    final matchesAsync = ref.watch(matchHistoryProvider(targetUserId));
     final profilePrefs = ref.watch(profilePreferencesProvider);
 
     return Scaffold(
@@ -47,7 +151,8 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                 error: (_, __) => _buildHeroCard(
                   context,
                   ref,
-                  userId,
+                  targetUserId,
+                  isOwnProfile,
                   0,
                   0.0,
                   profilePrefs.playStyle,
@@ -62,10 +167,11 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                 data: (data) => _buildHeroCard(
                   context,
                   ref,
-                  userId,
+                  targetUserId,
+                  isOwnProfile,
                   data['skill_rating'] ?? 0,
                   (data['form_rating'] as num?)?.toDouble() ?? 0.0,
-                  profilePrefs.playStyle.isNotEmpty
+                  isOwnProfile && profilePrefs.playStyle.isNotEmpty
                       ? profilePrefs.playStyle
                       : (data['play_style'] as String? ?? 'Possession Game'),
                   data['matches_played'] ?? 0,
@@ -102,7 +208,8 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                 child: _buildTabContent(
                   context,
                   ref,
-                  userId,
+                  targetUserId,
+                  isOwnProfile,
                   _selectedTabIndex,
                   profileAsync,
                   eloAsync,
@@ -121,6 +228,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
     BuildContext context,
     WidgetRef ref,
     String userId,
+    bool isOwnProfile,
     int elo,
     double form,
     String style,
@@ -149,9 +257,14 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
       tierColor = AppColors.winGreen;
     }
 
-    final displayName = profilePrefs.displayName.isNotEmpty
-        ? profilePrefs.displayName
-        : (data['username'] as String? ?? 'PLAYER');
+    final displayName = isOwnProfile && profilePrefs.safeDisplayName.isNotEmpty
+        ? profilePrefs.safeDisplayName
+        : (data['username'] as String? ?? data['display_name'] as String? ?? 'PLAYER');
+
+    final avatarKey = isOwnProfile && profilePrefs.safeAvatarGraphic.isNotEmpty
+        ? profilePrefs.safeAvatarGraphic
+        : (data['avatar_graphic'] as String? ?? 'striker');
+    final avatarData = getAvatarById(avatarKey);
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 50, 20, 16),
@@ -167,47 +280,65 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
         children: [
           Row(
             children: [
-              // Avatar with glowing rank ring
-              Stack(
-                alignment: Alignment.center,
-                children: [
-                  Container(
-                    width: 76,
-                    height: 76,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        colors: [tierColor, AppColors.primary],
-                      ),
-                      boxShadow: [
-                        BoxShadow(color: tierColor.withOpacity(0.5), blurRadius: 20),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    width: 70,
-                    height: 70,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppColors.surface,
-                    ),
-                    child: const Icon(Icons.person, color: Colors.white, size: 40),
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              // Avatar with predefined graphic & glowing rank ring
+              GestureDetector(
+                onTap: isOwnProfile
+                    ? () => _showEditProfileBottomSheet(context, ref, userId, data, profilePrefs)
+                    : null,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: 76,
+                      height: 76,
                       decoration: BoxDecoration(
-                        color: tierColor,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        tierName,
-                        style: GoogleFonts.orbitron(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.black),
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: avatarData.gradient,
+                        ),
+                        boxShadow: [
+                          BoxShadow(color: avatarData.gradient.first.withOpacity(0.5), blurRadius: 20),
+                        ],
                       ),
                     ),
-                  ),
-                ],
+                    Container(
+                      width: 70,
+                      height: 70,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.surface,
+                      ),
+                      child: Icon(avatarData.icon, color: avatarData.gradient.first, size: 36),
+                    ),
+                    if (isOwnProfile)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.camera_alt, size: 10, color: Colors.black),
+                        ),
+                      ),
+                    Positioned(
+                      bottom: 0,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: tierColor,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          tierName,
+                          style: GoogleFonts.orbitron(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.black),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(width: 16),
 
@@ -277,35 +408,56 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
           ),
           const SizedBox(height: 10),
 
-          // Action Buttons Row (Edit Profile & Share Ultimate Card)
+          // Action Buttons Row (Edit Profile / Player Profile & Share Card)
           Row(
             children: [
               Expanded(
-                child: Container(
-                  height: 38,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    gradient: const LinearGradient(
-                      colors: [AppColors.primary, Color(0xFFFF8C00)],
-                    ),
-                    boxShadow: [
-                      BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 8),
-                    ],
-                  ),
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.transparent,
-                      shadowColor: Colors.transparent,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    icon: const Icon(Icons.edit, size: 16, color: Colors.black),
-                    label: Text(
-                      'EDIT PROFILE',
-                      style: GoogleFonts.orbitron(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black, letterSpacing: 1),
-                    ),
-                    onPressed: () => _showEditProfileBottomSheet(context, ref, userId, data, profilePrefs),
-                  ),
-                ),
+                child: isOwnProfile
+                    ? Container(
+                        height: 38,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          gradient: const LinearGradient(
+                            colors: [AppColors.primary, Color(0xFFFF8C00)],
+                          ),
+                          boxShadow: [
+                            BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 8),
+                          ],
+                        ),
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          icon: const Icon(Icons.edit, size: 16, color: Colors.black),
+                          label: Text(
+                            'EDIT PROFILE',
+                            style: GoogleFonts.orbitron(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black, letterSpacing: 1),
+                          ),
+                          onPressed: () => _showEditProfileBottomSheet(context, ref, userId, data, profilePrefs),
+                        ),
+                      )
+                    : Container(
+                        height: 38,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          color: AppColors.cyan.withOpacity(0.12),
+                          border: Border.all(color: AppColors.cyan.withOpacity(0.4)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.verified, size: 15, color: AppColors.cyan),
+                            const SizedBox(width: 6),
+                            Text(
+                              'PLAYER PROFILE',
+                              style: GoogleFonts.orbitron(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.cyan, letterSpacing: 1),
+                            ),
+                          ],
+                        ),
+                      ),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -347,6 +499,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
     BuildContext context,
     WidgetRef ref,
     String userId,
+    bool isOwnProfile,
     int tabIndex,
     AsyncValue<Map<String, dynamic>> profileAsync,
     AsyncValue<Map<String, dynamic>> eloAsync,
@@ -357,8 +510,8 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
       case 0:
         return profileAsync.when(
           loading: () => const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator(color: AppColors.primary))),
-          error: (_, __) => _buildDossierTab(context, ref, userId, {}, profilePrefs),
-          data: (data) => _buildDossierTab(context, ref, userId, data, profilePrefs),
+          error: (_, __) => _buildDossierTab(context, ref, userId, isOwnProfile, {}, profilePrefs),
+          data: (data) => _buildDossierTab(context, ref, userId, isOwnProfile, data, profilePrefs),
         );
       case 1:
         return _buildAnalyticsTab(profileAsync, eloAsync);
@@ -376,37 +529,38 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
     BuildContext context,
     WidgetRef ref,
     String userId,
+    bool isOwnProfile,
     Map<String, dynamic> data,
     ProfilePreferences profilePrefs,
   ) {
-    final gameId = profilePrefs.gameId.isNotEmpty
+    final gameId = isOwnProfile && profilePrefs.gameId.isNotEmpty
         ? profilePrefs.gameId
         : (data['efootball_game_id'] as String? ?? 'N/A');
-    final foot = profilePrefs.preferredFoot.isNotEmpty
+    final foot = isOwnProfile && profilePrefs.preferredFoot.isNotEmpty
         ? profilePrefs.preferredFoot
         : (data['preferred_foot'] as String? ?? 'Right');
-    final jersey = profilePrefs.jerseyNumber.isNotEmpty
+    final jersey = isOwnProfile && profilePrefs.jerseyNumber.isNotEmpty
         ? profilePrefs.jerseyNumber
         : (data['jersey_number']?.toString() ?? 'N/A');
-    final device = profilePrefs.systemDevice.isNotEmpty
+    final device = isOwnProfile && profilePrefs.systemDevice.isNotEmpty
         ? profilePrefs.systemDevice
         : (data['system_device'] as String? ?? 'PlayStation 5');
-    final facebook = profilePrefs.facebookLink.isNotEmpty
+    final facebook = isOwnProfile && profilePrefs.facebookLink.isNotEmpty
         ? profilePrefs.facebookLink
         : (data['facebook_link'] as String? ?? 'N/A');
-    final district = profilePrefs.district.isNotEmpty
+    final district = isOwnProfile && profilePrefs.district.isNotEmpty
         ? profilePrefs.district
         : (data['district'] as String? ?? 'N/A');
-    final dob = profilePrefs.dateOfBirth.isNotEmpty
+    final dob = isOwnProfile && profilePrefs.dateOfBirth.isNotEmpty
         ? profilePrefs.dateOfBirth
         : (data['date_of_birth'] as String? ?? 'N/A');
-    final email = profilePrefs.contactEmail.isNotEmpty
+    final email = isOwnProfile && profilePrefs.contactEmail.isNotEmpty
         ? profilePrefs.contactEmail
         : (data['email_node'] as String? ?? 'N/A');
-    final phone = profilePrefs.phoneLine.isNotEmpty
+    final phone = isOwnProfile && profilePrefs.phoneLine.isNotEmpty
         ? profilePrefs.phoneLine
         : (data['phone_line'] as String? ?? 'N/A');
-    final bio = profilePrefs.bio.isNotEmpty
+    final bio = isOwnProfile && profilePrefs.bio.isNotEmpty
         ? profilePrefs.bio
         : (data['bio'] as String? ?? 'No biometric bio profile submitted to registry.');
 
@@ -440,11 +594,12 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                       ),
                     ],
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.edit_note, color: AppColors.cyan, size: 20),
-                    tooltip: 'Edit Bio',
-                    onPressed: () => _showEditProfileBottomSheet(context, ref, userId, data, profilePrefs),
-                  ),
+                  if (isOwnProfile)
+                    IconButton(
+                      icon: const Icon(Icons.edit_note, color: AppColors.cyan, size: 20),
+                      tooltip: 'Edit Bio',
+                      onPressed: () => _showEditProfileBottomSheet(context, ref, userId, data, profilePrefs),
+                    ),
                 ],
               ),
               const SizedBox(height: 6),
@@ -481,12 +636,13 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                       ),
                     ],
                   ),
-                  TextButton.icon(
-                    style: TextButton.styleFrom(padding: EdgeInsets.zero),
-                    icon: const Icon(Icons.edit, size: 14, color: AppColors.cyan),
-                    label: Text('EDIT', style: GoogleFonts.orbitron(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.cyan)),
-                    onPressed: () => _showEditProfileBottomSheet(context, ref, userId, data, profilePrefs),
-                  ),
+                  if (isOwnProfile)
+                    TextButton.icon(
+                      style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                      icon: const Icon(Icons.edit, size: 14, color: AppColors.cyan),
+                      label: Text('EDIT', style: GoogleFonts.orbitron(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.cyan)),
+                      onPressed: () => _showEditProfileBottomSheet(context, ref, userId, data, profilePrefs),
+                    ),
                 ],
               ),
               const SizedBox(height: 8),
@@ -495,7 +651,15 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
               _buildDossierRow('PREFERRED FOOT', foot, valColor: AppColors.cyan, icon: Icons.straighten),
               _buildDossierRow('JERSEY NUMBER', jersey, valColor: Colors.white, icon: Icons.numbers),
               _buildDossierRow('SYSTEM DEVICE', device, valColor: Colors.white, icon: Icons.devices),
-              _buildDossierRow('PLAY STYLE', profilePrefs.playStyle, valColor: AppColors.primary, isBold: true, icon: Icons.auto_awesome),
+              _buildDossierRow(
+                'PLAY STYLE',
+                isOwnProfile && profilePrefs.playStyle.isNotEmpty
+                    ? profilePrefs.playStyle
+                    : (data['play_style'] as String? ?? 'Possession Game'),
+                valColor: AppColors.primary,
+                isBold: true,
+                icon: Icons.auto_awesome,
+              ),
               _buildDossierRow('DISTRICT / REGION', district, valColor: Colors.white70, icon: Icons.location_on),
               _buildDossierRow('DATE OF BIRTH', dob, valColor: Colors.white70, icon: Icons.cake),
               _buildDossierRow('REGISTRAR JOINED', joined, valColor: Colors.white54, icon: Icons.calendar_today),
@@ -524,10 +688,11 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                     'REGISTRY CONTACT',
                     style: GoogleFonts.orbitron(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white54, letterSpacing: 1.5),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.edit, size: 14, color: AppColors.cyan),
-                    onPressed: () => _showEditProfileBottomSheet(context, ref, userId, data, profilePrefs),
-                  ),
+                  if (isOwnProfile)
+                    IconButton(
+                      icon: const Icon(Icons.edit, size: 14, color: AppColors.cyan),
+                      onPressed: () => _showEditProfileBottomSheet(context, ref, userId, data, profilePrefs),
+                    ),
                 ],
               ),
               const Divider(color: Colors.white10),
@@ -713,53 +878,57 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
     ProfilePreferences profilePrefs,
   ) {
     final displayNameCtrl = TextEditingController(
-      text: profilePrefs.displayName.isNotEmpty ? profilePrefs.displayName : (data['username'] as String? ?? ''),
+      text: profilePrefs.safeDisplayName.isNotEmpty ? profilePrefs.safeDisplayName : (data['username'] as String? ?? ''),
     );
     final bioCtrl = TextEditingController(
-      text: profilePrefs.bio.isNotEmpty ? profilePrefs.bio : (data['bio'] as String? ?? ''),
+      text: profilePrefs.safeBio.isNotEmpty ? profilePrefs.safeBio : (data['bio'] as String? ?? ''),
     );
     final gameIdCtrl = TextEditingController(
-      text: profilePrefs.gameId.isNotEmpty ? profilePrefs.gameId : (data['efootball_game_id'] as String? ?? ''),
+      text: profilePrefs.safeGameId.isNotEmpty ? profilePrefs.safeGameId : (data['efootball_game_id'] as String? ?? ''),
     );
     final jerseyCtrl = TextEditingController(
-      text: profilePrefs.jerseyNumber.isNotEmpty ? profilePrefs.jerseyNumber : (data['jersey_number']?.toString() ?? ''),
+      text: profilePrefs.safeJerseyNumber.isNotEmpty ? profilePrefs.safeJerseyNumber : (data['jersey_number']?.toString() ?? ''),
     );
     final emailCtrl = TextEditingController(
-      text: profilePrefs.contactEmail.isNotEmpty ? profilePrefs.contactEmail : (data['email_node'] as String? ?? ''),
+      text: profilePrefs.safeContactEmail.isNotEmpty ? profilePrefs.safeContactEmail : (data['email_node'] as String? ?? ''),
     );
     final phoneCtrl = TextEditingController(
-      text: profilePrefs.phoneLine.isNotEmpty ? profilePrefs.phoneLine : (data['phone_line'] as String? ?? ''),
+      text: profilePrefs.safePhoneLine.isNotEmpty ? profilePrefs.safePhoneLine : (data['phone_line'] as String? ?? ''),
     );
     final facebookCtrl = TextEditingController(
-      text: profilePrefs.facebookLink.isNotEmpty ? profilePrefs.facebookLink : (data['facebook_link'] as String? ?? ''),
+      text: profilePrefs.safeFacebookLink.isNotEmpty ? profilePrefs.safeFacebookLink : (data['facebook_link'] as String? ?? ''),
     );
     final districtCtrl = TextEditingController(
-      text: profilePrefs.district.isNotEmpty ? profilePrefs.district : (data['district'] as String? ?? ''),
+      text: profilePrefs.safeDistrict.isNotEmpty ? profilePrefs.safeDistrict : (data['district'] as String? ?? ''),
     );
     final dobCtrl = TextEditingController(
-      text: profilePrefs.dateOfBirth.isNotEmpty ? profilePrefs.dateOfBirth : (data['date_of_birth'] as String? ?? ''),
+      text: profilePrefs.safeDateOfBirth.isNotEmpty ? profilePrefs.safeDateOfBirth : (data['date_of_birth'] as String? ?? ''),
     );
 
-    String selectedPlayStyle = profilePrefs.playStyle.isNotEmpty
-        ? profilePrefs.playStyle
+    String selectedPlayStyle = profilePrefs.safePlayStyle.isNotEmpty
+        ? profilePrefs.safePlayStyle
         : (data['play_style'] as String? ?? 'Possession Game');
     if (!['Possession Game', 'Quick Counter', 'Out Wide', 'Long Ball Counter', 'Long Ball'].contains(selectedPlayStyle)) {
       selectedPlayStyle = 'Possession Game';
     }
 
-    String selectedFoot = profilePrefs.preferredFoot.isNotEmpty
-        ? profilePrefs.preferredFoot
+    String selectedFoot = profilePrefs.safePreferredFoot.isNotEmpty
+        ? profilePrefs.safePreferredFoot
         : (data['preferred_foot'] as String? ?? 'Right');
     if (!['Right', 'Left', 'Both'].contains(selectedFoot)) {
       selectedFoot = 'Right';
     }
 
-    String selectedDevice = profilePrefs.systemDevice.isNotEmpty
-        ? profilePrefs.systemDevice
+    String selectedDevice = profilePrefs.safeSystemDevice.isNotEmpty
+        ? profilePrefs.safeSystemDevice
         : (data['system_device'] as String? ?? 'PlayStation 5');
     if (!['PlayStation 5', 'Xbox Series X|S', 'PC / Steam', 'Mobile', 'Cross-Platform'].contains(selectedDevice)) {
       selectedDevice = 'PlayStation 5';
     }
+
+    String selectedAvatarGraphic = profilePrefs.safeAvatarGraphic.isNotEmpty
+        ? profilePrefs.safeAvatarGraphic
+        : (data['avatar_graphic'] as String? ?? 'striker');
 
     bool isSaving = false;
 
@@ -823,6 +992,63 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          _buildFormSectionHeader('SELECT PREDEFINED AVATAR GRAPHIC'),
+                          const SizedBox(height: 12),
+                          GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 4,
+                              crossAxisSpacing: 10,
+                              mainAxisSpacing: 10,
+                              childAspectRatio: 0.85,
+                            ),
+                            itemCount: predefinedAvatars.length,
+                            itemBuilder: (ctx, i) {
+                              final avatar = predefinedAvatars[i];
+                              final isSelected = selectedAvatarGraphic == avatar.id;
+                              return GestureDetector(
+                                onTap: () => setModalState(() => selectedAvatarGraphic = avatar.id),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(14),
+                                    gradient: LinearGradient(colors: avatar.gradient),
+                                    border: Border.all(
+                                      color: isSelected ? Colors.white : Colors.transparent,
+                                      width: isSelected ? 3 : 1,
+                                    ),
+                                    boxShadow: isSelected
+                                        ? [BoxShadow(color: avatar.gradient.first.withOpacity(0.6), blurRadius: 12)]
+                                        : null,
+                                  ),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(avatar.icon, color: Colors.white, size: 26),
+                                      const SizedBox(height: 4),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 2),
+                                        child: Text(
+                                          avatar.name,
+                                          style: GoogleFonts.orbitron(
+                                            fontSize: 7.5,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+
+                          const SizedBox(height: 24),
                           _buildFormSectionHeader('BASIC PLAYER IDENTIFICATION'),
                           const SizedBox(height: 12),
                           _buildCustomTextField(displayNameCtrl, 'Display Name / Alias', Icons.person),
@@ -929,6 +1155,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                                               facebookLink: facebookCtrl.text.trim(),
                                               district: districtCtrl.text.trim(),
                                               dateOfBirth: dobCtrl.text.trim(),
+                                              avatarGraphic: selectedAvatarGraphic,
                                             );
 
                                         // 2. Call backend API to persist database profile
@@ -946,6 +1173,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                                           'facebook_link': facebookCtrl.text.trim(),
                                           'district': districtCtrl.text.trim(),
                                           'date_of_birth': dobCtrl.text.trim(),
+                                          'avatar_graphic': selectedAvatarGraphic,
                                         });
 
                                         // 3. Invalidate provider to trigger fresh state render
@@ -1384,12 +1612,17 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
     final int elo = data['skill_rating'] ?? 0;
     final double form = (data['form_rating'] as num?)?.toDouble() ?? 0.0;
     final double winRate = (data['win_rate'] as num?)?.toDouble() ?? 0.0;
-    final String playStyle = profilePrefs.playStyle.isNotEmpty
-        ? profilePrefs.playStyle
+    final String playStyle = profilePrefs.safePlayStyle.isNotEmpty
+        ? profilePrefs.safePlayStyle
         : (data['play_style'] as String? ?? 'Possession Game');
-    final String username = profilePrefs.displayName.isNotEmpty
-        ? profilePrefs.displayName
+    final String username = profilePrefs.safeDisplayName.isNotEmpty
+        ? profilePrefs.safeDisplayName
         : (data['username'] as String? ?? 'PLAYER');
+
+    final avatarKey = profilePrefs.safeAvatarGraphic.isNotEmpty
+        ? profilePrefs.safeAvatarGraphic
+        : (data['avatar_graphic'] as String? ?? 'striker');
+    final avatarData = getAvatarById(avatarKey);
 
     final screenshotController = ScreenshotController();
 
@@ -1440,7 +1673,18 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      const Icon(Icons.person, size: 64, color: Colors.black),
+                      Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(colors: avatarData.gradient),
+                          boxShadow: [
+                            BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 10),
+                          ],
+                        ),
+                        child: Icon(avatarData.icon, size: 36, color: Colors.black),
+                      ),
                       const SizedBox(height: 12),
                       Text(username.toUpperCase(), style: GoogleFonts.orbitron(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black)),
                       Text(playStyle, style: GoogleFonts.rajdhani(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black54)),

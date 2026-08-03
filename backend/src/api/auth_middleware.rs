@@ -93,7 +93,7 @@ where
 
         Ok(AuthenticatedUser {
             user_id,
-            username: claims.username,
+            username: claims.username.unwrap_or_else(|| "Supabase User".to_string()),
         })
     }
 }

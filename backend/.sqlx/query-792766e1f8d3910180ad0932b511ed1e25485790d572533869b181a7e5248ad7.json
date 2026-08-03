@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT EXISTS (\n            SELECT 1 FROM Club_Memberships\n            WHERE club_id = $1 AND player_id = $2\n              AND LOWER(role) IN ('admin', 'organizer', 'president', 'captain', 'vice-captain')\n        ) AS is_official\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "is_official",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "792766e1f8d3910180ad0932b511ed1e25485790d572533869b181a7e5248ad7"
+}

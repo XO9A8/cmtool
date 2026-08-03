@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'dart:io';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'presentation/theme/app_theme.dart';
 import 'presentation/screens/auth_screen.dart';
@@ -18,12 +19,18 @@ import 'presentation/widgets/pending_verifications_modal.dart';
 import 'presentation/providers/match_provider.dart';
 import 'infrastructure/offline_sync_service.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
   }
+  
+  await Supabase.initialize(
+    url: const String.fromEnvironment('SUPABASE_URL', defaultValue: 'https://YOUR_PROJECT_ID.supabase.co'),
+    anonKey: const String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: 'YOUR_ANON_KEY'),
+  );
+
   runApp(const ProviderScope(child: EFootballApp()));
 }
 
@@ -157,7 +164,8 @@ class _NavigationRootScreenState extends State<NavigationRootScreen> {
           ),
           Consumer(
             builder: (context, ref, _) {
-              final userId = ref.watch(authStateProvider);
+              final profilePrefs = ref.watch(profilePreferencesProvider);
+              final avatarData = getAvatarById(profilePrefs.safeAvatarGraphic);
               return GestureDetector(
                 onTap: () {
                   Navigator.push(
@@ -167,16 +175,30 @@ class _NavigationRootScreenState extends State<NavigationRootScreen> {
                 },
                 child: Padding(
                   padding: const EdgeInsets.only(right: 16.0, left: 8.0),
-                  child: CircleAvatar(
-                    radius: 16,
-                    backgroundColor: AppColors.surfaceLight,
-                    child: Text(
-                      userId != null && userId.isNotEmpty
-                          ? userId.substring(0, 1).toUpperCase()
-                          : 'U',
-                      style: GoogleFonts.rajdhani(
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.cyan,
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        colors: avatarData.gradient,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: avatarData.gradient.first.withValues(alpha: 0.4),
+                          blurRadius: 8,
+                        ),
+                      ],
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(1.5),
+                      child: CircleAvatar(
+                        backgroundColor: AppColors.background,
+                        child: Icon(
+                          avatarData.icon,
+                          color: Colors.white,
+                          size: 14,
+                        ),
                       ),
                     ),
                   ),

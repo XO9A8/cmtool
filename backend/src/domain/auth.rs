@@ -10,7 +10,7 @@ use uuid::Uuid;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
     pub sub: String, // user_id Uuid
-    pub username: String,
+    pub username: Option<String>,
     pub exp: usize,
 }
 
@@ -42,7 +42,7 @@ pub fn create_jwt_token(user_id: Uuid, username: &str, secret: &str) -> Result<S
 
     let claims = Claims {
         sub: user_id.to_string(),
-        username: username.to_string(),
+        username: Some(username.to_string()),
         exp: expiration,
     };
 
@@ -88,6 +88,6 @@ mod tests {
         let claims = verify_jwt_token(&token, secret).expect("JWT decoding failed");
 
         assert_eq!(claims.sub, user_id.to_string());
-        assert_eq!(claims.username, username);
+        assert_eq!(claims.username.as_deref(), Some(username));
     }
 }

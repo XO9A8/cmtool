@@ -795,17 +795,25 @@ class _RosterTabState extends ConsumerState<_RosterTab> {
                 return GlassCard(
                   margin: const EdgeInsets.only(bottom: 10),
                   borderColor: rColor.withValues(alpha: 0.15),
+                  onTap: () {
+                    if (pid.isNotEmpty) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => PlayerProfileScreen(playerId: pid),
+                        ),
+                      );
+                    }
+                  },
                   child: Row(
                     children: [
                       // Avatar
                       CircleAvatar(
                         radius: 22,
-                        backgroundColor: rColor.withValues(alpha: 0.15),
+                        backgroundColor: getAvatarById(m['avatar_graphic']?.toString()).gradient.first.withValues(alpha: 0.2),
                         child: Icon(
-                          role == 'admin'
-                              ? Icons.star
-                              : (role == 'organizer' ? Icons.engineering : Icons.person),
-                          color: rColor,
+                          getAvatarById(m['avatar_graphic']?.toString()).icon,
+                          color: getAvatarById(m['avatar_graphic']?.toString()).gradient.first,
                           size: 22,
                         ),
                       ),
@@ -849,16 +857,35 @@ class _RosterTabState extends ConsumerState<_RosterTab> {
                         color: AppColors.surface,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(color: Colors.white12),
+                          side: const BorderSide(color: Colors.white12),
                         ),
                         onSelected: (val) {
-                          if (val == 'role') {
+                          if (val == 'profile') {
+                            if (pid.isNotEmpty) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => PlayerProfileScreen(playerId: pid),
+                                ),
+                              );
+                            }
+                          } else if (val == 'role') {
                             _showRoleDialog(widget.clubId, pid, role);
                           } else if (val == 'remove') {
                             _confirmRemove(widget.clubId, pid, username);
                           }
                         },
                         itemBuilder: (_) => [
+                          PopupMenuItem(
+                            value: 'profile',
+                            child: Row(
+                              children: [
+                                const Icon(Icons.person, color: AppColors.cyan, size: 16),
+                                const SizedBox(width: 8),
+                                Text('View Profile', style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 14)),
+                              ],
+                            ),
+                          ),
                           PopupMenuItem(
                             value: 'role',
                             child: Row(
@@ -1058,7 +1085,7 @@ class _LeaderboardTab extends ConsumerWidget {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => const PlayerProfileScreen(),
+                                builder: (_) => PlayerProfileScreen(playerId: pid),
                               ),
                             );
                           }

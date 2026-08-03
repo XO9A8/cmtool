@@ -1,7 +1,7 @@
 # ---------------------------------------------------
 # Stage 1: Build binary using official Rust image
 # ---------------------------------------------------
-FROM rust:1.80-slim-bookworm AS builder
+FROM rust:slim-bookworm AS builder
 
 WORKDIR /usr/src/app
 
@@ -13,6 +13,10 @@ COPY Cargo.toml ./
 
 # Build source code
 COPY src ./src
+COPY .sqlx ./.sqlx
+COPY migrations ./migrations
+
+ENV SQLX_OFFLINE=true
 RUN cargo build --release
 
 # ---------------------------------------------------

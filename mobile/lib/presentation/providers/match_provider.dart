@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../infrastructure/api_client.dart';
 import '../../domain/models/match_record.dart';
 
@@ -31,35 +32,39 @@ final authStateProvider = StateNotifierProvider<AuthNotifier, String?>((ref) {
 
 class AuthNotifier extends StateNotifier<String?> {
   AuthNotifier() : super(null) {
-    _loadStoredSession();
+    _initSupabaseAuth();
   }
 
-  Future<void> _loadStoredSession() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('jwt_token');
-    final userId = prefs.getString('user_id');
-    if (token != null && token.isNotEmpty && userId != null && userId.isNotEmpty) {
-      state = userId;
-    } else {
-      await prefs.remove('jwt_token');
-      await prefs.remove('user_id');
-      state = null;
-    }
+  void _initSupabaseAuth() {
+    Supabase.instance.client.auth.onAuthStateChange.listen((data) async {
+      final session = data.session;
+      final prefs = await SharedPreferences.getInstance();
+      if (session != null) {
+        state = session.user.id;
+        await prefs.setString('jwt_token', session.accessToken);
+        await prefs.setString('user_id', session.user.id);
+      } else {
+        state = null;
+        await prefs.remove('jwt_token');
+        await prefs.remove('user_id');
+      }
+    });
   }
 
   Future<void> login(ApiClient client, String username, String password) async {
-    final res = await client.loginUser(username, password);
-    state = res['user_id']?.toString();
+    final email = username.contains('@') ? username : '$username@example.com';
+    await Supabase.instance.client.auth.signInWithPassword(email: email, password: password);
+    await client.syncSupabaseUser(username);
   }
 
   Future<void> register(ApiClient client, String username, String password) async {
-    final res = await client.registerUser(username, password);
-    state = res['user_id']?.toString();
+    final email = username.contains('@') ? username : '$username@example.com';
+    await Supabase.instance.client.auth.signUp(email: email, password: password);
+    await client.syncSupabaseUser(username);
   }
 
   Future<void> logout(ApiClient client) async {
-    await client.logout();
-    state = null;
+    await Supabase.instance.client.auth.signOut();
   }
 
   void forceLogout() {
@@ -86,6 +91,7 @@ class ProfilePreferences {
   final String district;
   final String dateOfBirth;
   final String bio;
+  final String? avatarGraphic;
 
   const ProfilePreferences({
     this.displayName = 'Player',
@@ -102,7 +108,22 @@ class ProfilePreferences {
     this.district = '',
     this.dateOfBirth = '',
     this.bio = '',
+    this.avatarGraphic = 'striker',
   });
+
+  String get safeDisplayName => (displayName as dynamic)?.toString() ?? 'Player';
+  String get safePlayStyle => (playStyle as dynamic)?.toString() ?? 'Possession Game';
+  String get safeContactEmail => (contactEmail as dynamic)?.toString() ?? '';
+  String get safePreferredFoot => (preferredFoot as dynamic)?.toString() ?? 'Right';
+  String get safeGameId => (gameId as dynamic)?.toString() ?? '';
+  String get safeJerseyNumber => (jerseyNumber as dynamic)?.toString() ?? '';
+  String get safeSystemDevice => (systemDevice as dynamic)?.toString() ?? 'PlayStation 5';
+  String get safeFacebookLink => (facebookLink as dynamic)?.toString() ?? '';
+  String get safePhoneLine => (phoneLine as dynamic)?.toString() ?? '';
+  String get safeDistrict => (district as dynamic)?.toString() ?? '';
+  String get safeDateOfBirth => (dateOfBirth as dynamic)?.toString() ?? '';
+  String get safeBio => (bio as dynamic)?.toString() ?? '';
+  String get safeAvatarGraphic => avatarGraphic ?? 'striker';
 
   ProfilePreferences copyWith({
     String? displayName,
@@ -119,6 +140,7 @@ class ProfilePreferences {
     String? district,
     String? dateOfBirth,
     String? bio,
+    String? avatarGraphic,
   }) {
     return ProfilePreferences(
       displayName: displayName ?? this.displayName,
@@ -135,6 +157,7 @@ class ProfilePreferences {
       district: district ?? this.district,
       dateOfBirth: dateOfBirth ?? this.dateOfBirth,
       bio: bio ?? this.bio,
+      avatarGraphic: avatarGraphic ?? this.avatarGraphic,
     );
   }
 
@@ -153,6 +176,7 @@ class ProfilePreferences {
         'district': district,
         'date_of_birth': dateOfBirth,
         'bio': bio,
+        'avatar_graphic': avatarGraphic,
       };
 
   factory ProfilePreferences.fromJson(Map<String, dynamic> json) {
@@ -171,6 +195,7 @@ class ProfilePreferences {
       district: json['district']?.toString() ?? '',
       dateOfBirth: json['date_of_birth']?.toString() ?? '',
       bio: json['bio']?.toString() ?? '',
+      avatarGraphic: json['avatar_graphic']?.toString() ?? 'striker',
     );
   }
 }
@@ -216,6 +241,7 @@ class ProfilePreferencesNotifier extends StateNotifier<ProfilePreferences> {
     String? district,
     String? dateOfBirth,
     String? bio,
+    String? avatarGraphic,
   }) async {
     final next = state.copyWith(
       displayName: displayName,
@@ -232,6 +258,7 @@ class ProfilePreferencesNotifier extends StateNotifier<ProfilePreferences> {
       district: district,
       dateOfBirth: dateOfBirth,
       bio: bio,
+      avatarGraphic: avatarGraphic,
     );
 
     final prefs = await SharedPreferences.getInstance();

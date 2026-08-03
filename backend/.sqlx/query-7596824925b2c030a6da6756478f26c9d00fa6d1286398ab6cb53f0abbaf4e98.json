@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT player_1_score, player_2_score FROM T_Matches WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "player_1_score",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "player_2_score",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      true
+    ]
+  },
+  "hash": "7596824925b2c030a6da6756478f26c9d00fa6d1286398ab6cb53f0abbaf4e98"
+}
