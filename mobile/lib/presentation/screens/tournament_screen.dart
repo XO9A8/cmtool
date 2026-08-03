@@ -246,7 +246,16 @@ class _TournamentScreenState extends ConsumerState<TournamentScreen> with Single
         final upcoming = tournaments.where((t) => t['status'] == 'scheduled' || t['status'] == 'draft').toList();
         final completed = tournaments.where((t) => t['status'] == 'completed').toList();
 
-        final heroTournament = active.isNotEmpty ? active.first : (upcoming.isNotEmpty ? upcoming.first : tournaments.first);
+        // Hero: prefer active → upcoming → fallback to first non-completed → null if only completed exist
+        final dynamic heroTournament = active.isNotEmpty
+            ? active.first
+            : (upcoming.isNotEmpty ? upcoming.first : null);
+
+        // Completed list always shows all completed tournaments (none are excluded by a hero)
+        final liveAndUpcoming = [
+          ...active.where((t) => heroTournament == null || t['id'] != heroTournament['id']),
+          ...upcoming.where((t) => heroTournament == null || t['id'] != heroTournament['id']),
+        ];
 
         return SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -254,24 +263,26 @@ class _TournamentScreenState extends ConsumerState<TournamentScreen> with Single
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('FEATURED EVENT', style: GoogleFonts.rajdhani(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.cyan, letterSpacing: 1.5)),
-              const SizedBox(height: 12),
-              _buildHeroCard(heroTournament),
-              
-              if (active.length > 1 || upcoming.isNotEmpty) ...[
+              if (heroTournament != null) ...[
+                Text('FEATURED EVENT', style: GoogleFonts.rajdhani(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.cyan, letterSpacing: 1.5)),
+                const SizedBox(height: 12),
+                _buildHeroCard(heroTournament),
                 const SizedBox(height: 32),
+              ],
+
+              if (liveAndUpcoming.isNotEmpty) ...[
                 Text('LIVE & UPCOMING', style: GoogleFonts.rajdhani(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.cyan, letterSpacing: 1.5)),
                 const SizedBox(height: 12),
-                _buildHorizontalList([...active.where((t) => t['id'] != heroTournament['id']), ...upcoming.where((t) => t['id'] != heroTournament['id'])]),
+                _buildHorizontalList(liveAndUpcoming),
+                const SizedBox(height: 32),
               ],
 
               if (completed.isNotEmpty) ...[
-                const SizedBox(height: 32),
                 Text('PAST CHAMPIONS', style: GoogleFonts.rajdhani(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.cyan, letterSpacing: 1.5)),
                 const SizedBox(height: 12),
                 _buildHorizontalList(completed),
               ],
-              
+
               const SizedBox(height: 40),
             ],
           ),
@@ -282,10 +293,13 @@ class _TournamentScreenState extends ConsumerState<TournamentScreen> with Single
 
   Widget _buildHeroCard(dynamic tournament) {
     final format = (tournament['format_type'] ?? '').toString().replaceAll('_', ' ').toUpperCase();
-    final status = (tournament['status'] ?? 'draft').toString().toUpperCase();
+    final statusRaw = (tournament['status'] ?? 'draft').toString();
+    final status = statusRaw.toUpperCase();
+    final Color heroBadgeColor = statusRaw == 'completed' ? Colors.amber : (statusRaw == 'active' ? AppColors.winGreen : AppColors.textMuted);
+    final IconData heroBadgeIcon = statusRaw == 'completed' ? Icons.emoji_events : (statusRaw == 'active' ? Icons.play_circle : Icons.schedule);
     
     return GlassCard(
-      borderColor: AppColors.primary.withValues(alpha: 0.5),
+      borderColor: heroBadgeColor.withValues(alpha: 0.5),
       padding: EdgeInsets.zero,
       onTap: () => setState(() => _activeTournamentDetails = tournament),
       child: Column(
@@ -316,7 +330,7 @@ class _TournamentScreenState extends ConsumerState<TournamentScreen> with Single
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      GlowBadge(label: status, color: AppColors.winGreen, icon: Icons.play_circle),
+                      GlowBadge(label: status, color: heroBadgeColor, icon: heroBadgeIcon),
                       const SizedBox(height: 8),
                       Text(
                         tournament['name'] ?? 'Tournament',

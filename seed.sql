@@ -220,6 +220,8 @@ INSERT INTO Club_Memberships (player_id, club_id, role, skill_rating, form_ratin
 INSERT INTO Tournaments (id, club_id, name, format_type, status, rules_config) VALUES
 ('b0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'Season 1 Apex Champions League', 'league', 'active', '{"max_team_strength": 3000, "leg_type": "single"}'::jsonb),
 ('b0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000001', 'Summer Knockout Cup 2026', 'knockout', 'active', '{"max_team_strength": 2900}'::jsonb),
+('b0000000-0000-0000-0000-000000000005', 'a0000000-0000-0000-0000-000000000001', 'Pre-Season Apex Invitational', 'round_robin', 'completed', '{}'::jsonb),
+('b0000000-0000-0000-0000-000000000006', 'a0000000-0000-0000-0000-000000000001', 'Winter Knockout Trophy 2025', 'knockout', 'completed', '{}'::jsonb),
 ('b0000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000002', 'Cyber Strikers Round Robin', 'round_robin', 'completed', '{}'::jsonb),
 ('b0000000-0000-0000-0000-000000000004', 'a0000000-0000-0000-0000-000000000005', 'Vanguard Masters League', 'league', 'completed', '{}'::jsonb);
 
