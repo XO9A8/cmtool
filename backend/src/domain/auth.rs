@@ -55,10 +55,13 @@ pub fn create_jwt_token(user_id: Uuid, username: &str, secret: &str) -> Result<S
 }
 
 pub fn verify_jwt_token(token: &str, secret: &str) -> Result<Claims, String> {
+    let mut validation = Validation::default();
+    validation.validate_aud = false; // Supabase adds 'aud': 'authenticated' which fails default validation
+
     let token_data = decode::<Claims>(
         token,
         &DecodingKey::from_secret(secret.as_bytes()),
-        &Validation::default(),
+        &validation,
     )
     .map_err(|e| e.to_string())?;
 
