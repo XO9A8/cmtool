@@ -4,8 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'dart:convert';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:image_picker/image_picker.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
 import '../../domain/models/match_record.dart';
+import '../../domain/services/ocr_parser_service.dart';
 import '../../presentation/providers/match_provider.dart';
 import '../theme/app_theme.dart';
 
@@ -32,7 +37,6 @@ class OcrUploadModal extends ConsumerStatefulWidget {
 class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
   bool _is2v2Mode = false;
   String _selectedMatchType = 'league';
-  double _ocrConfidence = 82.5;
   int _uploadStep = 0; // 0: upload, 1: scanning, 2: results
 
   late final TextEditingController _opponentIdCtrl;
@@ -78,10 +82,34 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
     _opponentIdCtrl = TextEditingController(
       text: widget.defaultOpponentId ?? '00000000-0000-0000-0000-000000000001',
     );
+    _goalsForCtrl.addListener(_onFieldChanged);
+    _goalsAgainstCtrl.addListener(_onFieldChanged);
+    _shotsTotalCtrl.addListener(_onFieldChanged);
+    _shotsTotalAwayCtrl.addListener(_onFieldChanged);
+    _passesCompCtrl.addListener(_onFieldChanged);
+    _passesAttCtrl.addListener(_onFieldChanged);
+    _passesCompAwayCtrl.addListener(_onFieldChanged);
+    _passesAttAwayCtrl.addListener(_onFieldChanged);
+    _possessionCtrl.addListener(_onFieldChanged);
+    _possessionAwayCtrl.addListener(_onFieldChanged);
+  }
+
+  void _onFieldChanged() {
+    setState(() {});
   }
 
   @override
   void dispose() {
+    _goalsForCtrl.removeListener(_onFieldChanged);
+    _goalsAgainstCtrl.removeListener(_onFieldChanged);
+    _shotsTotalCtrl.removeListener(_onFieldChanged);
+    _shotsTotalAwayCtrl.removeListener(_onFieldChanged);
+    _passesCompCtrl.removeListener(_onFieldChanged);
+    _passesAttCtrl.removeListener(_onFieldChanged);
+    _passesCompAwayCtrl.removeListener(_onFieldChanged);
+    _passesAttAwayCtrl.removeListener(_onFieldChanged);
+    _possessionCtrl.removeListener(_onFieldChanged);
+    _possessionAwayCtrl.removeListener(_onFieldChanged);
     _opponentIdCtrl.dispose();
     _partnerIdCtrl.dispose();
     _opponentPartnerIdCtrl.dispose();
@@ -148,13 +176,68 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
     return sha256.convert(utf8.encode(data)).toString();
   }
 
-  void _simulateUpload() {
-    setState(() => _uploadStep = 1);
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        setState(() => _uploadStep = 2);
-      }
+  Future<void> _pickImage(ImageSource source) async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: source);
+    if (pickedFile == null) return;
+
+    setState(() {
+      _uploadStep = 1;
+      _errorMessage = null;
     });
+
+    try {
+      if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS)) {
+        throw UnsupportedError('Google ML Kit OCR is only supported on Android and iOS devices. Please run on a mobile device or emulator.');
+      }
+
+      final inputImage = InputImage.fromFilePath(pickedFile.path);
+      final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
+      final recognizedText = await textRecognizer.processImage(inputImage);
+      await textRecognizer.close();
+
+      final parsed = await OcrParserService.parse(recognizedText);
+
+      if (mounted) {
+        setState(() {
+          if (parsed.possessionHome != null) _possessionCtrl.text = parsed.possessionHome.toString();
+          if (parsed.possessionAway != null) _possessionAwayCtrl.text = parsed.possessionAway.toString();
+          if (parsed.shotsTotalHome != null) _shotsTotalCtrl.text = parsed.shotsTotalHome.toString();
+          if (parsed.shotsTotalAway != null) _shotsTotalAwayCtrl.text = parsed.shotsTotalAway.toString();
+          if (parsed.shotsTargetHome != null) _shotsTargetCtrl.text = parsed.shotsTargetHome.toString();
+          if (parsed.shotsTargetAway != null) _shotsTargetAwayCtrl.text = parsed.shotsTargetAway.toString();
+          if (parsed.foulsHome != null) _foulsCtrl.text = parsed.foulsHome.toString();
+          if (parsed.foulsAway != null) _foulsAwayCtrl.text = parsed.foulsAway.toString();
+          if (parsed.offsidesHome != null) _offsidesCtrl.text = parsed.offsidesHome.toString();
+          if (parsed.offsidesAway != null) _offsidesAwayCtrl.text = parsed.offsidesAway.toString();
+          if (parsed.cornersHome != null) _cornersCtrl.text = parsed.cornersHome.toString();
+          if (parsed.cornersAway != null) _cornersAwayCtrl.text = parsed.cornersAway.toString();
+          if (parsed.freeKicksHome != null) _freeKicksCtrl.text = parsed.freeKicksHome.toString();
+          if (parsed.freeKicksAway != null) _freeKicksAwayCtrl.text = parsed.freeKicksAway.toString();
+          if (parsed.passesAttHome != null) _passesAttCtrl.text = parsed.passesAttHome.toString();
+          if (parsed.passesAttAway != null) _passesAttAwayCtrl.text = parsed.passesAttAway.toString();
+          if (parsed.passesCompHome != null) _passesCompCtrl.text = parsed.passesCompHome.toString();
+          if (parsed.passesCompAway != null) _passesCompAwayCtrl.text = parsed.passesCompAway.toString();
+          if (parsed.crossesHome != null) _crossesCtrl.text = parsed.crossesHome.toString();
+          if (parsed.crossesAway != null) _crossesAwayCtrl.text = parsed.crossesAway.toString();
+          if (parsed.interceptionsHome != null) _interceptionsCtrl.text = parsed.interceptionsHome.toString();
+          if (parsed.interceptionsAway != null) _interceptionsAwayCtrl.text = parsed.interceptionsAway.toString();
+          if (parsed.tacklesHome != null) _tacklesCtrl.text = parsed.tacklesHome.toString();
+          if (parsed.tacklesAway != null) _tacklesAwayCtrl.text = parsed.tacklesAway.toString();
+          if (parsed.savesHome != null) _savesCtrl.text = parsed.savesHome.toString();
+          if (parsed.savesAway != null) _savesAwayCtrl.text = parsed.savesAway.toString();
+          
+          _uploadStep = 2;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Failed to process image: $e';
+          _uploadStep = 0;
+        });
+      }
+    }
   }
 
   Future<void> _submitMatchData() async {
@@ -329,13 +412,12 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
   Widget build(BuildContext context) {
     final submitState = ref.watch(ocrSubmitProvider);
     final isSubmitting = submitState is AsyncLoading;
-    final isLowConfidence = _ocrConfidence < 85.0;
 
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       child: GlassCard(
-        borderColor: isLowConfidence ? Colors.amber.withValues(alpha: 0.6) : AppColors.cyan.withValues(alpha: 0.5),
+        borderColor: AppColors.cyan.withValues(alpha: 0.5),
         padding: const EdgeInsets.all(0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -348,23 +430,18 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
                 border: Border(bottom: BorderSide(color: AppColors.cyan.withValues(alpha: 0.2))),
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
                     'OCR MATCH TERMINAL',
                     style: GoogleFonts.rajdhani(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1.2),
-                  ),
-                  if (_uploadStep == 2) GlowBadge(
-                    label: '${_ocrConfidence.toStringAsFixed(1)}% SCAN',
-                    color: isLowConfidence ? Colors.amber : AppColors.cyan,
-                    icon: isLowConfidence ? Icons.warning_amber_rounded : Icons.document_scanner,
                   ),
                 ],
               ),
             ),
             
             Flexible(
-              child: _buildBodyContent(isSubmitting, isLowConfidence),
+              child: _buildBodyContent(isSubmitting),
             ),
 
             // Footer
@@ -391,7 +468,7 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
     );
   }
 
-  Widget _buildBodyContent(bool isSubmitting, bool isLowConfidence) {
+  Widget _buildBodyContent(bool isSubmitting) {
     if (_uploadStep == 0) {
       return Padding(
         padding: const EdgeInsets.all(32.0),
@@ -421,23 +498,23 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                onPressed: _simulateUpload,
+                onPressed: () => _pickImage(ImageSource.gallery),
               ),
             ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.camera_alt, color: AppColors.cyan),
-                label: const Text('TAKE PHOTO', style: TextStyle(color: AppColors.cyan, fontWeight: FontWeight.bold)),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: AppColors.cyan),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            if (_errorMessage != null) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: AppColors.lossRed.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
+                child: Row(
+                  children: [
+                    const Icon(Icons.error_outline, color: AppColors.lossRed, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(_errorMessage!, style: const TextStyle(color: AppColors.lossRed, fontSize: 13, fontWeight: FontWeight.bold))),
+                  ],
                 ),
-                onPressed: _simulateUpload,
-              ),
-            ),
+              ).animate().shake(),
+            ],
           ],
         ),
       );
@@ -695,6 +772,28 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
   }
 
   Widget _buildEfootballRow(String label, TextEditingController leftCtrl, TextEditingController rightCtrl, {bool isPercent = false}) {
+    bool hasWarning = false;
+    
+    if (label == 'Possession') {
+      final h = double.tryParse(leftCtrl.text) ?? 0;
+      final a = double.tryParse(rightCtrl.text) ?? 0;
+      if (h > 0 && a > 0 && h + a != 100.0) hasWarning = true;
+    } else if (label == 'Successful Passes') {
+      final compH = int.tryParse(leftCtrl.text) ?? 0;
+      final attH = int.tryParse(_passesAttCtrl.text) ?? 0;
+      final compA = int.tryParse(rightCtrl.text) ?? 0;
+      final attA = int.tryParse(_passesAttAwayCtrl.text) ?? 0;
+      if ((attH > 0 && compH > attH) || (attA > 0 && compA > attA)) hasWarning = true;
+    } else if (label == 'Total Shots') {
+      final goalsH = int.tryParse(_goalsForCtrl.text) ?? 0;
+      final goalsA = int.tryParse(_goalsAgainstCtrl.text) ?? 0;
+      final shotsH = int.tryParse(leftCtrl.text) ?? 0;
+      final shotsA = int.tryParse(rightCtrl.text) ?? 0;
+      if (goalsH > shotsH || goalsA > shotsA) hasWarning = true;
+    }
+
+    final textColor = hasWarning ? Colors.amber : Colors.white;
+
     return Container(
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: Colors.white24, width: 1)),
@@ -711,12 +810,12 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
                   child: TextField(
                     controller: leftCtrl,
                     textAlign: TextAlign.center,
-                    style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                    style: GoogleFonts.rajdhani(color: textColor, fontSize: 16, fontWeight: FontWeight.bold),
                     keyboardType: isPercent ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.number,
                     decoration: const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.zero),
                   ),
                 ),
-                if (isPercent) Text('%', style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                if (isPercent) Text('%', style: GoogleFonts.rajdhani(color: textColor, fontSize: 16, fontWeight: FontWeight.bold)),
               ],
             ),
           ),
@@ -736,12 +835,12 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
                   child: TextField(
                     controller: rightCtrl,
                     textAlign: TextAlign.center,
-                    style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                    style: GoogleFonts.rajdhani(color: textColor, fontSize: 16, fontWeight: FontWeight.bold),
                     keyboardType: isPercent ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.number,
                     decoration: const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.zero),
                   ),
                 ),
-                if (isPercent) Text('%', style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                if (isPercent) Text('%', style: GoogleFonts.rajdhani(color: textColor, fontSize: 16, fontWeight: FontWeight.bold)),
               ],
             ),
           ),
