@@ -58,11 +58,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         Ok(p) => {
             tracing::info!("✅ Connected to PostgreSQL successfully.");
-            if let Err(e) = sqlx::migrate!("./migrations").run(&p).await {
-                tracing::error!("⚠️ Failed to run database migrations: {}", e);
-            } else {
-                tracing::info!("✅ Database migrations applied successfully.");
-            }
+            // ⚠️ DO NOT run sqlx::migrate!() on startup with Supabase pooler!
+            // It uses pg_advisory_lock which hangs indefinitely in Transaction Mode.
+            // Migrations should be applied manually or via CI/CD.
             p
         }
         Err(e) => {
