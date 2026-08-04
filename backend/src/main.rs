@@ -47,9 +47,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let db_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgres://postgres:postgres@127.0.0.1:5432/efootball_db".to_string());
 
+    let options = db_url.parse::<sqlx::postgres::PgConnectOptions>()
+        .expect("Invalid DATABASE_URL")
+        .statement_cache_capacity(0); // Required for Supabase PgBouncer transaction mode
+
     let pool = match sqlx::postgres::PgPoolOptions::new()
         .acquire_timeout(std::time::Duration::from_secs(3))
-        .connect(&db_url)
+        .connect_with(options)
         .await
     {
         Ok(p) => {
