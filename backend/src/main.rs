@@ -44,18 +44,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("Initializing eFootball Club Management Backend API Server...");
 
     // 3. Connect to PostgreSQL
-    let mut db_url = std::env::var("DATABASE_URL")
+    let db_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgres://postgres:postgres@127.0.0.1:5432/efootball_db".to_string());
 
-    // Force Session Mode for Supabase Pooler to fix sqlx prepared statement panics
-    if db_url.contains(".pooler.supabase.com:6543") {
-        tracing::warn!("Detected Supabase Transaction Mode pooler (port 6543). Rewriting to Session Mode (port 5432) for sqlx compatibility...");
-        db_url = db_url.replace(":6543", ":5432");
-    }
+    let options = db_url.parse::<sqlx::postgres::PgConnectOptions>()
+        .expect("Invalid DATABASE_URL")
+        .statement_cache_capacity(0); // REQUIRED for Supabase PgBouncer (Transaction Mode)
 
     let pool = match sqlx::postgres::PgPoolOptions::new()
         .acquire_timeout(std::time::Duration::from_secs(3))
-        .connect(&db_url)
+        .connect_with(options)
         .await
     {
         Ok(p) => {
