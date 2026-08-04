@@ -20,8 +20,6 @@ use uuid::Uuid;
 use crate::{
     api::auth_middleware::AuthenticatedUser,
     domain::{
-        ai_insights::generate_coaching_insights,
-        auth::{create_jwt_token, hash_password, verify_password},
         disputes::raise_match_dispute,
         elo::{calculate_elo, EloInput, MatchType},
         fallback_insights::{generate_fallback_report, InsightInput, InsightReport},
@@ -71,6 +69,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/api/v1/tournaments/bracket", post(create_knockout_bracket))
         .route("/api/v1/tournaments/round-robin", post(create_round_robin))
         .route("/api/v1/tournaments/:id/bracket", get(get_tournament_bracket))
+        .route("/api/v1/tournaments/:id", axum::routing::delete(delete_tournament))
 
         .route("/api/v1/tournaments/:id/standings", get(get_league_standings))
         .route("/api/v1/tournaments/:id/start", post(start_tournament))
@@ -1346,6 +1345,38 @@ async fn create_tournament(
         "format_type": payload.format_type,
         "status": "draft",
         "message": "Tournament created successfully",
+    })))
+}
+
+/// Deletes a tournament (club owners only).
+async fn delete_tournament(
+    State(state): State<Arc<AppState>>,
+    auth: AuthenticatedUser,
+    Path(tournament_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ApiErrorResponse>)> {
+    let club_id = db::get_tournament_club_id(&state.pool, tournament_id)
+        .await
+        .map_err(|e| internal_error(e))?
+        .ok_or_else(|| bad_request("NOT_FOUND", "Tournament not found"))?;
+
+    let is_owner = db::is_club_owner(&state.pool, club_id, auth.user_id)
+        .await
+        .map_err(|e| internal_error(e))?;
+    
+    if !is_owner {
+        return Err(forbidden(
+            "FORBIDDEN",
+            "Only the club owner can delete a tournament.",
+        ));
+    }
+
+    db::delete_tournament(&state.pool, tournament_id)
+        .await
+        .map_err(|e| internal_error(e))?;
+
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "message": "Tournament deleted successfully"
     })))
 }
 

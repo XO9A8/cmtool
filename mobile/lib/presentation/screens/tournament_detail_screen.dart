@@ -154,7 +154,7 @@ class _TournamentDetailScreenState extends ConsumerState<TournamentDetailScreen>
               indicatorColor: AppColors.primary.withValues(alpha: 0.2),
               height: 64,
               labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-              destinations: [
+              destinations: const [
                 NavigationDestination(
                   icon: Icon(Icons.calendar_month_outlined, color: AppColors.textMuted),
                   selectedIcon: Icon(Icons.calendar_month, color: AppColors.primary),
@@ -469,32 +469,34 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
           return true;
         }).toList();
 
-        return SingleChildScrollView(
+        return CustomScrollView(
           primary: false,
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // View toggle for knockout
-              if (isKnockout) ...[
-                _buildViewToggle(),
-                const SizedBox(height: 16),
-              ],
-
-              // Filter controls card
-              _buildFilterCard(rounds, groups, playersMap, fixtures.length, filteredFixtures.length, rounds.isNotEmpty ? rounds.last : 0),
-              const SizedBox(height: 16),
-
-              if (filteredFixtures.isEmpty)
-                _buildFilterEmptyState()
-              else if (isKnockout && widget.fixtureView == 1)
-                _buildBracketTreeView(context, widget.formatType == 'group_knockout' 
-                    ? filteredFixtures.where((f) => ((f['round_number'] as num?)?.toInt() ?? 1) >= 10).toList() 
-                    : filteredFixtures)
-              else
-                _buildFixtureList(context, filteredFixtures, rounds.isNotEmpty ? rounds.last : 0),
-            ],
-          ),
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.all(16),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  if (isKnockout) ...[
+                    _buildViewToggle(),
+                    const SizedBox(height: 16),
+                  ],
+                  _buildFilterCard(rounds, groups, playersMap, fixtures.length, filteredFixtures.length, rounds.isNotEmpty ? rounds.last : 0),
+                  const SizedBox(height: 16),
+                  if (filteredFixtures.isEmpty)
+                    _buildFilterEmptyState()
+                  else if (isKnockout && widget.fixtureView == 1)
+                    _buildBracketTreeView(context, widget.formatType == 'group_knockout' 
+                        ? filteredFixtures.where((f) => ((f['round_number'] as num?)?.toInt() ?? 1) >= 10).toList() 
+                        : filteredFixtures),
+                ]),
+              ),
+            ),
+            if (filteredFixtures.isNotEmpty && !(isKnockout && widget.fixtureView == 1))
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 16).copyWith(bottom: 16),
+                sliver: _buildFixtureListSliver(context, filteredFixtures, rounds.isNotEmpty ? rounds.last : 0),
+              ),
+          ],
         );
       },
     );
@@ -915,25 +917,31 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
     );
   }
 
-  Widget _buildFixtureList(BuildContext context, List<dynamic> fixtures, int totalRounds) {
+
+
+  Widget _buildFixtureListSliver(BuildContext context, List<dynamic> fixtures, int totalRounds) {
     final sorted = [...fixtures]..sort((a, b) {
         final rA = (a['round_number'] as num?)?.toInt() ?? 0;
         final rB = (b['round_number'] as num?)?.toInt() ?? 0;
         return rA.compareTo(rB);
       });
 
-    return Column(
-      children: sorted.asMap().entries.map((e) {
-        return _MatchFixtureTile(
-          fixture: e.value,
-          tournamentId: widget.tournamentId,
-          delay: e.key * 60,
-          totalRounds: totalRounds,
-          formatType: widget.formatType,
-        ).animate().fade(duration: 300.ms, delay: Duration(milliseconds: e.key * 60)).slideY(begin: 0.06, duration: 300.ms, delay: Duration(milliseconds: e.key * 60));
-      }).toList(),
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, index) {
+          return _MatchFixtureTile(
+            fixture: sorted[index],
+            tournamentId: widget.tournamentId,
+            delay: index * 60,
+            totalRounds: totalRounds,
+            formatType: widget.formatType,
+          ).animate().fade(duration: 300.ms, delay: Duration(milliseconds: (index % 10) * 60)).slideY(begin: 0.06, duration: 300.ms, delay: Duration(milliseconds: (index % 10) * 60));
+        },
+        childCount: sorted.length,
+      ),
     );
   }
+
 
   Widget _buildBracketTreeView(BuildContext context, List<dynamic> fixtures) {
     if (fixtures.isEmpty) {
@@ -1156,7 +1164,7 @@ class _MatchFixtureTile extends ConsumerWidget {
     // e.g. " • 11:59 PM"
     // Since backend might not have deadline, we just hardcode the requested string if it's a group match, or always?
     // User: "and whats the lable round 1 instead say match day also include date and deadline of 11:59 pm"
-    final dateStr = ' • 11:59 PM'; // Hardcoded deadline for now as requested
+    const dateStr = ' • 11:59 PM'; // Hardcoded deadline for now as requested
     
     final headerText = groupName != null && groupName.isNotEmpty && isGroupMatch
         ? '$groupName • $roundLabel$dateStr'
@@ -1724,7 +1732,7 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
             label: 'COMPLETE',
             icon: Icons.check_circle_outline,
             height: 40,
-            gradient: [AppColors.textMuted, Colors.grey],
+            gradient: const [AppColors.textMuted, Colors.grey],
             onPressed: () => Navigator.of(ctx).pop(true),
           ),
         ],
@@ -1740,6 +1748,62 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
       ref.invalidate(tournamentBracketProvider(widget.tournamentId));
       ref.invalidate(leagueStandingsProvider(widget.tournamentId));
       ref.invalidate(clubTournamentsProvider);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Failed: ${ApiClient.formatErrorMessage(e)}', style: GoogleFonts.rajdhani()),
+          backgroundColor: AppColors.lossRed,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _isActing = false);
+    }
+  }
+
+  Future<void> _confirmAndDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: AppColors.lossRed.withValues(alpha: 0.4)),
+        ),
+        title: Text('DELETE TOURNAMENT?',
+            style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+        content: Text(
+          'This will permanently delete the tournament and all its fixtures. This action cannot be undone. Only the club owner can perform this action.',
+          style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 15),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text('CANCEL', style: GoogleFonts.rajdhani(color: AppColors.textMuted)),
+          ),
+          EsportsButton(
+            label: 'DELETE',
+            icon: Icons.delete_outline,
+            height: 40,
+            gradient: const [AppColors.lossRed, Colors.red],
+            onPressed: () => Navigator.of(ctx).pop(true),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    setState(() => _isActing = true);
+    try {
+      final client = ref.read(apiClientProvider);
+      await client.deleteTournament(widget.tournamentId);
+      if (mounted) {
+        ref.invalidate(clubTournamentsProvider);
+        Navigator.of(context).pop(); // Go back to club screen
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Tournament deleted successfully.', style: GoogleFonts.rajdhani()),
+          backgroundColor: AppColors.winGreen,
+        ));
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -2063,6 +2127,27 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
                       onPressed: _confirmAndComplete,
                     ),
                   ],
+                  const SizedBox(height: 16),
+                  Divider(color: Colors.white.withValues(alpha: 0.08), height: 1),
+                  const SizedBox(height: 16),
+                  Text(
+                    'DANGER ZONE',
+                    style: GoogleFonts.rajdhani(color: AppColors.lossRed, fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Permanently remove this tournament (Club Owners only).',
+                    style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 13),
+                  ),
+                  const SizedBox(height: 14),
+                  EsportsButton(
+                    label: 'DELETE TOURNAMENT',
+                    icon: Icons.delete_outline,
+                    isLoading: _isActing,
+                    gradient: [AppColors.lossRed, Colors.red.shade900],
+                    textColor: Colors.white,
+                    onPressed: _confirmAndDelete,
+                  ),
                 ],
               ),
             ).animate().fade(duration: 300.ms, delay: 140.ms).slideY(begin: 0.06, duration: 300.ms, delay: 140.ms),

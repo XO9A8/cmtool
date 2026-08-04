@@ -136,7 +136,7 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
                                 _currentParams = null;
                               });
                             },
-                            backgroundColor: Colors.white.withOpacity(0.05),
+                            backgroundColor: Colors.white.withValues(alpha: 0.05),
                             selectedColor: AppColors.primary,
                             labelStyle: GoogleFonts.rajdhani(
                               color: isSelected ? Colors.black : Colors.white70,
@@ -182,18 +182,18 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
         }
 
         return GlassCard(
-          borderColor: AppColors.cyan.withOpacity(0.3),
+          borderColor: AppColors.cyan.withValues(alpha: 0.3),
           child: Column(
             children: [
               DropdownButtonFormField<String>(
-                value: _p1Id,
+                initialValue: _p1Id,
                 dropdownColor: AppColors.surface,
                 style: GoogleFonts.rajdhani(fontSize: 15, color: Colors.white, fontWeight: FontWeight.w600),
                 decoration: InputDecoration(
                   labelText: 'Player 1',
                   labelStyle: const TextStyle(color: Colors.white60),
                   filled: true,
-                  fillColor: Colors.white.withOpacity(0.04),
+                  fillColor: Colors.white.withValues(alpha: 0.04),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                   prefixIcon: const Icon(Icons.person, color: AppColors.primary),
                 ),
@@ -212,14 +212,14 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
               ),
               const SizedBox(height: 14),
               DropdownButtonFormField<String>(
-                value: _p2Id,
+                initialValue: _p2Id,
                 dropdownColor: AppColors.surface,
                 style: GoogleFonts.rajdhani(fontSize: 15, color: Colors.white, fontWeight: FontWeight.w600),
                 decoration: InputDecoration(
                   labelText: 'Player 2',
                   labelStyle: const TextStyle(color: Colors.white60),
                   filled: true,
-                  fillColor: Colors.white.withOpacity(0.04),
+                  fillColor: Colors.white.withValues(alpha: 0.04),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                   prefixIcon: const Icon(Icons.person, color: AppColors.cyan),
                 ),
@@ -281,7 +281,7 @@ class _H2hResultWidget extends ConsumerWidget {
 
         return GlassCard(
           gradientColors: const [Color(0xFF191C2B), Color(0xFF0F111A)],
-          borderColor: AppColors.primary.withOpacity(0.5),
+          borderColor: AppColors.primary.withValues(alpha: 0.5),
           padding: const EdgeInsets.all(24),
           child: Column(
             children: [

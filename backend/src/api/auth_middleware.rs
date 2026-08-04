@@ -11,10 +11,7 @@ use axum::{
 };
 use uuid::Uuid;
 
-use crate::{
-    api::routes::{ApiErrorDetail, ApiErrorResponse},
-    domain::auth::verify_jwt_token,
-};
+use crate::api::routes::{ApiErrorDetail, ApiErrorResponse};
 
 #[allow(dead_code)]
 const JWT_SECRET: &str = "default_cmtool_jwt_secret_key_2026";

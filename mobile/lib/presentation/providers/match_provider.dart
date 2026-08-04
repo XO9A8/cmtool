@@ -12,7 +12,7 @@ import '../../domain/models/match_record.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 final apiClientProvider = Provider<ApiClient>((ref) {
-  const envUrl = String.fromEnvironment('BACKEND_URL');
+  const envUrl = String.fromEnvironment('BACKEND_URL', defaultValue: 'https://cmtool-backend-asia-production.up.railway.app');
   final baseUrl = envUrl.isNotEmpty ? envUrl : (Platform.isAndroid ? 'http://10.0.2.2:3000' : 'http://127.0.0.1:3000');
   return ApiClient(
     baseUrl: baseUrl,
@@ -86,6 +86,12 @@ class AuthNotifier extends StateNotifier<String?> {
 
   void forceLogout() {
     state = null;
+  }
+
+  Future<void> updatePassword(String newPassword) async {
+    await Supabase.instance.client.auth.updateUser(
+      UserAttributes(password: newPassword),
+    );
   }
 }
 

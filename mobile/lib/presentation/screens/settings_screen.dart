@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -80,6 +79,84 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  void _showUpdatePasswordDialog() {
+    final passwordController = TextEditingController();
+    bool isUpdating = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: AppColors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: AppColors.cyan),
+          ),
+          title: Text(
+            'UPDATE PASSWORD',
+            style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: passwordController,
+                style: const TextStyle(color: Colors.white),
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: 'New Password',
+                  labelStyle: const TextStyle(color: Colors.white60),
+                  filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.05),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: isUpdating ? null : () => Navigator.pop(ctx),
+              child: const Text('CANCEL', style: TextStyle(color: Colors.white60)),
+            ),
+            ElevatedButton(
+              onPressed: isUpdating ? null : () async {
+                final pwd = passwordController.text;
+                if (pwd.length < 6) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Password must be at least 6 characters')),
+                  );
+                  return;
+                }
+                setDialogState(() => isUpdating = true);
+                try {
+                  await ref.read(authStateProvider.notifier).updatePassword(pwd);
+                  if (context.mounted) {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Password updated successfully!')),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error updating password: $e')),
+                    );
+                  }
+                } finally {
+                  if (mounted) setDialogState(() => isUpdating = false);
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.cyan),
+              child: isUpdating 
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
+                  : const Text('UPDATE', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showEditProfileDialog(ProfilePreferences currentProfile) {
     String selectedStyle = currentProfile.playStyle;
     final displayNameController = TextEditingController(text: currentProfile.displayName);
@@ -109,7 +186,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   labelText: 'Display Name',
                   labelStyle: const TextStyle(color: Colors.white60),
                   filled: true,
-                  fillColor: Colors.white.withOpacity(0.05),
+                  fillColor: Colors.white.withValues(alpha: 0.05),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                 ),
               ),
@@ -120,12 +197,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: validStyles.contains(selectedStyle) ? selectedStyle : validStyles.first,
+                initialValue: validStyles.contains(selectedStyle) ? selectedStyle : validStyles.first,
                 dropdownColor: AppColors.surface,
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                   filled: true,
-                  fillColor: Colors.white.withOpacity(0.05),
+                  fillColor: Colors.white.withValues(alpha: 0.05),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 items: validStyles.map((style) {
@@ -246,11 +323,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Account Security Header
+            _buildSectionHeader('ACCOUNT SECURITY'),
+            const SizedBox(height: 12),
+            GlassCard(
+              borderColor: AppColors.primary.withValues(alpha: 0.4),
+              child: ListTile(
+                leading: const Icon(Icons.lock_outline, color: AppColors.cyan),
+                title: const Text('Update Password', style: TextStyle(color: Colors.white)),
+                subtitle: const Text('Change your account password', style: TextStyle(color: Colors.white60, fontSize: 12)),
+                trailing: const Icon(Icons.chevron_right, color: Colors.white30),
+                onTap: _showUpdatePasswordDialog,
+              ),
+            ),
+            const SizedBox(height: 24),
+
             // Operative Profile Header
             _buildSectionHeader('OPERATIVE PROFILE'),
             const SizedBox(height: 12),
             GlassCard(
-              borderColor: AppColors.primary.withOpacity(0.4),
+              borderColor: AppColors.primary.withValues(alpha: 0.4),
               padding: const EdgeInsets.all(20),
               child: profileAsync?.when(
                     loading: () => const Center(
@@ -300,6 +392,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 onChanged: (v) async {
                   ref.read(matchAlertsProvider.notifier).state = v;
                   await _persistToggle('match_alerts', v);
+                  if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Match Alerts ${v ? 'Enabled' : 'Disabled'}'),
@@ -307,7 +400,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                   );
                 },
-                activeColor: AppColors.cyan,
+                activeThumbColor: AppColors.cyan,
               ),
             ).animate().fade(delay: 200.ms),
             _buildSettingsTile(
@@ -319,6 +412,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 onChanged: (v) async {
                   ref.read(aiInsightsSettingsProvider.notifier).state = v;
                   await _persistToggle('ai_insights', v);
+                  if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('AI Tactical Insights ${v ? 'Enabled' : 'Disabled'}'),
@@ -326,7 +420,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                   );
                 },
-                activeColor: AppColors.cyan,
+                activeThumbColor: AppColors.cyan,
               ),
             ).animate().fade(delay: 250.ms),
             _buildSettingsTile(
@@ -339,7 +433,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ref.read(hapticFeedbackProvider.notifier).state = v;
                   await _persistToggle('haptic_feedback', v);
                 },
-                activeColor: AppColors.cyan,
+                activeThumbColor: AppColors.cyan,
               ),
             ).animate().fade(delay: 300.ms),
             _buildSettingsTile(
@@ -352,6 +446,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 value: profilePrefs.isPublic,
                 onChanged: (v) async {
                   await ref.read(profilePreferencesProvider.notifier).update(isPublic: v);
+                  if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(v ? 'Profile visibility enabled' : 'Profile visibility disabled'),
@@ -359,7 +454,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                   );
                 },
-                activeColor: AppColors.cyan,
+                activeThumbColor: AppColors.cyan,
               ),
             ).animate().fade(delay: 320.ms),
 
@@ -447,7 +542,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             _buildSectionHeader('API BACKEND HEALTH'),
             const SizedBox(height: 12),
             GlassCard(
-              borderColor: AppColors.cyan.withOpacity(0.3),
+              borderColor: AppColors.cyan.withValues(alpha: 0.3),
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
@@ -465,12 +560,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             fontSize: 14,
                           ),
                         ),
-                        Consumer(builder: (context, ref, _) {
-                          return Text(
-                            '${ref.read(apiClientProvider).baseUrl} (Backend API v1)',
-                            style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
-                          );
-                        }),
+                        const Text(
+                          'Backend API v1',
+                          style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                        ),
                       ],
                     ),
                   ),
@@ -516,10 +609,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.lossRed.withOpacity(0.2),
+                  backgroundColor: AppColors.lossRed.withValues(alpha: 0.2),
                   foregroundColor: AppColors.lossRed,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  side: BorderSide(color: AppColors.lossRed.withOpacity(0.6)),
+                  side: BorderSide(color: AppColors.lossRed.withValues(alpha: 0.6)),
                 ),
                 onPressed: _confirmLogout,
               ),
@@ -550,7 +643,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             boxShadow: [
               BoxShadow(
-                color: AppColors.cyan.withOpacity(0.4),
+                color: AppColors.cyan.withValues(alpha: 0.4),
                 blurRadius: 12,
               )
             ],
@@ -654,7 +747,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return GlassCard(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
-      borderColor: color.withOpacity(0.3),
+      borderColor: color.withValues(alpha: 0.3),
       child: InkWell(
         onTap: onTap,
         child: Row(
@@ -663,7 +756,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.15),
+                color: color.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(icon, color: color, size: 20),

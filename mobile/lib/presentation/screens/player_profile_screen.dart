@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -297,7 +296,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                           colors: avatarData.gradient,
                         ),
                         boxShadow: [
-                          BoxShadow(color: avatarData.gradient.first.withOpacity(0.5), blurRadius: 20),
+                          BoxShadow(color: avatarData.gradient.first.withValues(alpha: 0.5), blurRadius: 20),
                         ],
                       ),
                     ),
@@ -368,7 +367,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                         const SizedBox(width: 6),
                         Text(
                           'PTS',
-                          style: GoogleFonts.orbitron(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary.withOpacity(0.8)),
+                          style: GoogleFonts.orbitron(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary.withValues(alpha: 0.8)),
                         ),
                       ],
                     ),
@@ -391,9 +390,9 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
           Container(
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.3),
+              color: Colors.black.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white.withOpacity(0.08)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -421,7 +420,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                             colors: [AppColors.primary, Color(0xFFFF8C00)],
                           ),
                           boxShadow: [
-                            BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 8),
+                            BoxShadow(color: AppColors.primary.withValues(alpha: 0.3), blurRadius: 8),
                           ],
                         ),
                         child: ElevatedButton.icon(
@@ -443,8 +442,8 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(10),
-                          color: AppColors.cyan.withOpacity(0.12),
-                          border: Border.all(color: AppColors.cyan.withOpacity(0.4)),
+                          color: AppColors.cyan.withValues(alpha: 0.12),
+                          border: Border.all(color: AppColors.cyan.withValues(alpha: 0.4)),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -466,7 +465,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: AppColors.cyan),
-                    color: AppColors.cyan.withOpacity(0.1),
+                    color: AppColors.cyan.withValues(alpha: 0.1),
                   ),
                   child: TextButton.icon(
                     icon: const Icon(Icons.share, size: 15, color: AppColors.cyan),
@@ -576,7 +575,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
       children: [
         // Bio Slogan Header Card
         GlassCard(
-          borderColor: AppColors.primary.withOpacity(0.4),
+          borderColor: AppColors.primary.withValues(alpha: 0.4),
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -710,7 +709,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
           decoration: BoxDecoration(
             color: const Color(0xFF0D0F18),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.winGreen.withOpacity(0.3)),
+            border: Border.all(color: AppColors.winGreen.withValues(alpha: 0.3)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -789,7 +788,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
               decoration: BoxDecoration(
                 color: Colors.white10,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.cyan.withOpacity(0.3)),
+                border: Border.all(color: AppColors.cyan.withValues(alpha: 0.3)),
               ),
               child: MpsRadarChart(
                 possession: (data['avg_possession'] as num?)?.toDouble() ?? 55.0,
@@ -944,9 +943,9 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
               decoration: BoxDecoration(
                 color: const Color(0xFF10121D),
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                border: Border.all(color: AppColors.primary.withOpacity(0.5)),
+                border: Border.all(color: AppColors.primary.withValues(alpha: 0.5)),
                 boxShadow: [
-                  BoxShadow(color: AppColors.primary.withOpacity(0.2), blurRadius: 30, offset: const Offset(0, -5)),
+                  BoxShadow(color: AppColors.primary.withValues(alpha: 0.2), blurRadius: 30, offset: const Offset(0, -5)),
                 ],
               ),
               child: Column(
@@ -1019,7 +1018,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                                       width: isSelected ? 3 : 1,
                                     ),
                                     boxShadow: isSelected
-                                        ? [BoxShadow(color: avatar.gradient.first.withOpacity(0.6), blurRadius: 12)]
+                                        ? [BoxShadow(color: avatar.gradient.first.withValues(alpha: 0.6), blurRadius: 12)]
                                         : null,
                                   ),
                                   child: Column(
@@ -1127,7 +1126,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                                 colors: [AppColors.primary, Color(0xFFFF8C00)],
                               ),
                               boxShadow: [
-                                BoxShadow(color: AppColors.primary.withOpacity(0.4), blurRadius: 12),
+                                BoxShadow(color: AppColors.primary.withValues(alpha: 0.4), blurRadius: 12),
                               ],
                             ),
                             child: ElevatedButton(
@@ -1258,10 +1257,10 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
         labelStyle: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 13),
         prefixIcon: Icon(icon, color: AppColors.primary, size: 18),
         filled: true,
-        fillColor: Colors.white.withOpacity(0.05),
+        fillColor: Colors.white.withValues(alpha: 0.05),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -1293,10 +1292,10 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
         labelStyle: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 13),
         prefixIcon: const Icon(Icons.list, color: AppColors.primary, size: 18),
         filled: true,
-        fillColor: Colors.white.withOpacity(0.05),
+        fillColor: Colors.white.withValues(alpha: 0.05),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -1359,7 +1358,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
     final range = maxR - minR;
 
     return GlassCard(
-      borderColor: AppColors.primary.withOpacity(0.4),
+      borderColor: AppColors.primary.withValues(alpha: 0.4),
       padding: const EdgeInsets.all(16),
       child: SizedBox(
         height: 140,
@@ -1413,7 +1412,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
 
   Widget _buildStatCard(String label, String value, IconData icon, Color color) {
     return GlassCard(
-      borderColor: color.withOpacity(0.3),
+      borderColor: color.withValues(alpha: 0.3),
       padding: const EdgeInsets.all(12),
       child: Column(
         children: [
@@ -1452,7 +1451,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
 
     return GlassCard(
       margin: const EdgeInsets.only(bottom: 8),
-      borderColor: resultColor.withOpacity(0.3),
+      borderColor: resultColor.withValues(alpha: 0.3),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
@@ -1460,7 +1459,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
             width: 34,
             height: 34,
             decoration: BoxDecoration(
-              color: resultColor.withOpacity(0.15),
+              color: resultColor.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
             child: Icon(resultIcon, color: resultColor, size: 18),
@@ -1486,9 +1485,9 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                         margin: const EdgeInsets.only(left: 8),
                         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                         decoration: BoxDecoration(
-                          color: AppColors.cyan.withOpacity(0.2),
+                          color: AppColors.cyan.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: AppColors.cyan.withOpacity(0.5)),
+                          border: Border.all(color: AppColors.cyan.withValues(alpha: 0.5)),
                         ),
                         child: const Icon(Icons.auto_awesome, color: AppColors.cyan, size: 12),
                       ),
@@ -1572,14 +1571,14 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
   Widget _buildBadgeTile(String title, String desc) {
     return GlassCard(
       margin: const EdgeInsets.only(bottom: 10),
-      borderColor: AppColors.primary.withOpacity(0.3),
+      borderColor: AppColors.primary.withValues(alpha: 0.3),
       padding: const EdgeInsets.all(14),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.15),
+              color: AppColors.primary.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.military_tech, color: AppColors.primary),
@@ -1654,7 +1653,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                       end: Alignment.bottomRight,
                     ),
                     boxShadow: [
-                      BoxShadow(color: const Color(0xFFFFD700).withOpacity(0.4), blurRadius: 20),
+                      BoxShadow(color: const Color(0xFFFFD700).withValues(alpha: 0.4), blurRadius: 20),
                     ],
                   ),
                   child: Column(
@@ -1680,7 +1679,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                           shape: BoxShape.circle,
                           gradient: LinearGradient(colors: avatarData.gradient),
                           boxShadow: [
-                            BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 10),
+                            BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 10),
                           ],
                         ),
                         child: Icon(avatarData.icon, size: 36, color: Colors.black),
@@ -1729,7 +1728,12 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                             final directory = await getTemporaryDirectory();
                             final imagePath = await File('${directory.path}/ultimate_card.png').create();
                             await imagePath.writeAsBytes(image);
-                            await Share.shareXFiles([XFile(imagePath.path)], text: 'Check out my eFootball Ultimate Team Card on Club Manager!');
+                            await SharePlus.instance.share(
+                              ShareParams(
+                                text: 'Check out my eFootball Ultimate Team Card on Club Manager!',
+                                files: [XFile(imagePath.path)],
+                              ),
+                            );
                           }
                         } catch (e) {
                           if (ctx.mounted) {
@@ -1775,7 +1779,7 @@ class _EsportsTabHeaderDelegate extends SliverPersistentHeaderDelegate {
         decoration: BoxDecoration(
           color: const Color(0xFF141624),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withOpacity(0.08)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         ),
         child: Row(
           children: [
@@ -1858,7 +1862,7 @@ class _EloChartPainter extends CustomPainter {
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [AppColors.primary.withOpacity(0.3), Colors.transparent],
+        colors: [AppColors.primary.withValues(alpha: 0.3), Colors.transparent],
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
 
     final path = Path();

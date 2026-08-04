@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../domain/models/match_record.dart';
@@ -28,6 +29,19 @@ class ApiClient {
         }
         handler.next(options);
       },
+      onResponse: (response, handler) async {
+        // Globally invalidate all local GET caches whenever a mutation occurs
+        if (['POST', 'PUT', 'PATCH', 'DELETE'].contains(response.requestOptions.method.toUpperCase())) {
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            final keys = prefs.getKeys().where((k) => k.startsWith('cache_')).toList();
+            for (var key in keys) {
+              await prefs.remove(key);
+            }
+          } catch (_) {}
+        }
+        handler.next(response);
+      },
       onError: (error, handler) async {
         if (error.response?.statusCode == 401) {
           final prefs = await SharedPreferences.getInstance();
@@ -57,6 +71,54 @@ class ApiClient {
       }
     }
     return error.toString();
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Caching GET requests
+  // ─────────────────────────────────────────────────────────────────────────
+  Future<Response<T>> _getWithCache<T>(String path, {Map<String, dynamic>? queryParameters}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final cacheKey = 'cache_${path}_${queryParameters?.toString() ?? ''}';
+    final timeKey = '${cacheKey}_time';
+    
+    final cachedStr = prefs.getString(cacheKey);
+    final cachedTimeStr = prefs.getString(timeKey);
+    
+    if (cachedStr != null && cachedTimeStr != null) {
+      final cachedTime = DateTime.tryParse(cachedTimeStr);
+      // Use cache if less than 5 minutes old
+      if (cachedTime != null && DateTime.now().difference(cachedTime).inMinutes < 5) {
+        try {
+          final decoded = jsonDecode(cachedStr);
+          return Response(
+            requestOptions: RequestOptions(path: path),
+            data: decoded as T,
+            statusCode: 200,
+          );
+        } catch (_) {}
+      }
+    }
+    
+    try {
+      final response = await _dio.get<T>(path, queryParameters: queryParameters);
+      if (response.statusCode == 200 && response.data != null) {
+        await prefs.setString(cacheKey, jsonEncode(response.data));
+        await prefs.setString(timeKey, DateTime.now().toIso8601String());
+      }
+      return response;
+    } catch (e) {
+      if (cachedStr != null) {
+        try {
+          final decoded = jsonDecode(cachedStr);
+          return Response(
+            requestOptions: RequestOptions(path: path),
+            data: decoded as T,
+            statusCode: 200,
+          );
+        } catch (_) {}
+      }
+      rethrow;
+    }
   }
 
   /// Checks if backend is online and reachable.
@@ -120,13 +182,13 @@ class ApiClient {
 
   /// Fetches all clubs the current player belongs to.
   Future<Map<String, dynamic>> getMyClubs() async {
-    final response = await _dio.get('/api/v1/clubs/my');
+    final response = await _getWithCache('/api/v1/clubs/my');
     return response.data as Map<String, dynamic>;
   }
 
   /// Fetches all members of a club with their ratings and roles.
   Future<Map<String, dynamic>> getClubMembers(String clubId) async {
-    final response = await _dio.get('/api/v1/clubs/$clubId/members');
+    final response = await _getWithCache('/api/v1/clubs/$clubId/members');
     return response.data as Map<String, dynamic>;
   }
 
@@ -156,7 +218,7 @@ class ApiClient {
 
   /// Fetches all tournaments for a club.
   Future<Map<String, dynamic>> getClubTournaments(String clubId) async {
-    final response = await _dio.get('/api/v1/clubs/$clubId/tournaments');
+    final response = await _getWithCache('/api/v1/clubs/$clubId/tournaments');
     return response.data as Map<String, dynamic>;
   }
 
@@ -202,7 +264,7 @@ class ApiClient {
     int? p1H2hWins,
     int? p2H2hWins,
   }) async {
-    final response = await _dio.get(
+    final response = await _getWithCache(
       '/api/v1/matches/predict',
       queryParameters: {
         'p1_rating': p1Rating,
@@ -220,7 +282,7 @@ class ApiClient {
 
   /// Fetches full player profile (analytics, clubs, badges combined).
   Future<Map<String, dynamic>> getPlayerProfile(String playerId) async {
-    final response = await _dio.get('/api/v1/players/$playerId/profile');
+    final response = await _getWithCache('/api/v1/players/$playerId/profile');
     return response.data as Map<String, dynamic>;
   }
 
@@ -237,13 +299,13 @@ class ApiClient {
 
   /// Fetches full player analytics (MPS, Elo, form, win rate) from the backend.
   Future<Map<String, dynamic>> getAnalytics(String playerId) async {
-    final response = await _dio.get('/api/v1/players/$playerId/analytics');
+    final response = await _getWithCache('/api/v1/players/$playerId/analytics');
     return response.data as Map<String, dynamic>;
   }
 
   /// Fetches paginated match history for a player.
   Future<Map<String, dynamic>> getMatchHistory(String playerId, {int limit = 20, int offset = 0}) async {
-    final response = await _dio.get(
+    final response = await _getWithCache(
       '/api/v1/players/$playerId/matches',
       queryParameters: {'limit': limit, 'offset': offset},
     );
@@ -252,25 +314,25 @@ class ApiClient {
 
   /// Fetches scheduled matches for a player.
   Future<Map<String, dynamic>> getPlayerScheduledMatches(String playerId) async {
-    final response = await _dio.get('/api/v1/players/$playerId/scheduled-matches');
+    final response = await _getWithCache('/api/v1/players/$playerId/scheduled-matches');
     return response.data as Map<String, dynamic>;
   }
 
   /// Fetches Elo rating progression history for chart rendering.
   Future<Map<String, dynamic>> getEloHistory(String playerId) async {
-    final response = await _dio.get('/api/v1/players/$playerId/elo-history');
+    final response = await _getWithCache('/api/v1/players/$playerId/elo-history');
     return response.data as Map<String, dynamic>;
   }
 
   /// Fetches badges earned by a player.
   Future<Map<String, dynamic>> getPlayerBadges(String playerId) async {
-    final response = await _dio.get('/api/v1/players/$playerId/badges');
+    final response = await _getWithCache('/api/v1/players/$playerId/badges');
     return response.data as Map<String, dynamic>;
   }
 
   /// Fetches Head-to-Head rivalry stats between two players.
   Future<Map<String, dynamic>> getH2hRecord(String p1Id, String p2Id) async {
-    final response = await _dio.get('/api/v1/players/$p1Id/h2h/$p2Id');
+    final response = await _getWithCache('/api/v1/players/$p1Id/h2h/$p2Id');
     return response.data as Map<String, dynamic>;
   }
 
@@ -280,7 +342,7 @@ class ApiClient {
 
   /// Fetches club player rankings sorted by Elo rating.
   Future<List<dynamic>> getLeaderboard(String clubId) async {
-    final response = await _dio.get('/api/v1/leaderboards/$clubId');
+    final response = await _getWithCache('/api/v1/leaderboards/$clubId');
     return response.data as List<dynamic>;
   }
 
@@ -306,7 +368,7 @@ class ApiClient {
 
   /// Fetches live bracket state for a tournament.
   Future<Map<String, dynamic>> getTournamentBracket(String tournamentId) async {
-    final response = await _dio.get('/api/v1/tournaments/$tournamentId/bracket');
+    final response = await _getWithCache('/api/v1/tournaments/$tournamentId/bracket');
     return response.data as Map<String, dynamic>;
   }
 
@@ -330,7 +392,13 @@ class ApiClient {
 
   /// Fetches live league standings for a tournament.
   Future<Map<String, dynamic>> getLeagueStandings(String tournamentId) async {
-    final response = await _dio.get('/api/v1/tournaments/$tournamentId/standings');
+    final response = await _getWithCache('/api/v1/tournaments/$tournamentId/standings');
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// Deletes a tournament (club owners only).
+  Future<Map<String, dynamic>> deleteTournament(String tournamentId) async {
+    final response = await _dio.delete('/api/v1/tournaments/$tournamentId');
     return response.data as Map<String, dynamic>;
   }
 
@@ -378,17 +446,17 @@ class ApiClient {
   // ─────────────────────────────────────────────────────────────────────────
 
   Future<List<dynamic>> getClubActivity(String clubId) async {
-    final response = await _dio.get('/api/v1/clubs/$clubId/activity');
+    final response = await _getWithCache('/api/v1/clubs/$clubId/activity');
     return response.data as List<dynamic>;
   }
 
   Future<List<dynamic>> getClubResolvedActivity(String clubId) async {
-    final response = await _dio.get('/api/v1/clubs/$clubId/resolved-activity');
+    final response = await _getWithCache('/api/v1/clubs/$clubId/resolved-activity');
     return response.data as List<dynamic>;
   }
 
   Future<List<dynamic>> getClubSeasons(String clubId) async {
-    final response = await _dio.get('/api/v1/clubs/$clubId/seasons');
+    final response = await _getWithCache('/api/v1/clubs/$clubId/seasons');
     return response.data as List<dynamic>;
   }
 

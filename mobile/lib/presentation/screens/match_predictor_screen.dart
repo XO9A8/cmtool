@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 
 import '../theme/app_theme.dart';
 import '../providers/match_provider.dart';
@@ -17,8 +16,8 @@ class MatchPredictorScreen extends ConsumerStatefulWidget {
 class _MatchPredictorScreenState extends ConsumerState<MatchPredictorScreen> {
   int _r1 = 1200;
   int _r2 = 1100;
-  int _h2h1 = 3;
-  int _h2h2 = 1;
+  final int _h2h1 = 3;
+  final int _h2h2 = 1;
 
   @override
   Widget build(BuildContext context) {

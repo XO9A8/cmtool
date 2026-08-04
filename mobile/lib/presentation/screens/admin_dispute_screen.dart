@@ -74,7 +74,7 @@ class AdminDisputeScreen extends ConsumerWidget {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 16),
                 child: GlassCard(
-                  borderColor: AppColors.lossRed.withOpacity(0.5),
+                  borderColor: AppColors.lossRed.withValues(alpha: 0.5),
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -83,7 +83,7 @@ class AdminDisputeScreen extends ConsumerWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          GlowBadge(
+                          const GlowBadge(
                             label: 'DISPUTE',
                             color: AppColors.lossRed,
                             icon: Icons.warning_amber_rounded,

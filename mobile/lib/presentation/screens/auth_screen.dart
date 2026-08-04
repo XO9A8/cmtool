@@ -84,7 +84,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               height: 300,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFF00E5FF).withOpacity(0.10),
+                color: const Color(0xFF00E5FF).withValues(alpha: 0.10),
                 boxShadow: const [BoxShadow(color: Color(0xFF00E5FF), blurRadius: 60)],
               ),
             ).animate(onPlay: (c) => c.repeat(reverse: true)).scale(duration: 4.seconds, begin: const Offset(0.8, 0.8), end: const Offset(1.2, 1.2)),
@@ -97,7 +97,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               height: 400,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFFB000FF).withOpacity(0.10),
+                color: const Color(0xFFB000FF).withValues(alpha: 0.10),
                 boxShadow: const [BoxShadow(color: Color(0xFFB000FF), blurRadius: 60)],
               ),
             ).animate(onPlay: (c) => c.repeat(reverse: true)).scale(duration: 5.seconds, begin: const Offset(0.9, 0.9), end: const Offset(1.1, 1.1)),
@@ -123,7 +123,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF00E5FF).withOpacity(0.5),
+                          color: const Color(0xFF00E5FF).withValues(alpha: 0.5),
                           blurRadius: 25,
                           offset: const Offset(0, 5),
                         ),
@@ -165,9 +165,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(32),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.05),
+                          color: Colors.white.withValues(alpha: 0.05),
                           borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: Colors.white.withOpacity(0.1)),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
                         ),
                         child: Column(
                           children: [
@@ -188,9 +188,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                               Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: Colors.redAccent.withOpacity(0.15),
+                                  color: Colors.redAccent.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.redAccent.withOpacity(0.5)),
+                                  border: Border.all(color: Colors.redAccent.withValues(alpha: 0.5)),
                                 ),
                                 child: Row(
                                   children: [
@@ -232,7 +232,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                                     borderRadius: BorderRadius.circular(16),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: const Color(0xFFB000FF).withOpacity(0.4),
+                                        color: const Color(0xFFB000FF).withValues(alpha: 0.4),
                                         blurRadius: 15,
                                         offset: const Offset(0, 4),
                                       )
@@ -311,14 +311,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       labelStyle: const TextStyle(color: Colors.white60, fontWeight: FontWeight.w500),
       prefixIcon: Icon(icon, color: const Color(0xFF00E5FF), size: 22),
       filled: true,
-      fillColor: Colors.white.withOpacity(0.05),
+      fillColor: Colors.white.withValues(alpha: 0.05),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
       ),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),

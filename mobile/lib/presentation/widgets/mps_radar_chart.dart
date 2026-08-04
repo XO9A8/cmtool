@@ -105,7 +105,7 @@ class RadarChartPainter extends CustomPainter {
       textPainter.layout();
       
       // Adjust label position slightly outwards
-      final labelOffset = 15.0;
+      const labelOffset = 15.0;
       final lx = center.dx + (radius + labelOffset) * cos(i * angle - pi / 2) - textPainter.width / 2;
       final ly = center.dy + (radius + labelOffset) * sin(i * angle - pi / 2) - textPainter.height / 2;
       textPainter.paint(canvas, Offset(lx, ly));
@@ -113,7 +113,7 @@ class RadarChartPainter extends CustomPainter {
 
     // Draw data polygon
     final dataPaint = Paint()
-      ..color = color.withOpacity(0.4)
+      ..color = color.withValues(alpha: 0.4)
       ..style = PaintingStyle.fill;
     
     final dataOutlinePaint = Paint()

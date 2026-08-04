@@ -365,7 +365,7 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
   Widget build(BuildContext context) {
     ref.listen(clubMembersProvider(widget.clubId), (prev, next) {
       if (!_initializedMembers && next.hasValue) {
-        final data = next.value as Map<String, dynamic>? ?? {};
+        final data = next.value ?? {};
         final members = (data['members'] as List<dynamic>? ?? []);
         setState(() {
           _selectedPlayerIds.addAll(members.map((m) => m['user_id']?.toString() ?? '').where((id) => id.isNotEmpty));
@@ -701,7 +701,7 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
                       ),
                       Switch.adaptive(
                         value: _hasThirdPlaceMatch,
-                        activeColor: AppColors.primary,
+                        activeThumbColor: AppColors.primary,
                         onChanged: (val) => setState(() => _hasThirdPlaceMatch = val),
                       ),
                     ],
@@ -736,7 +736,7 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
                         ),
                         Switch.adaptive(
                           value: _singleFinalMatch,
-                          activeColor: AppColors.primary,
+                          activeThumbColor: AppColors.primary,
                           onChanged: (val) => setState(() => _singleFinalMatch = val),
                         ),
                       ],
@@ -1209,10 +1209,10 @@ class _TournamentHeroCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
+                  const Row(
                     children: [
                       _PulseDot(color: AppColors.winGreen),
-                      const SizedBox(width: 6),
+                      SizedBox(width: 6),
                       GlowBadge(label: 'LIVE', color: AppColors.winGreen),
                     ],
                   ),
@@ -1246,7 +1246,7 @@ class _TournamentHeroCard extends StatelessWidget {
                       EsportsButton(
                         label: 'ENTER →',
                         height: 36,
-                        gradient: [AppColors.winGreen, AppColors.cyan],
+                        gradient: const [AppColors.winGreen, AppColors.cyan],
                         onPressed: () => Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -1336,7 +1336,7 @@ class _TournamentScheduledCardState extends ConsumerState<_TournamentScheduledCa
       await client.startTournament(id, []);
       ref.invalidate(clubTournamentsProvider(widget.selectedClubId));
     } catch (e) {
-      if (mounted) {
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to start: ${ApiClient.formatErrorMessage(e)}', style: GoogleFonts.rajdhani()),
@@ -1419,7 +1419,7 @@ class _TournamentScheduledCardState extends ConsumerState<_TournamentScheduledCa
                   icon: Icons.play_arrow,
                   height: 36,
                   isLoading: _isStarting,
-                  gradient: [AppColors.cyan, AppColors.winGreen],
+                  gradient: const [AppColors.cyan, AppColors.winGreen],
                   textColor: Colors.black,
                   onPressed: () => _showStartDialog(context),
                 ),
@@ -1485,7 +1485,7 @@ class _TournamentCompletedRow extends StatelessWidget {
               style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 11),
             ),
             const SizedBox(width: 8),
-            GlowBadge(label: 'ARCHIVED', color: AppColors.textMuted),
+            const GlowBadge(label: 'ARCHIVED', color: AppColors.textMuted),
           ],
         ),
       ),

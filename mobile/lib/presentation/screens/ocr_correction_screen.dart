@@ -70,12 +70,12 @@ class _OcrCorrectionScreenState extends State<OcrCorrectionScreen> {
         decoration: InputDecoration(
           labelText: label,
           labelStyle: TextStyle(
-            color: isLowConfidence ? AppColors.lossRed.withOpacity(0.8) : Colors.white54,
+            color: isLowConfidence ? AppColors.lossRed.withValues(alpha: 0.8) : Colors.white54,
           ),
           filled: true,
           fillColor: isLowConfidence 
-              ? AppColors.lossRed.withOpacity(0.05) 
-              : Colors.white.withOpacity(0.05),
+              ? AppColors.lossRed.withValues(alpha: 0.05) 
+              : Colors.white.withValues(alpha: 0.05),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
             borderSide: BorderSide(
@@ -141,11 +141,11 @@ class _OcrCorrectionScreenState extends State<OcrCorrectionScreen> {
               child: InteractiveViewer(
                 minScale: 1.0,
                 maxScale: 5.0,
-                child: Stack(
+                child: const Stack(
                   alignment: Alignment.center,
                   children: [
                     // Placeholder for actual image: Image.file(File(widget.screenshotPath))
-                    const Icon(Icons.image, size: 50, color: Colors.white24),
+                    Icon(Icons.image, size: 50, color: Colors.white24),
                     // Tapping a field would theoretically animate the InteractiveViewer's TransformationController to zoom into a bounding box here.
                   ],
                 ),

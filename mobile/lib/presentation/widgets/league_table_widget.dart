@@ -60,12 +60,12 @@ class LeagueTableWidget extends ConsumerWidget {
               children: [
                 _headerCell('#', 28),
                 _headerCell('PLAYER', 0, flex: true),
-                _headerCell('P', 28),
-                _headerCell('W', 28),
-                _headerCell('D', 28),
-                _headerCell('L', 28),
-                _headerCell('GD', 32),
-                _headerCell('PTS', 36, isHighlighted: true),
+                _headerCell('P', 26),
+                _headerCell('W', 26),
+                _headerCell('D', 26),
+                _headerCell('L', 26),
+                _headerCell('GD', 30),
+                _headerCell('PTS', 34, isHighlighted: true),
               ],
             ),
           ),
@@ -201,17 +201,17 @@ class LeagueTableWidget extends ConsumerWidget {
               ),
             ),
           ),
-          _dataCell('$played', 28),
-          _dataCell('$won', 28, color: won > 0 ? AppColors.winGreen : null),
-          _dataCell('$drawn', 28),
-          _dataCell('$lost', 28, color: lost > 0 ? AppColors.lossRed.withValues(alpha: 0.8) : null),
+          _dataCell('$played', 26),
+          _dataCell('$won', 26, color: won > 0 ? AppColors.winGreen : null),
+          _dataCell('$drawn', 26),
+          _dataCell('$lost', 26, color: lost > 0 ? AppColors.lossRed.withValues(alpha: 0.8) : null),
           _dataCell(
             gd > 0 ? '+$gd' : '$gd',
-            32,
+            30,
             color: gd > 0 ? AppColors.winGreen : (gd < 0 ? AppColors.lossRed : null),
           ),
           Container(
-            width: 36,
+            width: 34,
             alignment: Alignment.center,
             padding: const EdgeInsets.symmetric(vertical: 4),
             decoration: BoxDecoration(
@@ -252,11 +252,11 @@ class LeagueTableWidget extends ConsumerWidget {
   }
 
   Widget _buildSkeleton() {
-    return SizedBox(
+    return const SizedBox(
       height: 250,
       child: GlassCard(
         padding: EdgeInsets.zero,
-        child: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+        child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
       ),
     );
   }

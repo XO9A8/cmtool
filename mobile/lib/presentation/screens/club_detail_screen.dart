@@ -195,7 +195,7 @@ class _ClubDetailScreenState extends ConsumerState<ClubDetailScreen> {
                         ),
                       ).animate().fadeIn(duration: 400.ms).slideX(begin: -0.15),
                       const SizedBox(height: 4),
-                      GlowBadge(label: 'CLUB', color: AppColors.primary),
+                      const GlowBadge(label: 'CLUB', color: AppColors.primary),
                     ],
                   ),
                 ),
@@ -481,7 +481,7 @@ class _OverviewTabState extends ConsumerState<_OverviewTab> {
                       children: [
                         _sectionLabel('EDIT CLUB', AppColors.cyan),
                         const SizedBox(width: 8),
-                        GlowBadge(label: 'ADMIN ONLY', color: AppColors.primary, icon: Icons.star),
+                        const GlowBadge(label: 'ADMIN ONLY', color: AppColors.primary, icon: Icons.star),
                       ],
                     ),
                     const SizedBox(height: 14),
@@ -748,175 +748,187 @@ class _RosterTabState extends ConsumerState<_RosterTab> {
             data['club']?['invite_code']?.toString() ??
             '—';
 
-        return ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            // Invite button
-            Row(
-              children: [
-                _sectionLabel('SQUAD ROSTER', AppColors.cyan),
-                const Spacer(),
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.purple,
-                    side: BorderSide(color: AppColors.purple.withValues(alpha: 0.5)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  ),
-                  icon: const Icon(Icons.link, size: 16),
-                  label: Text('INVITE', style: GoogleFonts.rajdhani(fontWeight: FontWeight.bold, fontSize: 13)),
-                  onPressed: () => _showInviteDialog(inviteCode),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            if (members.isEmpty)
-              GlassCard(
-                child: Center(
-                  child: Text(
-                    'No members in this club.',
-                    style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 15),
-                  ),
-                ),
-              )
-            else
-              ...members.asMap().entries.map((entry) {
-                final i = entry.key;
-                final m = entry.value as Map<String, dynamic>;
-                final role = m['role']?.toString() ?? 'player';
-                final username = m['username']?.toString() ?? 'Player';
-                final pid = m['user_id']?.toString() ?? '';
-                final rating = m['skill_rating'] ?? 0;
-                final wins = m['wins'] ?? 0;
-                final losses = m['losses'] ?? 0;
-                final rColor = _roleColor(role);
-
-                return GlassCard(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  borderColor: rColor.withValues(alpha: 0.15),
-                  onTap: () {
-                    if (pid.isNotEmpty) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => PlayerProfileScreen(playerId: pid),
-                        ),
-                      );
-                    }
-                  },
-                  child: Row(
+        return CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                children: [
+                  Row(
                     children: [
-                      // Avatar
-                      CircleAvatar(
-                        radius: 22,
-                        backgroundColor: getAvatarById(m['avatar_graphic']?.toString()).gradient.first.withValues(alpha: 0.2),
-                        child: Icon(
-                          getAvatarById(m['avatar_graphic']?.toString()).icon,
-                          color: getAvatarById(m['avatar_graphic']?.toString()).gradient.first,
-                          size: 22,
+                      _sectionLabel('SQUAD ROSTER', AppColors.cyan),
+                      const Spacer(),
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.purple,
+                          side: BorderSide(color: AppColors.purple.withValues(alpha: 0.5)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              username,
-                              style: GoogleFonts.rajdhani(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                GlowBadge(label: role.toUpperCase(), color: rColor),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'W:$wins / L:$losses',
-                                  style: GoogleFonts.rajdhani(
-                                    fontSize: 12,
-                                    color: AppColors.textMuted,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      // ELO badge
-                      GlowBadge(label: '$rating ELO', color: AppColors.primary),
-                      const SizedBox(width: 4),
-                      // Options menu
-                      PopupMenuButton<String>(
-                        icon: const Icon(Icons.more_vert, color: Colors.white54, size: 20),
-                        color: AppColors.surface,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: const BorderSide(color: Colors.white12),
-                        ),
-                        onSelected: (val) {
-                          if (val == 'profile') {
-                            if (pid.isNotEmpty) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => PlayerProfileScreen(playerId: pid),
-                                ),
-                              );
-                            }
-                          } else if (val == 'role') {
-                            _showRoleDialog(widget.clubId, pid, role);
-                          } else if (val == 'remove') {
-                            _confirmRemove(widget.clubId, pid, username);
-                          }
-                        },
-                        itemBuilder: (_) => [
-                          PopupMenuItem(
-                            value: 'profile',
-                            child: Row(
-                              children: [
-                                const Icon(Icons.person, color: AppColors.cyan, size: 16),
-                                const SizedBox(width: 8),
-                                Text('View Profile', style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 14)),
-                              ],
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: 'role',
-                            child: Row(
-                              children: [
-                                const Icon(Icons.manage_accounts, color: AppColors.cyan, size: 16),
-                                const SizedBox(width: 8),
-                                Text('Change Role', style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 14)),
-                              ],
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: 'remove',
-                            child: Row(
-                              children: [
-                                const Icon(Icons.person_remove, color: AppColors.lossRed, size: 16),
-                                const SizedBox(width: 8),
-                                Text('Remove Member', style: GoogleFonts.rajdhani(color: AppColors.lossRed, fontSize: 14)),
-                              ],
-                            ),
-                          ),
-                        ],
+                        icon: const Icon(Icons.link, size: 16),
+                        label: Text('INVITE', style: GoogleFonts.rajdhani(fontWeight: FontWeight.bold, fontSize: 13)),
+                        onPressed: () => _showInviteDialog(inviteCode),
                       ),
                     ],
                   ),
-                )
-                    .animate(delay: Duration(milliseconds: i * 55))
-                    .fadeIn(duration: 350.ms)
-                    .slideY(begin: 0.12);
-              }),
+                  const SizedBox(height: 12),
+                  if (members.isEmpty)
+                    GlassCard(
+                      child: Center(
+                        child: Text(
+                          'No members in this club.',
+                          style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 15),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              ),
+            ),
+            if (members.isNotEmpty)
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final m = members[index] as Map<String, dynamic>;
+                    final role = m['role']?.toString() ?? 'player';
+                    final username = m['username']?.toString() ?? 'Player';
+                    final pid = m['user_id']?.toString() ?? '';
+                    final rating = m['skill_rating'] ?? 0;
+                    final wins = m['wins'] ?? 0;
+                    final losses = m['losses'] ?? 0;
+                    final rColor = _roleColor(role);
 
-            const SizedBox(height: 80),
+                    return GlassCard(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      borderColor: rColor.withValues(alpha: 0.15),
+                      onTap: () {
+                        if (pid.isNotEmpty) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => PlayerProfileScreen(playerId: pid),
+                            ),
+                          );
+                        }
+                      },
+                      child: Row(
+                        children: [
+                          // Avatar
+                          CircleAvatar(
+                            radius: 22,
+                            backgroundColor: getAvatarById(m['avatar_graphic']?.toString()).gradient.first.withValues(alpha: 0.2),
+                            child: Icon(
+                              getAvatarById(m['avatar_graphic']?.toString()).icon,
+                              color: getAvatarById(m['avatar_graphic']?.toString()).gradient.first,
+                              size: 22,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  username,
+                                  style: GoogleFonts.rajdhani(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    GlowBadge(label: role.toUpperCase(), color: rColor),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'W:$wins / L:$losses',
+                                      style: GoogleFonts.rajdhani(
+                                        fontSize: 12,
+                                        color: AppColors.textMuted,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          // ELO badge
+                          GlowBadge(label: '$rating ELO', color: AppColors.primary),
+                          const SizedBox(width: 4),
+                          // Options menu
+                          PopupMenuButton<String>(
+                            icon: const Icon(Icons.more_vert, color: Colors.white54, size: 20),
+                            color: AppColors.surface,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: const BorderSide(color: Colors.white12),
+                            ),
+                            onSelected: (val) {
+                              if (val == 'profile') {
+                                if (pid.isNotEmpty) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => PlayerProfileScreen(playerId: pid),
+                                    ),
+                                  );
+                                }
+                              } else if (val == 'role') {
+                                _showRoleDialog(widget.clubId, pid, role);
+                              } else if (val == 'remove') {
+                                _confirmRemove(widget.clubId, pid, username);
+                              }
+                            },
+                            itemBuilder: (_) => [
+                              PopupMenuItem(
+                                value: 'profile',
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.person, color: AppColors.cyan, size: 16),
+                                    const SizedBox(width: 8),
+                                    Text('View Profile', style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 14)),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'role',
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.manage_accounts, color: AppColors.cyan, size: 16),
+                                    const SizedBox(width: 8),
+                                    Text('Change Role', style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 14)),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'remove',
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.person_remove, color: AppColors.lossRed, size: 16),
+                                    const SizedBox(width: 8),
+                                    Text('Remove Member', style: GoogleFonts.rajdhani(color: AppColors.lossRed, fontSize: 14)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    )
+                        .animate(delay: Duration(milliseconds: (index % 10) * 55))
+                        .fadeIn(duration: 350.ms)
+                        .slideY(begin: 0.12);
+                  },
+                  childCount: members.length,
+                ),
+              ),
+              ),
+            const SliverToBoxAdapter(child: SizedBox(height: 80)),
           ],
         );
       },
@@ -1666,7 +1678,7 @@ class _SeasonCard extends StatelessWidget {
                       ),
                     ),
                     if (isActive)
-                      GlowBadge(label: 'ACTIVE', color: AppColors.cyan)
+                      const GlowBadge(label: 'ACTIVE', color: AppColors.cyan)
                           .animate(onPlay: (c) => c.repeat(reverse: true))
                           .fadeIn(duration: 800.ms),
                   ],

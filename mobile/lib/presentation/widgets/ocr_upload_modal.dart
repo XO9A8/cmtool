@@ -7,7 +7,6 @@ import 'dart:convert';
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
 import '../../domain/models/match_record.dart';
 import '../../domain/services/ocr_parser_service.dart';
@@ -36,43 +35,44 @@ class OcrUploadModal extends ConsumerStatefulWidget {
 
 class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
   bool _is2v2Mode = false;
-  String _selectedMatchType = 'league';
+  final String _selectedMatchType = 'league';
   int _uploadStep = 0; // 0: upload, 1: scanning, 2: results
+  Set<String> _assumedFields = {};
 
   late final TextEditingController _opponentIdCtrl;
   final _partnerIdCtrl         = TextEditingController();
   final _opponentPartnerIdCtrl = TextEditingController();
 
-  final _goalsForCtrl      = TextEditingController(text: '3');
-  final _goalsAgainstCtrl  = TextEditingController(text: '1');
-  final _possessionCtrl    = TextEditingController(text: '62.5');
-  final _possessionAwayCtrl= TextEditingController(text: '37.5');
-  final _passesCompCtrl    = TextEditingController(text: '120');
-  final _passesCompAwayCtrl= TextEditingController(text: '70');
-  final _passesAttCtrl     = TextEditingController(text: '140');
-  final _passesAttAwayCtrl = TextEditingController(text: '95');
-  final _shotsTargetCtrl   = TextEditingController(text: '5');
-  final _shotsTargetAwayCtrl=TextEditingController(text: '1');
-  final _shotsTotalCtrl    = TextEditingController(text: '8');
-  final _shotsTotalAwayCtrl= TextEditingController(text: '3');
-  final _interceptionsCtrl = TextEditingController(text: '7');
-  final _interceptionsAwayCtrl = TextEditingController(text: '4');
+  final _goalsForCtrl      = TextEditingController(text: '');
+  final _goalsAgainstCtrl  = TextEditingController(text: '');
+  final _possessionCtrl    = TextEditingController(text: '');
+  final _possessionAwayCtrl= TextEditingController(text: '');
+  final _passesCompCtrl    = TextEditingController(text: '');
+  final _passesCompAwayCtrl= TextEditingController(text: '');
+  final _passesAttCtrl     = TextEditingController(text: '');
+  final _passesAttAwayCtrl = TextEditingController(text: '');
+  final _shotsTargetCtrl   = TextEditingController(text: '');
+  final _shotsTargetAwayCtrl=TextEditingController(text: '');
+  final _shotsTotalCtrl    = TextEditingController(text: '');
+  final _shotsTotalAwayCtrl= TextEditingController(text: '');
+  final _interceptionsCtrl = TextEditingController(text: '');
+  final _interceptionsAwayCtrl = TextEditingController(text: '');
   
   // New eFootball Fields
-  final _foulsCtrl         = TextEditingController(text: '0');
-  final _foulsAwayCtrl     = TextEditingController(text: '2');
-  final _offsidesCtrl      = TextEditingController(text: '0');
-  final _offsidesAwayCtrl  = TextEditingController(text: '1');
-  final _cornersCtrl       = TextEditingController(text: '0');
-  final _cornersAwayCtrl   = TextEditingController(text: '2');
-  final _freeKicksCtrl     = TextEditingController(text: '0');
-  final _freeKicksAwayCtrl = TextEditingController(text: '1');
-  final _crossesCtrl       = TextEditingController(text: '1');
-  final _crossesAwayCtrl   = TextEditingController(text: '2');
-  final _tacklesCtrl       = TextEditingController(text: '5');
-  final _tacklesAwayCtrl   = TextEditingController(text: '8');
-  final _savesCtrl         = TextEditingController(text: '1');
-  final _savesAwayCtrl     = TextEditingController(text: '3');
+  final _foulsCtrl         = TextEditingController(text: '');
+  final _foulsAwayCtrl     = TextEditingController(text: '');
+  final _offsidesCtrl      = TextEditingController(text: '');
+  final _offsidesAwayCtrl  = TextEditingController(text: '');
+  final _cornersCtrl       = TextEditingController(text: '');
+  final _cornersAwayCtrl   = TextEditingController(text: '');
+  final _freeKicksCtrl     = TextEditingController(text: '');
+  final _freeKicksAwayCtrl = TextEditingController(text: '');
+  final _crossesCtrl       = TextEditingController(text: '');
+  final _crossesAwayCtrl   = TextEditingController(text: '');
+  final _tacklesCtrl       = TextEditingController(text: '');
+  final _tacklesAwayCtrl   = TextEditingController(text: '');
+  final _savesCtrl         = TextEditingController(text: '');
+  final _savesAwayCtrl     = TextEditingController(text: '');
 
   String? _errorMessage;
 
@@ -191,15 +191,12 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
         throw UnsupportedError('Google ML Kit OCR is only supported on Android and iOS devices. Please run on a mobile device or emulator.');
       }
 
-      final inputImage = InputImage.fromFilePath(pickedFile.path);
-      final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
-      final recognizedText = await textRecognizer.processImage(inputImage);
-      await textRecognizer.close();
-
-      final parsed = await OcrParserService.parse(recognizedText);
+      final parsed = await OcrParserService.parseFile(pickedFile.path);
 
       if (mounted) {
         setState(() {
+          if (parsed.goalsHome != null) _goalsForCtrl.text = parsed.goalsHome.toString();
+          if (parsed.goalsAway != null) _goalsAgainstCtrl.text = parsed.goalsAway.toString();
           if (parsed.possessionHome != null) _possessionCtrl.text = parsed.possessionHome.toString();
           if (parsed.possessionAway != null) _possessionAwayCtrl.text = parsed.possessionAway.toString();
           if (parsed.shotsTotalHome != null) _shotsTotalCtrl.text = parsed.shotsTotalHome.toString();
@@ -227,6 +224,7 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
           if (parsed.savesHome != null) _savesCtrl.text = parsed.savesHome.toString();
           if (parsed.savesAway != null) _savesAwayCtrl.text = parsed.savesAway.toString();
           
+          _assumedFields = parsed.assumedFields;
           _uploadStep = 2;
         });
       }
@@ -734,19 +732,19 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
                             ),
                           ),
                           const SizedBox(height: 8),
-                          _buildEfootballRow('Possession', _possessionCtrl, _possessionAwayCtrl, isPercent: true),
-                          _buildEfootballRow('Total Shots', _shotsTotalCtrl, _shotsTotalAwayCtrl),
-                          _buildEfootballRow('Shots on Target', _shotsTargetCtrl, _shotsTargetAwayCtrl),
-                          _buildEfootballRow('Fouls', _foulsCtrl, _foulsAwayCtrl),
-                          _buildEfootballRow('Offsides', _offsidesCtrl, _offsidesAwayCtrl),
-                          _buildEfootballRow('Corner Kicks', _cornersCtrl, _cornersAwayCtrl),
-                          _buildEfootballRow('Free Kicks', _freeKicksCtrl, _freeKicksAwayCtrl),
-                          _buildEfootballRow('Passes', _passesAttCtrl, _passesAttAwayCtrl),
-                          _buildEfootballRow('Successful Passes', _passesCompCtrl, _passesCompAwayCtrl),
-                          _buildEfootballRow('Crosses', _crossesCtrl, _crossesAwayCtrl),
-                          _buildEfootballRow('Interceptions', _interceptionsCtrl, _interceptionsAwayCtrl),
-                          _buildEfootballRow('Tackles', _tacklesCtrl, _tacklesAwayCtrl),
-                          _buildEfootballRow('Saves', _savesCtrl, _savesAwayCtrl),
+                          _buildEfootballRow('Possession', 'possession', _possessionCtrl, _possessionAwayCtrl, isPercent: true),
+                          _buildEfootballRow('Total Shots', 'shotsTotal', _shotsTotalCtrl, _shotsTotalAwayCtrl),
+                          _buildEfootballRow('Shots on Target', 'shotsTarget', _shotsTargetCtrl, _shotsTargetAwayCtrl),
+                          _buildEfootballRow('Fouls', 'fouls', _foulsCtrl, _foulsAwayCtrl),
+                          _buildEfootballRow('Offsides', 'offsides', _offsidesCtrl, _offsidesAwayCtrl),
+                          _buildEfootballRow('Corner Kicks', 'corners', _cornersCtrl, _cornersAwayCtrl),
+                          _buildEfootballRow('Free Kicks', 'freeKicks', _freeKicksCtrl, _freeKicksAwayCtrl),
+                          _buildEfootballRow('Passes', 'passesAtt', _passesAttCtrl, _passesAttAwayCtrl),
+                          _buildEfootballRow('Successful Passes', 'passesComp', _passesCompCtrl, _passesCompAwayCtrl),
+                          _buildEfootballRow('Crosses', 'crosses', _crossesCtrl, _crossesAwayCtrl),
+                          _buildEfootballRow('Interceptions', 'interceptions', _interceptionsCtrl, _interceptionsAwayCtrl),
+                          _buildEfootballRow('Tackles', 'tackles', _tacklesCtrl, _tacklesAwayCtrl),
+                          _buildEfootballRow('Saves', 'saves', _savesCtrl, _savesAwayCtrl),
                           const SizedBox(height: 8),
                         ],
                       ),
@@ -771,7 +769,7 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
     );
   }
 
-  Widget _buildEfootballRow(String label, TextEditingController leftCtrl, TextEditingController rightCtrl, {bool isPercent = false}) {
+  Widget _buildEfootballRow(String label, String statId, TextEditingController leftCtrl, TextEditingController rightCtrl, {bool isPercent = false}) {
     bool hasWarning = false;
     
     if (label == 'Possession') {
@@ -793,6 +791,8 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
     }
 
     final textColor = hasWarning ? Colors.amber : Colors.white;
+    final leftAssumed = _assumedFields.contains('${statId}Home');
+    final rightAssumed = _assumedFields.contains('${statId}Away');
 
     return Container(
       decoration: const BoxDecoration(
@@ -801,47 +801,39 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                IntrinsicWidth(
-                  child: TextField(
-                    controller: leftCtrl,
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.rajdhani(color: textColor, fontSize: 16, fontWeight: FontWeight.bold),
-                    keyboardType: isPercent ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.number,
-                    decoration: const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.zero),
-                  ),
-                ),
-                if (isPercent) Text('%', style: GoogleFonts.rajdhani(color: textColor, fontSize: 16, fontWeight: FontWeight.bold)),
-              ],
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Text(
-              label,
+          SizedBox(
+            width: 36,
+            child: TextField(
+              controller: leftCtrl,
               textAlign: TextAlign.center,
-              style: GoogleFonts.rajdhani(color: Colors.yellow, fontSize: 15, fontWeight: FontWeight.bold),
+              keyboardType: TextInputType.number,
+              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+              decoration: InputDecoration(
+                filled: true, 
+                fillColor: leftAssumed ? Colors.amber.shade200 : Colors.white, 
+                isDense: true, 
+                contentPadding: const EdgeInsets.symmetric(vertical: 4),
+              ),
             ),
           ),
-          Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                IntrinsicWidth(
-                  child: TextField(
-                    controller: rightCtrl,
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.rajdhani(color: textColor, fontSize: 16, fontWeight: FontWeight.bold),
-                    keyboardType: isPercent ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.number,
-                    decoration: const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.zero),
-                  ),
-                ),
-                if (isPercent) Text('%', style: GoogleFonts.rajdhani(color: textColor, fontSize: 16, fontWeight: FontWeight.bold)),
-              ],
+          const SizedBox(width: 12),
+          Expanded(child: Text(label, textAlign: TextAlign.center, style: GoogleFonts.rajdhani(color: textColor, fontWeight: FontWeight.bold, fontSize: 13))),
+          const SizedBox(width: 12),
+          SizedBox(
+            width: 36,
+            child: TextField(
+              controller: rightCtrl,
+              textAlign: TextAlign.center,
+              keyboardType: TextInputType.number,
+              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+              decoration: InputDecoration(
+                filled: true, 
+                fillColor: rightAssumed ? Colors.amber.shade200 : Colors.white, 
+                isDense: true, 
+                contentPadding: const EdgeInsets.symmetric(vertical: 4),
+              ),
             ),
           ),
         ],

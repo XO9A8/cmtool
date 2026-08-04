@@ -1845,6 +1845,55 @@ pub async fn is_club_official(
     Ok(row.is_official.unwrap_or(false))
 }
 
+/// Checks if a user is the owner of a club.
+pub async fn is_club_owner(
+    pool: &PgPool,
+    club_id: Uuid,
+    user_id: Uuid,
+) -> Result<bool, sqlx::Error> {
+    let is_owner: bool = sqlx::query_scalar(
+        r#"
+        SELECT EXISTS (
+            SELECT 1 FROM Clubs
+            WHERE id = $1 AND owner_id = $2
+        )
+        "#,
+    )
+    .bind(club_id)
+    .bind(user_id)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(is_owner)
+}
+
+/// Deletes a tournament.
+pub async fn delete_tournament(
+    pool: &PgPool,
+    tournament_id: Uuid,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("DELETE FROM Tournaments WHERE id = $1")
+        .bind(tournament_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+/// Gets the club_id for a given tournament.
+pub async fn get_tournament_club_id(
+    pool: &PgPool,
+    tournament_id: Uuid,
+) -> Result<Option<Uuid>, sqlx::Error> {
+    let club_id: Option<Uuid> = sqlx::query_scalar(
+        "SELECT club_id FROM Tournaments WHERE id = $1",
+    )
+    .bind(tournament_id)
+    .fetch_optional(pool)
+    .await?;
+    
+    Ok(club_id)
+}
+
 /// Checks if all group stage matches (with a group_name) for a tournament are completed.
 pub async fn check_group_stage_completed(
     pool: &PgPool,

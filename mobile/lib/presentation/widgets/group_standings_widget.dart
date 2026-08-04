@@ -304,27 +304,32 @@ class _GroupStandingsWidgetState extends ConsumerState<GroupStandingsWidget> {
                 child: Text('No players assigned yet', style: GoogleFonts.rajdhani(color: AppColors.textMuted)),
               )
             else
-              ...players.asMap().entries.map((entry) {
-                final idx = entry.key;
-                final s = entry.value;
-                final pos = idx + 1;
-                final isQualified = pos <= widget.advancingPerGroup;
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: EdgeInsets.zero,
+                itemCount: players.length,
+                itemBuilder: (context, idx) {
+                  final s = players[idx];
+                  final pos = idx + 1;
+                  final isQualified = pos <= widget.advancingPerGroup;
 
-                return _buildRow(
-                  position: pos,
-                  name: s['player_name'] ?? s['username'] ?? 'Player $pos',
-                  played: (s['played'] as num?)?.toInt() ?? 0,
-                  won: (s['won'] as num?)?.toInt() ?? 0,
-                  drawn: (s['drawn'] as num?)?.toInt() ?? 0,
-                  lost: (s['lost'] as num?)?.toInt() ?? 0,
-                  gf: (s['goals_for'] as num?)?.toInt() ?? 0,
-                  ga: (s['goals_against'] as num?)?.toInt() ?? 0,
-                  gd: (s['goal_diff'] as num?)?.toInt() ?? 0,
-                  pts: (s['points'] as num?)?.toInt() ?? 0,
-                  isQualified: isQualified,
-                  isLast: idx == players.length - 1,
-                );
-              }),
+                  return _buildRow(
+                    position: pos,
+                    name: s['player_name'] ?? s['username'] ?? 'Player $pos',
+                    played: (s['played'] as num?)?.toInt() ?? 0,
+                    won: (s['won'] as num?)?.toInt() ?? 0,
+                    drawn: (s['drawn'] as num?)?.toInt() ?? 0,
+                    lost: (s['lost'] as num?)?.toInt() ?? 0,
+                    gf: (s['goals_for'] as num?)?.toInt() ?? 0,
+                    ga: (s['goals_against'] as num?)?.toInt() ?? 0,
+                    gd: (s['goal_diff'] as num?)?.toInt() ?? 0,
+                    pts: (s['points'] as num?)?.toInt() ?? 0,
+                    isQualified: isQualified,
+                    isLast: idx == players.length - 1,
+                  );
+                },
+              ),
           ],
         ),
       ),

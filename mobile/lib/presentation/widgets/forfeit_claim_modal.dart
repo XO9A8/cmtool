@@ -200,25 +200,25 @@ class _ForfeitClaimModalState extends ConsumerState<ForfeitClaimModal> {
               data: Theme.of(context).copyWith(
                 unselectedWidgetColor: AppColors.textMuted,
               ),
-              child: Column(
-                children: [
-                  RadioListTile<String>(
-                    title: Text(widget.player1Name, style: const TextStyle(color: Colors.white)),
-                    value: widget.player1Id,
-                    groupValue: _forfeitingPlayerId,
-                    activeColor: AppColors.lossRed,
-                    contentPadding: EdgeInsets.zero,
-                    onChanged: (val) => setState(() => _forfeitingPlayerId = val),
-                  ),
-                  RadioListTile<String>(
-                    title: Text(widget.player2Name, style: const TextStyle(color: Colors.white)),
-                    value: widget.player2Id,
-                    groupValue: _forfeitingPlayerId,
-                    activeColor: AppColors.lossRed,
-                    contentPadding: EdgeInsets.zero,
-                    onChanged: (val) => setState(() => _forfeitingPlayerId = val),
-                  ),
-                ],
+              child: RadioGroup<String>(
+                groupValue: _forfeitingPlayerId,
+                onChanged: (val) => setState(() => _forfeitingPlayerId = val),
+                child: Column(
+                  children: [
+                    RadioListTile<String>(
+                      title: Text(widget.player1Name, style: const TextStyle(color: Colors.white)),
+                      value: widget.player1Id,
+                      activeColor: AppColors.lossRed,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    RadioListTile<String>(
+                      title: Text(widget.player2Name, style: const TextStyle(color: Colors.white)),
+                      value: widget.player2Id,
+                      activeColor: AppColors.lossRed,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 24),

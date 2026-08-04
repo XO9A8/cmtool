@@ -4,3 +4,7 @@
 -dontwarn com.google.mlkit.vision.text.devanagari.**
 -dontwarn com.google.mlkit.vision.text.japanese.**
 -dontwarn com.google.mlkit.vision.text.korean.**
+
+# Keep ML Kit classes to prevent NullPointerExceptions during reflection/initialization
+-keep class com.google.mlkit.** { *; }
+-dontwarn com.google.mlkit.**
