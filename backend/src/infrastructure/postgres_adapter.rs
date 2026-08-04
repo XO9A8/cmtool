@@ -307,6 +307,7 @@ pub async fn get_player_mps_history(
 #[derive(FromRow)]
 pub struct PlayerAnalyticsRow {
     pub user_id: Uuid,
+    pub username: Option<String>,
     pub skill_rating: i32,
     pub form_rating: f64,
     pub play_style: Option<String>,
@@ -344,6 +345,7 @@ pub async fn get_player_analytics(
         r#"
         SELECT
             p.user_id,
+            u.username,
             COALESCE(cm.skill_rating, 1000)                          AS skill_rating,
             COALESCE(cm.form_rating, 50.0)::FLOAT8                   AS form_rating,
             cm.play_style,
@@ -369,6 +371,7 @@ pub async fn get_player_analytics(
             p.auth_status,
             p.source_feed
         FROM Player_Profiles p
+        LEFT JOIN Users u ON u.id = p.user_id
         -- DISTINCT ON ensures only one membership row per player (most recently joined club)
         LEFT JOIN (
             SELECT DISTINCT ON (player_id)
@@ -378,7 +381,7 @@ pub async fn get_player_analytics(
         ) cm ON cm.player_id = p.user_id
         LEFT JOIN Match_Records m ON m.player_id = p.user_id
         WHERE p.user_id = $1
-        GROUP BY p.user_id, cm.skill_rating, cm.form_rating, cm.play_style,
+        GROUP BY p.user_id, u.username, cm.skill_rating, cm.form_rating, cm.play_style,
                  p.efootball_game_id, p.preferred_foot, p.jersey_number, p.system_device,
                  p.facebook, p.blood_group, p.district, p.date_of_birth, p.registrar_joined,
                  p.contract_start, p.contract_end, p.facebook_link, p.email_node,
@@ -392,6 +395,7 @@ pub async fn get_player_analytics(
 
     Ok(row.unwrap_or(PlayerAnalyticsRow {
         user_id: player_id,
+        username: None,
         skill_rating: 1000,
         form_rating: 50.0,
         play_style: Some("Unclassified".into()),

@@ -6,8 +6,8 @@ This document describes the sample data populated in the PostgreSQL database (`e
 
 ## 1. Overview of Seeded Data
 
-- **Total Users / Players**: 50 active accounts with real-world player names across 5 clubs.
-- **Clubs**: 5 fully populated clubs with 10 players each.
+- **Total Users / Players**: 65 active accounts with real-world player names across 6 clubs.
+- **Clubs**: 6 fully populated clubs (5 clubs with 10 players, 1 club with 15 players).
 - **Player Dossier & Compliance Metadata**: Full registration dossier, contact channels, and compliance status seeded for every player (matching official registry specifications).
 - **Tournaments**: 4 tournaments covering multiple stages (**Halfway Finished**, **Nearly Finished**, and **Completed/Finished**).
 - **Default Password for All Users**: `password123` (argon2id hashed).
@@ -103,6 +103,29 @@ This document describes the sample data populated in the PostgreSQL database (`e
   8. `pepe_ferreira` (Player | Elo: 1600 | Form: 56.0 | Defensive)
   9. `diogo_costa` (Player | Elo: 1620 | Form: 58.0 | Defensive)
   10. `nuno_mendes` (Player | Elo: 1640 | Form: 60.0 | High-Press)
+
+---
+
+### 6. Black Falcons
+- **Club ID**: `a0000000-0000-0000-0000-000000000006`
+- **Invite Code**: `BLACKFAL26`
+- **Owner / Captain**: `2107023_jonayet` (Jonayet Hossain)
+- **Roster (15 Players)**:
+  1. `2107023_jonayet` (Jonayet Hossain | Admin / Captain | Elo: 1850 | Form: 75.0 | Counter-Attack)
+  2. `foysalhosen77master` (AF Foysal Hosen | Player | Elo: 1690 | Form: 75.0 | Counter-Attack)
+  3. `arianhassan661` (Arian Hasan Rishad | Player | Elo: 1680 | Form: 75.0 | Counter-Attack)
+  4. `chakma927` (Harsha Bardhan Chakma | Player | Elo: 1670 | Form: 75.0 | Counter-Attack)
+  5. `mdr368798` (MD Ornob RK | Player | Elo: 1650 | Form: 75.0 | Counter-Attack)
+  6. `umoin842` (Moin Uddin | Player | Elo: 1640 | Form: 75.0 | Counter-Attack)
+  7. `tanvirrahman5676` (Nafis Rafi | Player | Elo: 1630 | Form: 75.0 | Counter-Attack)
+  8. `nishankhanoo2020` (Nishan khan | Player | Elo: 1620 | Form: 75.0 | Counter-Attack)
+  9. `rakibulhasan7992` (Räkibül Häsäñ Säikät | Player | Elo: 1610 | Form: 75.0 | Counter-Attack)
+  10. `saikatchakma20` (Saikat Chakma | Player | Elo: 1600 | Form: 75.0 | Counter-Attack)
+  11. `sadidkabir007` (Shahriar Shadid | Player | Elo: 1590 | Form: 75.0 | Counter-Attack)
+  12. `shihabshahriyar614` (Shihab Shahriar | Player | Elo: 1580 | Form: 75.0 | Counter-Attack)
+  13. `kahalu2` (Sifat | Player | Elo: 1570 | Form: 75.0 | Counter-Attack)
+  14. `talishan2016` (Sk Sohan Hossain | Player | Elo: 1560 | Form: 75.0 | Counter-Attack)
+  15. `mdshohanmia0312` (Standard User | Player | Elo: 1550 | Form: 75.0 | Counter-Attack)
 
 ---
 

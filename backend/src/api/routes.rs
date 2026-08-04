@@ -752,6 +752,7 @@ async fn get_h2h_record(
 #[derive(Serialize)]
 pub struct PlayerAnalyticsResponse {
     pub player_id: Uuid,
+    pub username: Option<String>,
     pub skill_rating: i32,
     pub form_rating: f64,
     pub play_style: String,
@@ -797,6 +798,7 @@ async fn get_player_analytics(
 
     Ok(Json(PlayerAnalyticsResponse {
         player_id,
+        username:       row.username,
         skill_rating:   row.skill_rating,
         form_rating:    row.form_rating,
         play_style:     row.play_style.unwrap_or_else(|| "Unclassified".into()),
@@ -1100,6 +1102,7 @@ async fn get_player_profile(
 
     Ok(Json(serde_json::json!({
         "player_id": player_id,
+        "username": analytics.username,
         "skill_rating": analytics.skill_rating,
         "form_rating": analytics.form_rating,
         "play_style": analytics.play_style.unwrap_or_else(|| "Unclassified".into()),

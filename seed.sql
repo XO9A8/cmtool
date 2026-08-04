@@ -17,7 +17,7 @@ TRUNCATE TABLE Player_Profiles CASCADE;
 TRUNCATE TABLE Clubs CASCADE;
 TRUNCATE TABLE Users CASCADE;
 
--- 1. Insert 50 Real-World Named Users Across 5 Clubs (Password is 'password123' for all)
+-- 1. Insert 65 Real-World Named Users Across 6 Clubs (Password is 'password123' for all)
 INSERT INTO Users (id, username, password_hash) VALUES
 -- Club 1: Apex Esports Club (10 Players)
 ('11111111-1111-1111-1111-111111111111', 'erling_haaland', '$argon2id$v=19$m=19456,t=2,p=1$liJmbCQFXm+obBlFaulJaw$gj7S0P7+xQe7LrO5aTFwh8jKbxMNgS/gCNo6Siprklg'),
@@ -77,7 +77,23 @@ INSERT INTO Users (id, username, password_hash) VALUES
 ('55555555-5555-5555-5555-555555555507', 'joao_cancelo', '$argon2id$v=19$m=19456,t=2,p=1$liJmbCQFXm+obBlFaulJaw$gj7S0P7+xQe7LrO5aTFwh8jKbxMNgS/gCNo6Siprklg'),
 ('55555555-5555-5555-5555-555555555508', 'pepe_ferreira', '$argon2id$v=19$m=19456,t=2,p=1$liJmbCQFXm+obBlFaulJaw$gj7S0P7+xQe7LrO5aTFwh8jKbxMNgS/gCNo6Siprklg'),
 ('55555555-5555-5555-5555-555555555509', 'diogo_costa', '$argon2id$v=19$m=19456,t=2,p=1$liJmbCQFXm+obBlFaulJaw$gj7S0P7+xQe7LrO5aTFwh8jKbxMNgS/gCNo6Siprklg'),
-('55555555-5555-5555-5555-555555555510', 'nuno_mendes', '$argon2id$v=19$m=19456,t=2,p=1$liJmbCQFXm+obBlFaulJaw$gj7S0P7+xQe7LrO5aTFwh8jKbxMNgS/gCNo6Siprklg');
+('55555555-5555-5555-5555-555555555510', 'nuno_mendes', '$argon2id$v=19$m=19456,t=2,p=1$liJmbCQFXm+obBlFaulJaw$gj7S0P7+xQe7LrO5aTFwh8jKbxMNgS/gCNo6Siprklg'),
+-- Club 6: Black Falcons (15 Players)
+('66666666-6666-6666-6666-666666666601', 'foysalhosen77master', '$argon2id$v=19$m=19456,t=2,p=1$liJmbCQFXm+obBlFaulJaw$gj7S0P7+xQe7LrO5aTFwh8jKbxMNgS/gCNo6Siprklg'),
+('66666666-6666-6666-6666-666666666602', 'arianhassan661', '$argon2id$v=19$m=19456,t=2,p=1$liJmbCQFXm+obBlFaulJaw$gj7S0P7+xQe7LrO5aTFwh8jKbxMNgS/gCNo6Siprklg'),
+('66666666-6666-6666-6666-666666666603', 'chakma927', '$argon2id$v=19$m=19456,t=2,p=1$liJmbCQFXm+obBlFaulJaw$gj7S0P7+xQe7LrO5aTFwh8jKbxMNgS/gCNo6Siprklg'),
+('66666666-6666-6666-6666-666666666604', '2107023_jonayet', '$argon2id$v=19$m=19456,t=2,p=1$liJmbCQFXm+obBlFaulJaw$gj7S0P7+xQe7LrO5aTFwh8jKbxMNgS/gCNo6Siprklg'),
+('66666666-6666-6666-6666-666666666605', 'mdr368798', '$argon2id$v=19$m=19456,t=2,p=1$liJmbCQFXm+obBlFaulJaw$gj7S0P7+xQe7LrO5aTFwh8jKbxMNgS/gCNo6Siprklg'),
+('66666666-6666-6666-6666-666666666606', 'umoin842', '$argon2id$v=19$m=19456,t=2,p=1$liJmbCQFXm+obBlFaulJaw$gj7S0P7+xQe7LrO5aTFwh8jKbxMNgS/gCNo6Siprklg'),
+('66666666-6666-6666-6666-666666666607', 'tanvirrahman5676', '$argon2id$v=19$m=19456,t=2,p=1$liJmbCQFXm+obBlFaulJaw$gj7S0P7+xQe7LrO5aTFwh8jKbxMNgS/gCNo6Siprklg'),
+('66666666-6666-6666-6666-666666666608', 'nishankhanoo2020', '$argon2id$v=19$m=19456,t=2,p=1$liJmbCQFXm+obBlFaulJaw$gj7S0P7+xQe7LrO5aTFwh8jKbxMNgS/gCNo6Siprklg'),
+('66666666-6666-6666-6666-666666666609', 'rakibulhasan7992', '$argon2id$v=19$m=19456,t=2,p=1$liJmbCQFXm+obBlFaulJaw$gj7S0P7+xQe7LrO5aTFwh8jKbxMNgS/gCNo6Siprklg'),
+('66666666-6666-6666-6666-666666666610', 'saikatchakma20', '$argon2id$v=19$m=19456,t=2,p=1$liJmbCQFXm+obBlFaulJaw$gj7S0P7+xQe7LrO5aTFwh8jKbxMNgS/gCNo6Siprklg'),
+('66666666-6666-6666-6666-666666666611', 'sadidkabir007', '$argon2id$v=19$m=19456,t=2,p=1$liJmbCQFXm+obBlFaulJaw$gj7S0P7+xQe7LrO5aTFwh8jKbxMNgS/gCNo6Siprklg'),
+('66666666-6666-6666-6666-666666666612', 'shihabshahriyar614', '$argon2id$v=19$m=19456,t=2,p=1$liJmbCQFXm+obBlFaulJaw$gj7S0P7+xQe7LrO5aTFwh8jKbxMNgS/gCNo6Siprklg'),
+('66666666-6666-6666-6666-666666666613', 'kahalu2', '$argon2id$v=19$m=19456,t=2,p=1$liJmbCQFXm+obBlFaulJaw$gj7S0P7+xQe7LrO5aTFwh8jKbxMNgS/gCNo6Siprklg'),
+('66666666-6666-6666-6666-666666666614', 'talishan2016', '$argon2id$v=19$m=19456,t=2,p=1$liJmbCQFXm+obBlFaulJaw$gj7S0P7+xQe7LrO5aTFwh8jKbxMNgS/gCNo6Siprklg'),
+('66666666-6666-6666-6666-666666666615', 'mdshohanmia0312', '$argon2id$v=19$m=19456,t=2,p=1$liJmbCQFXm+obBlFaulJaw$gj7S0P7+xQe7LrO5aTFwh8jKbxMNgS/gCNo6Siprklg');
 
 -- 2. Insert Player Profiles with complete Dossier, Contact, and Compliance metadata (from reference dossier)
 INSERT INTO Player_Profiles (
@@ -144,15 +160,32 @@ INSERT INTO Player_Profiles (
 ('55555555-5555-5555-5555-555555555507', 31, 18, 'VANG-444-555-007', 'RIGHT', 20, 'XIAOMI 13 PRO', 'HTTPS://WWW.FACEBOOK.COM/CANCELO20', 'B+', 'KHULNA', '1994-05-27', '2026-07-19', '2026-07-23', '2027-01-31', 'CANCELO20', 'cancelo@vanguard.gg', '01899112255', 'ACTIVE', 'MEMBER', 'CENTRAL FEDERATION'),
 ('55555555-5555-5555-5555-555555555508', 25, 12, 'VANG-555-666-008', 'RIGHT', 3, 'REALME GT NEO 5', 'HTTPS://WWW.FACEBOOK.COM/PEPE3', 'AB+', 'BARISHAL', '1983-02-26', '2026-07-21', '2026-07-25', '2027-07-31', 'PEPE3', 'pepe@vanguard.gg', '01900223366', 'ACTIVE', 'MEMBER', 'CENTRAL FEDERATION'),
 ('55555555-5555-5555-5555-555555555509', 22, 11, 'VANG-666-777-009', 'RIGHT', 1, 'IQOO 11', 'HTTPS://WWW.FACEBOOK.COM/DIOGOCOSTA1', 'O+', 'CUMILLA', '1999-09-19', '2026-07-23', '2026-07-27', '2027-06-15', 'COSTA1', 'costa@vanguard.gg', '01611334477', 'ACTIVE', 'MEMBER', 'CENTRAL FEDERATION'),
-('55555555-5555-5555-5555-555555555510', 24, 13, 'VANG-777-888-010', 'LEFT', 25, 'VIVO V27', 'HTTPS://WWW.FACEBOOK.COM/NUNOMENDES25', 'A-', 'MYMENSINGH', '2002-06-19', '2026-07-25', '2026-07-29', '2027-01-20', 'MENDES25', 'mendes@vanguard.gg', '01522445588', 'ACTIVE', 'MEMBER', 'CENTRAL FEDERATION');
+('55555555-5555-5555-5555-555555555510', 24, 13, 'VANG-777-888-010', 'LEFT', 25, 'VIVO V27', 'HTTPS://WWW.FACEBOOK.COM/NUNOMENDES25', 'A-', 'MYMENSINGH', '2002-06-19', '2026-07-25', '2026-07-29', '2027-01-20', 'MENDES25', 'mendes@vanguard.gg', '01522445588', 'ACTIVE', 'MEMBER', 'CENTRAL FEDERATION'),
+-- Club 6 Members (Black Falcons)
+('66666666-6666-6666-6666-666666666601', 10, 5, 'ASEQ-833-276-423', 'RIGHT', 1, 'SYMPHONY Z45', 'https://www.facebook.com/af.foysal.hosen', 'O+', 'BOGURA', '2005-09-07', '2026-07-26', '2026-07-29', '2027-01-29', 'af.foysal.hosen', 'foysalhosen77master@gmail.com', '01714862341', 'ACTIVE', 'MEMBER', 'CENTRAL FEDERATION'),
+('66666666-6666-6666-6666-666666666602', 10, 5, 'ASDM-574-495-494', 'RIGHT', 2, 'SYMPHONY Z45', 'https://www.facebook.com/Arian.Hasan.Rishad', 'O+', 'BOGURA', '2003-01-01', '2026-07-26', '2026-07-29', '2027-01-25', 'Arian.Hasan.Rishad', 'arianhassan661@gmail.com', 'N/A', 'ACTIVE', 'MEMBER', 'CENTRAL FEDERATION'),
+('66666666-6666-6666-6666-666666666603', 10, 5, 'ASPV-807-697-035', 'RIGHT', 3, 'SYMPHONY Z45', 'https://www.facebook.com/share/1BqgMW9Vm2/', 'O+', 'RANGAMATI', '2004-08-31', '2026-07-26', '2026-07-29', '2027-01-25', '', 'chakma927@gmail.com', 'N/A', 'ACTIVE', 'MEMBER', 'CENTRAL FEDERATION'),
+('66666666-6666-6666-6666-666666666604', 10, 5, 'ASAA-625-821-344', 'RIGHT', 10, 'REDMI NOTE 14 PRO+', 'https://www.facebook.com/jonayet01', 'O+', 'BOGURA', '2003-03-11', '2026-07-26', '2026-07-28', '2027-01-24', 'jonayet01', '2107023.jonayet@gmail.com', '01831502884', 'ACTIVE', 'CAPTAIN', 'CENTRAL FEDERATION'),
+('66666666-6666-6666-6666-666666666605', 10, 5, 'ASKE-715-287-395', 'RIGHT', 5, 'REALME8 5G', 'https://www.facebook.com/share/1LQ99M1pLt/', 'O+', 'BOGURA', '2003-11-20', '2026-07-26', '2026-07-29', '2027-01-29', '', 'mdr368798@gmail.com', '01771025716', 'ACTIVE', 'MEMBER', 'CENTRAL FEDERATION'),
+('66666666-6666-6666-6666-666666666606', 10, 5, 'Asaa 942 896 069', 'RIGHT', 6, 'IQOO Z11 TURBO', 'https://www.facebook.com/1moin7', 'O+', 'DHAKA', '2003-05-29', '2026-07-26', '2026-07-28', '2027-01-24', '1moin7', 'umoin842@gmail.com', '01736060757', 'ACTIVE', 'MEMBER', 'CENTRAL FEDERATION'),
+('66666666-6666-6666-6666-666666666607', 10, 5, 'ASEQ-430-922-695', 'RIGHT', 7, 'SYMPHONY Z45', 'https://www.facebook.com/nafis.rafi.359', 'O+', 'BOGURA', '2003-01-01', '2026-07-26', '2026-07-29', '2027-01-25', 'nafis.rafi.359', 'tanvirrahman5676@gmail.com', 'N/A', 'ACTIVE', 'MEMBER', 'CENTRAL FEDERATION'),
+('66666666-6666-6666-6666-666666666608', 10, 5, 'ASAA-982-720-394', 'RIGHT', 8, 'IQOO NEO 9', 'https://www.facebook.com/share/14jr8mvv1VL/', 'B+', 'DHAKA', '2003-09-11', '2026-07-26', '2026-07-28', '2027-01-24', '', 'nishankhanoo2020@gmail.com', '01533364412', 'ACTIVE', 'MEMBER', 'CENTRAL FEDERATION'),
+('66666666-6666-6666-6666-666666666609', 10, 5, 'ASPY842143242', 'RIGHT', 9, 'REDMI K80', 'https://www.facebook.com/saikathossain.hossain', 'A+', 'BOGURA', '2002-05-02', '2026-07-26', '2026-07-29', '2027-01-29', 'saikathossain.hossain', 'rakibulhasan7992@gmail.com', '01855081965', 'ACTIVE', 'MEMBER', 'CENTRAL FEDERATION'),
+('66666666-6666-6666-6666-666666666610', 10, 5, 'ASLS-096-069-122', 'RIGHT', 10, 'XIAOMI REDMI NOTE 9S', 'https://www.facebook.com/saik.at.7334', 'A+', 'RANGAMATI', '1004-11-24', '2026-07-26', '2026-07-28', '2027-01-24', 'saik.at.7334', 'saikatchakma20@gmail.com', '01849406758', 'ACTIVE', 'MEMBER', 'CENTRAL FEDERATION'),
+('66666666-6666-6666-6666-666666666611', 10, 5, 'ASEK-600-656-778', 'RIGHT', 11, 'REDMI NOTE 10 PRO', 'https://www.facebook.com/sadidshahriar.57', 'B+', 'GAIBANDHA', '2005-12-30', '2026-07-26', '2026-07-28', '2027-01-24', 'sadidshahriar.57', 'sadidkabir007@gmail.com', '01309404500', 'ACTIVE', 'MEMBER', 'CENTRAL FEDERATION'),
+('66666666-6666-6666-6666-666666666612', 10, 5, 'ASEM-096-082-275', 'RIGHT', 12, 'IQOO NEO 10', 'https://www.facebook.com/share/1GGSnPyq9s/ ', 'B+', 'BOGURA', '2002-10-04', '2026-07-26', '2026-07-31', '2027-01-27', ' ', 'shihabshahriyar614@gmail.com', '01960501511', 'ACTIVE', 'MEMBER', 'CENTRAL FEDERATION'),
+('66666666-6666-6666-6666-666666666613', 10, 5, 'ASNL-686-138-018', 'RIGHT', 13, 'IQOOZ9TURBO', 'https://www.facebook.com/share/14jv8cNByCV/', 'AB+', 'BOGURA', '2003-12-31', '2026-07-26', '2026-07-29', '2027-01-29', '', 'kahalu2@gmail.com', '01701010309', 'ACTIVE', 'MEMBER', 'CENTRAL FEDERATION'),
+('66666666-6666-6666-6666-666666666614', 10, 5, 'ASNU-450-935-746', 'RIGHT', 14, 'MOTOROLA EDGE 40 NEO', 'https://www.facebook.com/share/1ACCEozDMe/', 'B+', 'KISHOREGANJ', '2005-04-07', '2026-07-26', '2026-07-28', '2027-01-24', '', 'talishan2016@gmail.com', '01608842393', 'ACTIVE', 'MEMBER', 'CENTRAL FEDERATION'),
+('66666666-6666-6666-6666-666666666615', 10, 5, 'Id:ASFY781506223', 'RIGHT', 15, 'REDMI TURBO 3', 'https://www.facebook.com/61584072632731/', 'O+', 'BOGURA', '2002-12-03', '2026-07-26', '2026-07-28', '2027-01-24', '', 'mdshohanmia0312@gmail.com', '01345049949', 'ACTIVE', 'MEMBER', 'CENTRAL FEDERATION');
 
--- 3. Insert 5 Active Clubs
+-- 3. Insert 6 Active Clubs
 INSERT INTO Clubs (id, name, invite_code, owner_id) VALUES
 ('a0000000-0000-0000-0000-000000000001', 'Apex Esports Club', 'APEX2026', '11111111-1111-1111-1111-111111111111'),
 ('a0000000-0000-0000-0000-000000000002', 'Cyber Strikers FC', 'CYBER99', '33333333-3333-3333-3333-333333333333'),
 ('a0000000-0000-0000-0000-000000000003', 'Titan Elite Gaming', 'TITAN77', '22222222-2222-2222-2222-222222222222'),
 ('a0000000-0000-0000-0000-000000000004', 'Galacticos FC', 'GALA2026', '88888888-8888-8888-8888-888888888888'),
-('a0000000-0000-0000-0000-000000000005', 'Vanguard eSports', 'VANGUARD10', '77777777-7777-7777-7777-777777777777');
+('a0000000-0000-0000-0000-000000000005', 'Vanguard eSports', 'VANGUARD10', '77777777-7777-7777-7777-777777777777'),
+('a0000000-0000-0000-0000-000000000006', 'Black Falcons', 'BLACKFAL26', '66666666-6666-6666-6666-666666666604');
 
 -- 4. Insert Club Memberships (10 Members per Club)
 INSERT INTO Club_Memberships (player_id, club_id, role, skill_rating, form_rating, play_style) VALUES
@@ -214,7 +247,23 @@ INSERT INTO Club_Memberships (player_id, club_id, role, skill_rating, form_ratin
 ('55555555-5555-5555-5555-555555555507', 'a0000000-0000-0000-0000-000000000005', 'player', 1700, 67.00, 'Out-Wide'),
 ('55555555-5555-5555-5555-555555555508', 'a0000000-0000-0000-0000-000000000005', 'player', 1600, 56.00, 'Defensive'),
 ('55555555-5555-5555-5555-555555555509', 'a0000000-0000-0000-0000-000000000005', 'player', 1620, 58.00, 'Defensive'),
-('55555555-5555-5555-5555-555555555510', 'a0000000-0000-0000-0000-000000000005', 'player', 1640, 60.00, 'High-Press');
+('55555555-5555-5555-5555-555555555510', 'a0000000-0000-0000-0000-000000000005', 'player', 1640, 60.00, 'High-Press'),
+-- Club 6: Black Falcons Members
+('66666666-6666-6666-6666-666666666601', 'a0000000-0000-0000-0000-000000000006', 'player', 1690, 75.00, 'Counter-Attack'),
+('66666666-6666-6666-6666-666666666602', 'a0000000-0000-0000-0000-000000000006', 'player', 1680, 75.00, 'Counter-Attack'),
+('66666666-6666-6666-6666-666666666603', 'a0000000-0000-0000-0000-000000000006', 'player', 1670, 75.00, 'Counter-Attack'),
+('66666666-6666-6666-6666-666666666604', 'a0000000-0000-0000-0000-000000000006', 'admin', 1850, 75.00, 'Counter-Attack'),
+('66666666-6666-6666-6666-666666666605', 'a0000000-0000-0000-0000-000000000006', 'player', 1650, 75.00, 'Counter-Attack'),
+('66666666-6666-6666-6666-666666666606', 'a0000000-0000-0000-0000-000000000006', 'player', 1640, 75.00, 'Counter-Attack'),
+('66666666-6666-6666-6666-666666666607', 'a0000000-0000-0000-0000-000000000006', 'player', 1630, 75.00, 'Counter-Attack'),
+('66666666-6666-6666-6666-666666666608', 'a0000000-0000-0000-0000-000000000006', 'player', 1620, 75.00, 'Counter-Attack'),
+('66666666-6666-6666-6666-666666666609', 'a0000000-0000-0000-0000-000000000006', 'player', 1610, 75.00, 'Counter-Attack'),
+('66666666-6666-6666-6666-666666666610', 'a0000000-0000-0000-0000-000000000006', 'player', 1600, 75.00, 'Counter-Attack'),
+('66666666-6666-6666-6666-666666666611', 'a0000000-0000-0000-0000-000000000006', 'player', 1590, 75.00, 'Counter-Attack'),
+('66666666-6666-6666-6666-666666666612', 'a0000000-0000-0000-0000-000000000006', 'player', 1580, 75.00, 'Counter-Attack'),
+('66666666-6666-6666-6666-666666666613', 'a0000000-0000-0000-0000-000000000006', 'player', 1570, 75.00, 'Counter-Attack'),
+('66666666-6666-6666-6666-666666666614', 'a0000000-0000-0000-0000-000000000006', 'player', 1560, 75.00, 'Counter-Attack'),
+('66666666-6666-6666-6666-666666666615', 'a0000000-0000-0000-0000-000000000006', 'player', 1550, 75.00, 'Counter-Attack');
 
 -- 5. Insert Tournaments (Halfway Finished, Nearly Finished, Completed, Draft)
 INSERT INTO Tournaments (id, club_id, name, format_type, status, rules_config) VALUES

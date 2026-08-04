@@ -33,6 +33,7 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
   bool _is2v2Mode = false;
   String _selectedMatchType = 'league';
   double _ocrConfidence = 82.5;
+  int _uploadStep = 0; // 0: upload, 1: scanning, 2: results
 
   late final TextEditingController _opponentIdCtrl;
   final _partnerIdCtrl         = TextEditingController();
@@ -145,6 +146,15 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
     final data = 'hash_${playerId}_${opponent}_${_selectedMatchType}_${_goalsForCtrl.text}_${_goalsAgainstCtrl.text}'
         '_${_possessionCtrl.text}_${widget.tMatchId ?? ''}_${DateTime.now().millisecondsSinceEpoch}';
     return sha256.convert(utf8.encode(data)).toString();
+  }
+
+  void _simulateUpload() {
+    setState(() => _uploadStep = 1);
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        setState(() => _uploadStep = 2);
+      }
+    });
   }
 
   Future<void> _submitMatchData() async {
@@ -344,7 +354,7 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
                     'OCR MATCH TERMINAL',
                     style: GoogleFonts.rajdhani(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1.2),
                   ),
-                  GlowBadge(
+                  if (_uploadStep == 2) GlowBadge(
                     label: '${_ocrConfidence.toStringAsFixed(1)}% SCAN',
                     color: isLowConfidence ? Colors.amber : AppColors.cyan,
                     icon: isLowConfidence ? Icons.warning_amber_rounded : Icons.document_scanner,
@@ -354,9 +364,108 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
             ),
             
             Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                physics: const BouncingScrollPhysics(),
+              child: _buildBodyContent(isSubmitting, isLowConfidence),
+            ),
+
+            // Footer
+            if (_uploadStep == 2) Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.4),
+                border: Border(top: BorderSide(color: AppColors.cyan.withValues(alpha: 0.2))),
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                child: EsportsButton(
+                  label: 'VERIFY & SUBMIT MATCH',
+                  icon: Icons.upload_file,
+                  gradient: const [AppColors.cyan, Color(0xFF00B0FF)],
+                  isLoading: isSubmitting,
+                  onPressed: _submitMatchData,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBodyContent(bool isSubmitting, bool isLowConfidence) {
+    if (_uploadStep == 0) {
+      return Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.cloud_upload_outlined, size: 64, color: AppColors.cyan.withValues(alpha: 0.8)),
+            const SizedBox(height: 24),
+            Text(
+              'UPLOAD MATCH RESULT',
+              style: GoogleFonts.rajdhani(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Select a screenshot of the match statistics to automatically extract the data.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.rajdhani(fontSize: 14, color: Colors.white70),
+            ),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.photo_library, color: Colors.black),
+                label: const Text('CHOOSE FROM GALLERY', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.cyan,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: _simulateUpload,
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.camera_alt, color: AppColors.cyan),
+                label: const Text('TAKE PHOTO', style: TextStyle(color: AppColors.cyan, fontWeight: FontWeight.bold)),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.cyan),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: _simulateUpload,
+              ),
+            ),
+          ],
+        ),
+      );
+    } else if (_uploadStep == 1) {
+      return Padding(
+        padding: const EdgeInsets.all(48.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(color: AppColors.cyan).animate().scale(),
+            const SizedBox(height: 24),
+            Text(
+              'ANALYZING IMAGE...',
+              style: GoogleFonts.orbitron(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.cyan, letterSpacing: 1.5),
+            ).animate(onPlay: (c) => c.repeat(reverse: true)).fade(duration: 800.ms),
+            const SizedBox(height: 8),
+            Text(
+              'Extracting match statistics',
+              style: GoogleFonts.rajdhani(fontSize: 14, color: Colors.white70),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      physics: const BouncingScrollPhysics(),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -582,30 +691,6 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
                     ],
                   ],
                 ),
-              ),
-            ),
-
-            // Footer
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.4),
-                border: Border(top: BorderSide(color: AppColors.cyan.withValues(alpha: 0.2))),
-              ),
-              child: SizedBox(
-                width: double.infinity,
-                child: EsportsButton(
-                  label: 'VERIFY & SUBMIT MATCH',
-                  icon: Icons.upload_file,
-                  gradient: const [AppColors.cyan, Color(0xFF00B0FF)],
-                  isLoading: isSubmitting,
-                  onPressed: _submitMatchData,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 

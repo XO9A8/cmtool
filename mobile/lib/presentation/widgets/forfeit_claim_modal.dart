@@ -242,7 +242,7 @@ class _ForfeitClaimModalState extends ConsumerState<ForfeitClaimModal> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: EsportsButton(
-                    label: _submitting ? 'CLAIMING...' : 'CONFIRM FORFEIT',
+                    label: _submitting ? 'CLAIMING...' : 'CONFIRM',
                     icon: Icons.gavel,
                     gradient: const [AppColors.lossRed, Colors.orangeAccent],
                     onPressed: _submitting ? null : _submitForfeit,

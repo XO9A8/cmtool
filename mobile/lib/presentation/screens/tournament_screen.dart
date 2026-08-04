@@ -206,14 +206,18 @@ class _TournamentScreenState extends ConsumerState<TournamentScreen> {
                           shaderCallback: (bounds) => const LinearGradient(
                             colors: [AppColors.primary, AppColors.cyan],
                           ).createShader(bounds),
-                          child: Text(
-                            'TOURNAMENT\nHUB',
-                            style: GoogleFonts.orbitron(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                              height: 1.1,
-                              letterSpacing: 1.5,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'TOURNAMENT\nHUB',
+                              style: GoogleFonts.orbitron(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                                height: 1.1,
+                                letterSpacing: 1.5,
+                              ),
                             ),
                           ),
                         ),

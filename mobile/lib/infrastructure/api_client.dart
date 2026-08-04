@@ -132,7 +132,7 @@ class ApiClient {
 
   /// Updates a club member's role.
   Future<Map<String, dynamic>> updateMemberRole(String clubId, String playerId, String role) async {
-    final response = await _dio.post(
+    final response = await _dio.put(
       '/api/v1/clubs/$clubId/members/$playerId/role',
       data: {'role': role},
     );

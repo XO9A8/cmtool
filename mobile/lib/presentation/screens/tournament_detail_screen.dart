@@ -1174,20 +1174,23 @@ class _MatchFixtureTile extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(16, 12, 12, 8),
             child: Row(
               children: [
-                Text(
-                  headerText,
-                  style: GoogleFonts.rajdhani(
-                    color: groupName != null && groupName.isNotEmpty ? AppColors.cyan : AppColors.textMuted,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.4,
+                Expanded(
+                  child: Text(
+                    headerText,
+                    style: GoogleFonts.rajdhani(
+                      color: groupName != null && groupName.isNotEmpty ? AppColors.cyan : AppColors.textMuted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.4,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 if (isCompleted) ...[
                   const SizedBox(width: 8),
                   const GlowBadge(label: 'COMPLETED', color: AppColors.winGreen),
                 ],
-                const Spacer(),
+                const SizedBox(width: 4),
                 // Predict button
                 _IconActionButton(
                   icon: Icons.psychology,
@@ -1350,21 +1353,19 @@ class _PlayerColumn extends StatelessWidget {
     return Column(
       crossAxisAlignment: rightAlign ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       children: [
-        if (!rightAlign) ...[
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: (highlight ? displayColor : AppColors.primary).withValues(alpha: 0.2),
-            child: Text(
-              initials,
-              style: GoogleFonts.orbitron(
-                color: highlight ? displayColor : AppColors.primary,
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-              ),
+        CircleAvatar(
+          radius: 18,
+          backgroundColor: (highlight ? displayColor : (rightAlign ? AppColors.purple : AppColors.primary)).withValues(alpha: 0.2),
+          child: Text(
+            initials,
+            style: GoogleFonts.orbitron(
+              color: highlight ? displayColor : (rightAlign ? AppColors.purple : AppColors.primary),
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 6),
-        ],
+        ),
+        const SizedBox(height: 6),
         Text(
           name,
           style: GoogleFonts.rajdhani(
@@ -1376,24 +1377,6 @@ class _PlayerColumn extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           textAlign: rightAlign ? TextAlign.right : TextAlign.left,
         ),
-        if (rightAlign) ...[
-          const SizedBox(height: 6),
-          Align(
-            alignment: Alignment.centerRight,
-            child: CircleAvatar(
-              radius: 18,
-              backgroundColor: (highlight ? displayColor : AppColors.purple).withValues(alpha: 0.2),
-              child: Text(
-                initials,
-                style: GoogleFonts.orbitron(
-                  color: highlight ? displayColor : AppColors.purple,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-        ],
       ],
     );
   }
@@ -1417,24 +1400,24 @@ class _IconActionButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(6),
           border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: color, size: 14),
-            const SizedBox(width: 4),
+            Icon(icon, color: color, size: 12),
+            const SizedBox(width: 3),
             Text(
               label,
               style: GoogleFonts.rajdhani(
                 color: color,
-                fontSize: 11,
+                fontSize: 10,
                 fontWeight: FontWeight.bold,
-                letterSpacing: 0.5,
+                letterSpacing: 0.3,
               ),
             ),
           ],
