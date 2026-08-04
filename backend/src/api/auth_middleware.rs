@@ -67,10 +67,10 @@ where
 
         let token = &auth_header[7..];
 
-        let jwt_secret = std::env::var("JWT_SECRET")
-            .unwrap_or_else(|_| "default_cmtool_jwt_secret_key_2026".to_string());
+        let supabase_url = std::env::var("SUPABASE_URL")
+            .unwrap_or_else(|_| "https://ypsrkdefgbghvluuyynm.supabase.co".to_string());
 
-        let claims = verify_jwt_token(token, &jwt_secret).map_err(|e| {
+        let claims = crate::api::jwks::verify_supabase_token(token, &supabase_url).await.map_err(|e| {
             (
                 StatusCode::UNAUTHORIZED,
                 Json(ApiErrorResponse {
