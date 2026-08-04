@@ -54,13 +54,29 @@ class AuthNotifier extends StateNotifier<String?> {
 
   Future<void> login(ApiClient client, String username, String password) async {
     final email = username.contains('@') ? username : '$username@example.com';
-    await Supabase.instance.client.auth.signInWithPassword(email: email, password: password);
+    final response = await Supabase.instance.client.auth.signInWithPassword(email: email, password: password);
+    
+    // Ensure the token is available to ApiClient immediately before the sync request
+    if (response.session != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('jwt_token', response.session!.accessToken);
+      await prefs.setString('user_id', response.session!.user.id);
+    }
+    
     await client.syncSupabaseUser(username);
   }
 
   Future<void> register(ApiClient client, String username, String password) async {
     final email = username.contains('@') ? username : '$username@example.com';
-    await Supabase.instance.client.auth.signUp(email: email, password: password);
+    final response = await Supabase.instance.client.auth.signUp(email: email, password: password);
+    
+    // Ensure the token is available to ApiClient immediately before the sync request
+    if (response.session != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('jwt_token', response.session!.accessToken);
+      await prefs.setString('user_id', response.session!.user.id);
+    }
+    
     await client.syncSupabaseUser(username);
   }
 

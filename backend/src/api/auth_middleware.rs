@@ -71,6 +71,7 @@ where
             .unwrap_or_else(|_| "https://ypsrkdefgbghvluuyynm.supabase.co".to_string());
 
         let claims = crate::api::jwks::verify_supabase_token(token, &supabase_url).await.map_err(|e| {
+            tracing::error!("JWT Validation Failed: {}", e);
             (
                 StatusCode::UNAUTHORIZED,
                 Json(ApiErrorResponse {
