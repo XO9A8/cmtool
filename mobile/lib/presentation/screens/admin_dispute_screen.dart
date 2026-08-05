@@ -242,6 +242,7 @@ class AdminDisputeScreen extends ConsumerWidget {
                   dismiss: dismiss,
                   voidMatch: !dismiss,
                 );
+                await client.clearAllCache();
                 ref.invalidate(adminDisputesProvider);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(

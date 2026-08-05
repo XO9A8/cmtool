@@ -50,6 +50,7 @@ class _ForfeitClaimModalState extends ConsumerState<ForfeitClaimModal> {
       await client.claimTournamentForfeit(widget.tournamentId, widget.matchId, _forfeitingPlayerId!);
 
       // Invalidate relevant providers to refresh UI
+      await client.clearAllCache();
       ref.invalidate(tournamentBracketProvider(widget.tournamentId));
       ref.invalidate(leagueStandingsProvider(widget.tournamentId));
 

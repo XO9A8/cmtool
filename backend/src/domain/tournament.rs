@@ -411,7 +411,7 @@ pub async fn process_tournament_advancement(
     let format = tm.format_type.as_str();
 
     // 5a. League / Group-stage path → update standings with idempotency guard
-    if format == "round_robin" || format == "group_knockout" || format.is_empty() {
+    if format == "round_robin" || format == "group_knockout" || format == "league" || format.is_empty() {
 
         crate::infrastructure::postgres_adapter::update_league_standing_guarded(
             pool, tourney_id, tm.t_match_id, p1_id, p1_goals as i32, p2_goals as i32,

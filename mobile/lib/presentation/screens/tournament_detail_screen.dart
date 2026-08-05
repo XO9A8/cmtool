@@ -11,7 +11,7 @@ import '../widgets/league_table_widget.dart';
 import '../widgets/group_standings_widget.dart';
 import '../widgets/forfeit_claim_modal.dart';
 import '../widgets/ocr_upload_modal.dart';
-
+import 'player_profile_screen.dart';
 import '../widgets/tournament_leaders_widget.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1148,6 +1148,8 @@ class _MatchFixtureTile extends ConsumerWidget {
         (p1Id.length > 8 ? p1Id.substring(0, 8) : (p1Id.isNotEmpty ? p1Id : 'TBD'));
     final p2Name = fixture['player_2_name']?.toString() ??
         (p2Id.length > 8 ? p2Id.substring(0, 8) : (p2Id.isNotEmpty ? p2Id : 'TBD'));
+    final p1Avatar = fixture['player_1_avatar']?.toString();
+    final p2Avatar = fixture['player_2_avatar']?.toString();
     final round = (fixture['round_number'] as num?)?.toInt() ?? 1;
     final status = (fixture['status'] ?? 'scheduled').toString().toLowerCase();
     final winnerId = fixture['winner_player_id']?.toString();
@@ -1269,18 +1271,18 @@ class _MatchFixtureTile extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: isCompleted
-                ? _buildResultRow(p1Name, p2Name, p1IsWinner, p2IsWinner, winnerId == null, p1Score: p1Score, p2Score: p2Score)
-                : _buildVsRow(p1Name, p2Name),
+                ? _buildResultRow(p1Name, p2Name, p1IsWinner, p2IsWinner, winnerId == null, p1Score: p1Score, p2Score: p2Score, p1Avatar: p1Avatar, p2Avatar: p2Avatar)
+                : _buildVsRow(p1Name, p2Name, p1Avatar, p2Avatar),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildVsRow(String p1Name, String p2Name) {
+  Widget _buildVsRow(String p1Name, String p2Name, String? p1Avatar, String? p2Avatar) {
     return Row(
       children: [
-        Expanded(child: _PlayerColumn(name: p1Name, highlight: false)),
+        Expanded(child: _PlayerColumn(name: p1Name, highlight: false, avatarGraphic: p1Avatar)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Container(
@@ -1300,12 +1302,12 @@ class _MatchFixtureTile extends ConsumerWidget {
             ),
           ),
         ),
-        Expanded(child: _PlayerColumn(name: p2Name, highlight: false, rightAlign: true)),
+        Expanded(child: _PlayerColumn(name: p2Name, highlight: false, rightAlign: true, avatarGraphic: p2Avatar)),
       ],
     );
   }
 
-  Widget _buildResultRow(String p1Name, String p2Name, bool p1Won, bool p2Won, bool isDraw, {num? p1Score, num? p2Score}) {
+  Widget _buildResultRow(String p1Name, String p2Name, bool p1Won, bool p2Won, bool isDraw, {num? p1Score, num? p2Score, String? p1Avatar, String? p2Avatar}) {
     Color p1Color = isDraw ? Colors.amber : (p1Won ? AppColors.winGreen : AppColors.lossRed);
     Color p2Color = isDraw ? Colors.amber : (p2Won ? AppColors.winGreen : AppColors.lossRed);
 
@@ -1315,7 +1317,7 @@ class _MatchFixtureTile extends ConsumerWidget {
 
     return Row(
       children: [
-        Expanded(child: _PlayerColumn(name: p1Name, highlight: p1Won, color: p1Color)),
+        Expanded(child: _PlayerColumn(name: p1Name, highlight: p1Won, color: p1Color, avatarGraphic: p1Avatar)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Column(
@@ -1336,7 +1338,7 @@ class _MatchFixtureTile extends ConsumerWidget {
             ],
           ),
         ),
-        Expanded(child: _PlayerColumn(name: p2Name, highlight: p2Won, color: p2Color, rightAlign: true)),
+        Expanded(child: _PlayerColumn(name: p2Name, highlight: p2Won, color: p2Color, rightAlign: true, avatarGraphic: p2Avatar)),
       ],
     );
   }
@@ -1432,34 +1434,30 @@ class _PlayerColumn extends StatelessWidget {
   final bool highlight;
   final Color? color;
   final bool rightAlign;
+  final String? avatarGraphic;
 
   const _PlayerColumn({
     required this.name,
     required this.highlight,
     this.color,
     this.rightAlign = false,
+    this.avatarGraphic,
   });
 
   @override
   Widget build(BuildContext context) {
     final displayColor = color ?? Colors.white;
-    final initials = name.isNotEmpty
-        ? name.trim().split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase()
-        : '?';
 
     return Column(
       crossAxisAlignment: rightAlign ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       children: [
         CircleAvatar(
           radius: 18,
-          backgroundColor: (highlight ? displayColor : (rightAlign ? AppColors.purple : AppColors.primary)).withValues(alpha: 0.2),
-          child: Text(
-            initials,
-            style: GoogleFonts.orbitron(
-              color: highlight ? displayColor : (rightAlign ? AppColors.purple : AppColors.primary),
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-            ),
+          backgroundColor: getAvatarById(avatarGraphic).gradient.first.withValues(alpha: 0.2),
+          child: Icon(
+            getAvatarById(avatarGraphic).icon,
+            size: 20,
+            color: getAvatarById(avatarGraphic).gradient.first,
           ),
         ),
         const SizedBox(height: 6),

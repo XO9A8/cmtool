@@ -4,7 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../providers/match_provider.dart';
 import '../theme/app_theme.dart';
-
+import '../screens/player_profile_screen.dart';
 import 'tournament_leaders_widget.dart';
 
 /// Group Stage Standings widget for Group-First Knockout tournaments (`group_knockout`).
@@ -325,6 +325,7 @@ class _GroupStandingsWidgetState extends ConsumerState<GroupStandingsWidget> {
                     ga: (s['goals_against'] as num?)?.toInt() ?? 0,
                     gd: (s['goal_diff'] as num?)?.toInt() ?? 0,
                     pts: (s['points'] as num?)?.toInt() ?? 0,
+                    avatarGraphic: s['avatar_graphic']?.toString(),
                     isQualified: isQualified,
                     isLast: idx == players.length - 1,
                   );
@@ -369,6 +370,7 @@ class _GroupStandingsWidgetState extends ConsumerState<GroupStandingsWidget> {
     required int ga,
     required int gd,
     required int pts,
+    String? avatarGraphic,
     required bool isQualified,
     required bool isLast,
   }) {
@@ -403,14 +405,11 @@ class _GroupStandingsWidgetState extends ConsumerState<GroupStandingsWidget> {
                 children: [
                   CircleAvatar(
                     radius: 11,
-                    backgroundColor: isQualified ? AppColors.winGreen.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.1),
-                    child: Text(
-                      name.isNotEmpty ? name[0].toUpperCase() : '?',
-                      style: GoogleFonts.rajdhani(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: isQualified ? AppColors.winGreen : Colors.white,
-                      ),
+                    backgroundColor: getAvatarById(avatarGraphic).gradient.first.withValues(alpha: 0.2),
+                    child: Icon(
+                      getAvatarById(avatarGraphic).icon,
+                      size: 14,
+                      color: getAvatarById(avatarGraphic).gradient.first,
                     ),
                   ),
                   const SizedBox(width: 8),

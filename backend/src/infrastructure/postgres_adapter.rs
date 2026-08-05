@@ -175,6 +175,7 @@ pub async fn find_pending_opponent_match(
         WHERE player_id = $2 AND opponent_id = $3
           AND goals_for = $4 AND goals_against = $5
           AND created_at >= NOW() - INTERVAL '2 hours'
+          AND verification_status = 'pending'
         LIMIT 1
         "#,
     )
@@ -398,16 +399,18 @@ pub async fn update_player_profile(
     let preferred_foot = payload.get("preferred_foot").and_then(|v| v.as_str());
     let jersey_number = payload.get("jersey_number").and_then(|v| v.as_i64()).map(|v| v as i32);
     let system_device = payload.get("system_device").and_then(|v| v.as_str());
+    let avatar_graphic = payload.get("avatar_graphic").and_then(|v| v.as_str());
 
     sqlx::query(
         r#"
-        INSERT INTO Player_Profiles (user_id, efootball_game_id, preferred_foot, jersey_number, system_device)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO Player_Profiles (user_id, efootball_game_id, preferred_foot, jersey_number, system_device, avatar_graphic)
+        VALUES ($1, $2, $3, $4, $5, $6)
         ON CONFLICT (user_id) DO UPDATE SET
             efootball_game_id = EXCLUDED.efootball_game_id,
             preferred_foot = EXCLUDED.preferred_foot,
             jersey_number = EXCLUDED.jersey_number,
-            system_device = EXCLUDED.system_device
+            system_device = EXCLUDED.system_device,
+            avatar_graphic = EXCLUDED.avatar_graphic
         "#,
     )
     .bind(player_id)
@@ -415,6 +418,7 @@ pub async fn update_player_profile(
     .bind(preferred_foot)
     .bind(jersey_number)
     .bind(system_device)
+    .bind(avatar_graphic)
     .execute(&mut *tx)
     .await?;
 
@@ -502,6 +506,7 @@ pub struct LeaderboardRow {
     pub skill_rating: i32,
     pub form_rating: f64,
     pub play_style: Option<String>,
+    pub avatar_graphic: Option<String>,
 }
 
 /// Fetches real-time club player rankings sorted by skill rating.
@@ -512,9 +517,10 @@ pub async fn get_club_leaderboard_db(
     let rows = sqlx::query_as::<_, LeaderboardRow>(
         r#"
         SELECT u.id as user_id, COALESCE(NULLIF(u.full_name, ''), u.username) AS username, COALESCE(cm.skill_rating, 1000) as skill_rating, 
-               COALESCE(cm.form_rating, 50.0)::FLOAT8 as form_rating, cm.play_style
+               COALESCE(cm.form_rating, 50.0)::FLOAT8 as form_rating, cm.play_style, pp.avatar_graphic
         FROM Club_Memberships cm
         JOIN Users u ON cm.player_id = u.id
+        LEFT JOIN Player_Profiles pp ON u.id = pp.user_id
         WHERE cm.club_id = $1
         ORDER BY COALESCE(cm.skill_rating, 1000) DESC
         "#,
@@ -680,7 +686,8 @@ pub async fn confirm_match(
             (player_id != $2 AND opponent_id = $2)
             -- Club official: if club_id is set on the match, check that club
             OR (
-              club_id IS NOT NULL
+              player_id != $2 -- Prevent self-confirm by official
+              AND club_id IS NOT NULL
               AND EXISTS (
                 SELECT 1 FROM Club_Memberships cm
                 WHERE cm.club_id = Match_Records.club_id
@@ -934,6 +941,8 @@ pub struct TMatchRow {
     pub group_name: Option<String>,
     pub player_1_rating: Option<i32>,
     pub player_2_rating: Option<i32>,
+    pub player_1_avatar: Option<String>,
+    pub player_2_avatar: Option<String>,
 }
 
 /// Fetches all T_Matches for a tournament, ordered by round number.
@@ -966,10 +975,14 @@ pub async fn get_tournament_bracket(
             COALESCE(m.player_2_score, CASE WHEN mr.id IS NOT NULL AND mr.player_id = m.player_2_id THEN mr.goals_for WHEN mr.id IS NOT NULL AND mr.player_id = m.player_1_id THEN mr.goals_against ELSE NULL END)::INT4 AS player_2_score,
             COALESCE(m.group_name, ls1.group_name, ls2.group_name) AS group_name,
             cm1.skill_rating AS player_1_rating,
-            cm2.skill_rating AS player_2_rating
+            cm2.skill_rating AS player_2_rating,
+            pp1.avatar_graphic AS player_1_avatar,
+            pp2.avatar_graphic AS player_2_avatar
         FROM T_Matches m
         LEFT JOIN Users u1 ON m.player_1_id = u1.id
         LEFT JOIN Users u2 ON m.player_2_id = u2.id
+        LEFT JOIN Player_Profiles pp1 ON u1.id = pp1.user_id
+        LEFT JOIN Player_Profiles pp2 ON u2.id = pp2.user_id
         LEFT JOIN LATERAL (SELECT * FROM Match_Records WHERE t_match_id = m.id LIMIT 1) mr ON true
         LEFT JOIN League_Standings ls1 ON ls1.tournament_id = m.tournament_id AND ls1.player_id = m.player_1_id
         LEFT JOIN League_Standings ls2 ON ls2.tournament_id = m.tournament_id AND ls2.player_id = m.player_2_id
@@ -1093,6 +1106,7 @@ pub struct ClubMemberRow {
     pub form_rating: f64,
     pub play_style: Option<String>,
     pub matches_played: i64,
+    pub avatar_graphic: Option<String>,
 }
 
 /// Fetches all members of a club with their profile data.
@@ -1106,9 +1120,11 @@ pub async fn get_club_members(
                COALESCE(cm.skill_rating, 1000) AS skill_rating,
                COALESCE(cm.form_rating, 50.0)::FLOAT8 AS form_rating,
                cm.play_style,
+               pp.avatar_graphic,
                (SELECT COUNT(*) FROM Match_Records mr WHERE mr.player_id = u.id AND mr.verification_status = 'approved' AND mr.club_id = $1) AS matches_played
         FROM Club_Memberships cm
         JOIN Users u ON cm.player_id = u.id
+        LEFT JOIN Player_Profiles pp ON u.id = pp.user_id
         WHERE cm.club_id = $1
         ORDER BY COALESCE(cm.skill_rating, 1000) DESC
         "#,
@@ -1217,9 +1233,12 @@ pub async fn get_player_match_history(
                END AS result,
                CASE WHEN m.player_id = $1 THEN m.goals_for::INT4 ELSE m.goals_against::INT4 END AS goals_for, 
                CASE WHEN m.player_id = $1 THEN m.goals_against::INT4 ELSE m.goals_for::INT4 END AS goals_against,
-               m.possession::FLOAT8 AS possession,
-               m.passes_completed::INT4 AS passes_completed, m.passes_attempted::INT4 AS passes_attempted,
-               m.shots_on_target::INT4 AS shots_on_target, m.shots_total::INT4 AS shots_total, m.interceptions::INT4 AS interceptions,
+               CASE WHEN m.player_id = $1 THEN m.possession::FLOAT8 ELSE 0.0 END AS possession,
+               CASE WHEN m.player_id = $1 THEN m.passes_completed::INT4 ELSE 0 END AS passes_completed,
+               CASE WHEN m.player_id = $1 THEN m.passes_attempted::INT4 ELSE 0 END AS passes_attempted,
+               CASE WHEN m.player_id = $1 THEN m.shots_on_target::INT4 ELSE 0 END AS shots_on_target,
+               CASE WHEN m.player_id = $1 THEN m.shots_total::INT4 ELSE 0 END AS shots_total,
+               CASE WHEN m.player_id = $1 THEN m.interceptions::INT4 ELSE 0 END AS interceptions,
                m.created_at
         FROM Match_Records m
         LEFT JOIN Users u ON u.id = CASE WHEN m.player_id = $1 THEN m.opponent_id ELSE m.player_id END
@@ -1433,6 +1452,7 @@ pub struct LeagueStandingRow {
     pub goal_diff: i32,
     pub points: i32,
     pub group_name: Option<String>,
+    pub avatar_graphic: Option<String>,
 }
 
 /// Fetches league standings for a tournament, sorted by points then GD.
@@ -1446,9 +1466,11 @@ pub async fn get_league_standings(
                COALESCE(NULLIF(u.full_name, ''), u.username, 'Unknown') AS player_name,
                ls.played::INT4 AS played, ls.won::INT4 AS won, ls.drawn::INT4 AS drawn, ls.lost::INT4 AS lost,
                ls.goals_for::INT4 AS goals_for, ls.goals_against::INT4 AS goals_against, ls.goal_diff::INT4 AS goal_diff, ls.points::INT4 AS points,
-               ls.group_name
+               ls.group_name,
+               pp.avatar_graphic
         FROM League_Standings ls
         LEFT JOIN Users u ON ls.player_id = u.id
+        LEFT JOIN Player_Profiles pp ON u.id = pp.user_id
         WHERE ls.tournament_id = $1
         ORDER BY ls.group_name ASC NULLS FIRST, ls.points DESC, ls.goal_diff DESC, ls.goals_for DESC
         "#,
@@ -1549,23 +1571,22 @@ pub async fn update_league_standing_guarded(
         (0, 0, 1)
     };
 
-    let points = won * 3 + drawn;
-
     sqlx::query(
         r#"
-        UPDATE League_Standings
-        SET played        = played + 1,
-            won           = won + $1,
-            drawn         = drawn + $2,
-            lost          = lost + $3,
-            goals_for     = goals_for + $4,
-            goals_against = goals_against + $5,
-            points        = points + $6,
-            last_processed_match_id = $7,
+        INSERT INTO League_Standings (
+            tournament_id, player_id, played, won, drawn, lost, goals_for, goals_against, last_processed_match_id, updated_at
+        )
+        VALUES ($6, $7, 1, $1, $2, $3, $4, $5, $8, NOW())
+        ON CONFLICT (tournament_id, player_id) DO UPDATE
+        SET played        = League_Standings.played + 1,
+            won           = League_Standings.won + $1,
+            drawn         = League_Standings.drawn + $2,
+            lost          = League_Standings.lost + $3,
+            goals_for     = League_Standings.goals_for + $4,
+            goals_against = League_Standings.goals_against + $5,
+            last_processed_match_id = $8,
             updated_at    = NOW()
-        WHERE tournament_id = $8
-          AND player_id     = $9
-          AND (last_processed_match_id IS NULL OR last_processed_match_id != $7)
+        WHERE League_Standings.last_processed_match_id IS NULL OR League_Standings.last_processed_match_id != $8
         "#,
     )
     .bind(won)
@@ -1573,10 +1594,9 @@ pub async fn update_league_standing_guarded(
     .bind(lost)
     .bind(goals_for)
     .bind(goals_against)
-    .bind(points)
-    .bind(t_match_id)
     .bind(tournament_id)
     .bind(player_id)
+    .bind(t_match_id)
     .execute(pool)
     .await?;
 
@@ -2069,8 +2089,6 @@ pub async fn void_match(
                 (0, 0, 1)
             };
             
-            let points = won * 3 + drawn;
-            
             sqlx::query(
                 r#"
                 UPDATE League_Standings
@@ -2102,8 +2120,6 @@ pub async fn void_match(
             } else {
                 (0, 0, 1)
             };
-            
-            let o_points = o_won * 3 + o_drawn;
             
             sqlx::query(
                 r#"
@@ -2211,7 +2227,7 @@ pub async fn apply_match_stats(
 
     let match_row = sqlx::query(
         r#"
-        SELECT player_id, opponent_id, club_id, goals_for, goals_against, match_type
+        SELECT player_id, opponent_id, club_id, goals_for::INT4 AS goals_for, goals_against::INT4 AS goals_against, match_type
         FROM Match_Records
         WHERE id = $1
         "#

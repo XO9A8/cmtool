@@ -999,14 +999,11 @@ class _LeaderboardTab extends ConsumerWidget {
                   children: [
                     CircleAvatar(
                       radius: 26,
-                      backgroundColor: AppColors.cyan.withValues(alpha: 0.15),
-                      child: Text(
-                        name.isNotEmpty ? name[0].toUpperCase() : '?',
-                        style: GoogleFonts.rajdhani(
-                          color: AppColors.cyan,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 22,
-                        ),
+                      backgroundColor: getAvatarById(player['avatar_graphic']?.toString()).gradient.first.withValues(alpha: 0.2),
+                      child: Icon(
+                        getAvatarById(player['avatar_graphic']?.toString()).icon,
+                        size: 28,
+                        color: getAvatarById(player['avatar_graphic']?.toString()).gradient.first,
                       ),
                     ),
                     const SizedBox(width: 14),

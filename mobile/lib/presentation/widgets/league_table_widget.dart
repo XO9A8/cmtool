@@ -4,7 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../providers/match_provider.dart';
 import '../theme/app_theme.dart';
-
+import '../screens/player_profile_screen.dart';
 import '../widgets/tournament_leaders_widget.dart';
 
 /// Premier League-style league standings table widget.
@@ -89,6 +89,7 @@ class LeagueTableWidget extends ConsumerWidget {
               ga: s['goals_against'] ?? 0,
               gd: s['goal_diff'] ?? 0,
               pts: s['points'] ?? 0,
+              avatarGraphic: s['avatar_graphic']?.toString(),
               isTop: isTop,
               isBottom: isBottom,
               isLast: idx == standings.length - 1,
@@ -131,6 +132,7 @@ class LeagueTableWidget extends ConsumerWidget {
     required int ga,
     required int gd,
     required int pts,
+    String? avatarGraphic,
     required bool isTop,
     required bool isBottom,
     required bool isLast,
@@ -179,10 +181,11 @@ class LeagueTableWidget extends ConsumerWidget {
                 children: [
                   CircleAvatar(
                     radius: 12,
-                    backgroundColor: Colors.white.withValues(alpha: 0.1),
-                    child: Text(
-                      name.isNotEmpty ? name[0].toUpperCase() : '?',
-                      style: GoogleFonts.rajdhani(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                    backgroundColor: getAvatarById(avatarGraphic).gradient.first.withValues(alpha: 0.2),
+                    child: Icon(
+                      getAvatarById(avatarGraphic).icon,
+                      size: 15,
+                      color: getAvatarById(avatarGraphic).gradient.first,
                     ),
                   ),
                   const SizedBox(width: 8),

@@ -76,7 +76,7 @@ class ApiClient {
   // ─────────────────────────────────────────────────────────────────────────
   // Caching GET requests
   // ─────────────────────────────────────────────────────────────────────────
-  Future<Response<T>> _getWithCache<T>(String path, {Map<String, dynamic>? queryParameters}) async {
+  Future<Response<T>> _getWithCache<T>(String path, {Map<String, dynamic>? queryParameters, bool forceRefresh = false}) async {
     final prefs = await SharedPreferences.getInstance();
     final cacheKey = 'cache_${path}_${queryParameters?.toString() ?? ''}';
     final timeKey = '${cacheKey}_time';
@@ -84,7 +84,7 @@ class ApiClient {
     final cachedStr = prefs.getString(cacheKey);
     final cachedTimeStr = prefs.getString(timeKey);
     
-    if (cachedStr != null && cachedTimeStr != null) {
+    if (cachedStr != null && cachedTimeStr != null && !forceRefresh) {
       final cachedTime = DateTime.tryParse(cachedTimeStr);
       // Use cache if less than 5 minutes old
       if (cachedTime != null && DateTime.now().difference(cachedTime).inMinutes < 5) {
@@ -401,8 +401,8 @@ class ApiClient {
   }
 
   /// Fetches live league standings for a tournament.
-  Future<Map<String, dynamic>> getLeagueStandings(String tournamentId, ) async {
-    final response = await _getWithCache('/api/v1/tournaments/$tournamentId/standings');
+  Future<Map<String, dynamic>> getLeagueStandings(String tournamentId, {bool forceRefresh = false}) async {
+    final response = await _getWithCache('/api/v1/tournaments/$tournamentId/standings', forceRefresh: forceRefresh);
     return response.data as Map<String, dynamic>;
   }
 
