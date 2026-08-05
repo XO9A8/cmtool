@@ -1,11 +1,11 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT club_id FROM Tournaments WHERE id = $1",
+  "query": "SELECT t_match_id FROM Match_Records WHERE id = $1",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "club_id",
+        "name": "t_match_id",
         "type_info": "Uuid"
       }
     ],
@@ -15,8 +15,8 @@
       ]
     },
     "nullable": [
-      false
+      true
     ]
   },
-  "hash": "806df71eb05924993243d9aa5ca19639dc1535993d114619d3abffd30339c95f"
+  "hash": "be3c63cfcccd6f4697ffb23812e07a4c8d2321d4ea0c5e6dd2486d9757d85029"
 }

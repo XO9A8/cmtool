@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE Seasons SET is_active = false, end_date = CURRENT_DATE WHERE id = $1 AND is_active = true",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ac891ebbc68f27d51d80fa51235734f8a2bca816c6c4106cf6a3a53d2335591b"
+}

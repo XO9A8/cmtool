@@ -1,28 +1,29 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT round_number, match_number FROM T_Matches WHERE id = $1",
+  "query": "SELECT rating_after, rating_after - rating_before AS delta FROM Elo_History WHERE match_record_id = $1 AND player_id = $2",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "round_number",
+        "name": "rating_after",
         "type_info": "Int4"
       },
       {
         "ordinal": 1,
-        "name": "match_number",
+        "name": "delta",
         "type_info": "Int4"
       }
     ],
     "parameters": {
       "Left": [
+        "Uuid",
         "Uuid"
       ]
     },
     "nullable": [
       false,
-      false
+      null
     ]
   },
-  "hash": "e26139612a9571a3ed36b3215640119ac8d55e3d1fc7aa31e5dcbf306c6987f8"
+  "hash": "9e163c4ad968bced0c6d5ff5c6ce07f9b32887ccdf0b2711f8f3fc7805c28d35"
 }

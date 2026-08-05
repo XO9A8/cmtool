@@ -19,7 +19,6 @@ RUN rm -rf src
 # Now copy the actual source code
 COPY src ./src
 COPY .sqlx ./.sqlx
-COPY migrations ./migrations
 
 # Update the timestamp of main.rs to force cargo to recompile our code (and not use the dummy build)
 RUN touch src/main.rs

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            m.id          AS t_match_id,\n            m.tournament_id,\n            m.player_1_id,\n            m.player_2_id,\n            m.round_number,\n            m.match_number,\n            t.format_type,\n            mr.id         AS \"mr_id?: Uuid\",\n            mr.player_id  AS \"mr_player_id?: Uuid\",\n            mr.goals_for  AS \"goals_for?: i32\",\n            mr.goals_against AS \"goals_against?: i32\"\n        FROM T_Matches m\n        LEFT JOIN Match_Records mr ON mr.id = m.match_record_id\n        LEFT JOIN Tournaments t   ON t.id  = m.tournament_id\n        WHERE m.id = $1 OR m.match_record_id = $1\n        ",
+  "query": "\n        SELECT\n            m.id          AS t_match_id,\n            m.tournament_id,\n            m.player_1_id,\n            m.player_2_id,\n            m.round_number,\n            m.match_number,\n            t.format_type,\n            mr.id         AS \"mr_id?: Uuid\",\n            mr.player_id  AS \"mr_player_id?: Uuid\",\n            mr.goals_for  AS \"goals_for?: i32\",\n            mr.goals_against AS \"goals_against?: i32\"\n        FROM T_Matches m\n        LEFT JOIN Match_Records mr ON mr.t_match_id = m.id\n        LEFT JOIN Tournaments t   ON t.id  = m.tournament_id\n        WHERE m.id = $1 OR mr.id = $1\n        ",
   "describe": {
     "columns": [
       {
@@ -26,7 +26,7 @@
       {
         "ordinal": 4,
         "name": "round_number",
-        "type_info": "Int4"
+        "type_info": "Int2"
       },
       {
         "ordinal": 5,
@@ -36,7 +36,7 @@
       {
         "ordinal": 6,
         "name": "format_type",
-        "type_info": "Varchar"
+        "type_info": "Text"
       },
       {
         "ordinal": 7,
@@ -51,12 +51,12 @@
       {
         "ordinal": 9,
         "name": "goals_for?: i32",
-        "type_info": "Int4"
+        "type_info": "Int2"
       },
       {
         "ordinal": 10,
         "name": "goals_against?: i32",
-        "type_info": "Int4"
+        "type_info": "Int2"
       }
     ],
     "parameters": {
@@ -66,17 +66,17 @@
     },
     "nullable": [
       false,
-      true,
+      false,
       true,
       true,
       false,
       false,
       false,
       false,
-      true,
+      false,
       false,
       false
     ]
   },
-  "hash": "b7f0ee32443e6c732a9e7f7f6d53aa4ad7a4c3f5596e1a5b4f761d3253ff7fe5"
+  "hash": "76aaf040986fdfe71e84663b68b18546220bc96e7c1d87412802ec84be673739"
 }

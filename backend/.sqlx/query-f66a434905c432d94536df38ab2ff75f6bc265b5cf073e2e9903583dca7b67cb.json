@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, match_record_id, raised_by, reason, status, counter_screenshot_url, resolved_by, resolution_notes FROM Match_Disputes WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "match_record_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "raised_by",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "reason",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "status",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "counter_screenshot_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "resolved_by",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 7,
+        "name": "resolution_notes",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "f66a434905c432d94536df38ab2ff75f6bc265b5cf073e2e9903583dca7b67cb"
+}
