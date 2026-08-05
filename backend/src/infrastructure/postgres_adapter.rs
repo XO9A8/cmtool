@@ -6,7 +6,7 @@
 //! dispute persistence, tournament bracket fetching, and player analytics.
 
 use serde::Serialize;
-use sqlx::{FromRow, PgPool, Postgres, Transaction};
+use sqlx::{FromRow, PgPool, Postgres, Row, Transaction};
 use uuid::Uuid;
 
 use crate::domain::{
@@ -108,8 +108,7 @@ pub async fn save_match_transaction(
         .execute(&mut *tx)
         .await?;
     }
-
-    // 2. Upsert player profile rating + form rating + play style
+    // 2. Upsert player profile form rating + play style ONLY (Elo applied on confirmation)
     let pass_acc = if input.passes_attempted > 0 {
         (input.passes_completed as f64 / input.passes_attempted as f64) * 100.0
     } else {
@@ -128,57 +127,24 @@ pub async fn save_match_transaction(
         avg_interceptions: input.interceptions as f64,
     });
 
-    // If club_id is present, update Club_Memberships
+    // If club_id is present, update Club_Memberships (form & play style only)
     if let Some(c_id) = input.club_id {
         sqlx::query(
             r#"
-            INSERT INTO Club_Memberships (player_id, club_id, skill_rating, form_rating, play_style)
-            VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO Club_Memberships (player_id, club_id, form_rating, play_style)
+            VALUES ($1, $2, $3, $4)
             ON CONFLICT (player_id, club_id) DO UPDATE SET
-                skill_rating = $3,
-                form_rating  = $4,
-                play_style   = $5
+                form_rating  = $3,
+                play_style   = $4
             "#,
         )
         .bind(input.player_id)
         .bind(c_id)
-        .bind(input.elo_result.new_rating)
         .bind(input.form_rating)
         .bind(play_style.as_str())
         .execute(&mut *tx)
         .await?;
     }
-
-    // Update Player_Profiles lifetime stats
-    sqlx::query(
-        r#"
-        INSERT INTO Player_Profiles (user_id, lifetime_matches, lifetime_wins)
-        VALUES ($1, 1, $2)
-        ON CONFLICT (user_id) DO UPDATE SET
-            lifetime_matches = Player_Profiles.lifetime_matches + 1,
-            lifetime_wins    = Player_Profiles.lifetime_wins + $2,
-            updated_at       = NOW()
-        "#,
-    )
-    .bind(input.player_id)
-    .bind(if input.goals_for > input.goals_against { 1 } else { 0 })
-    .execute(&mut *tx)
-    .await?;
-
-    // 3. Log Elo History audit entry
-    sqlx::query(
-        r#"
-        INSERT INTO Elo_History (club_id, player_id, match_record_id, rating_before, rating_after)
-        VALUES ($1, $2, $3, $4, $5)
-        "#,
-    )
-    .bind(input.club_id)
-    .bind(input.player_id)
-    .bind(match_id)
-    .bind(input.elo_result.new_rating - input.elo_result.rating_delta)
-    .bind(input.elo_result.new_rating)
-    .execute(&mut *tx)
-    .await?;
 
     tx.commit().await?;
 
@@ -239,12 +205,18 @@ pub async fn approve_match(
     pool: &PgPool,
     match_id: Uuid,
     verifier_id: Uuid,
+    apply_stats: bool,
 ) -> Result<(), sqlx::Error> {
     sqlx::query("UPDATE Match_Records SET verification_status = 'approved', verified_by_id = $2 WHERE id = $1")
         .bind(match_id)
         .bind(verifier_id)
         .execute(pool)
         .await?;
+
+    if apply_stats {
+        apply_match_stats(pool, match_id).await?;
+    }
+
     Ok(())
 }
 
@@ -648,6 +620,8 @@ pub async fn confirm_match(
         return Err(sqlx::Error::RowNotFound);
     }
 
+    apply_match_stats(pool, match_id).await?;
+
     Ok(())
 }
 
@@ -763,6 +737,7 @@ pub async fn get_pending_matches_db(
 /// Fetches all open disputes from `Match_Disputes`, enriched with raiser username.
 pub async fn get_admin_disputes_db(
     pool: &PgPool,
+    user_id: Uuid,
 ) -> Result<Vec<serde_json::Value>, sqlx::Error> {
     use sqlx::Row;
 
@@ -778,11 +753,33 @@ pub async fn get_admin_disputes_db(
             md.created_at::TEXT AS created_at
         FROM Match_Disputes md
         LEFT JOIN Users u ON u.id = md.raised_by
+        LEFT JOIN Match_Records mr ON md.match_record_id = mr.id
         WHERE md.status = 'open'
+          AND (
+            mr.club_id IS NOT NULL
+            AND EXISTS (
+              SELECT 1 FROM Club_Memberships cm
+              WHERE cm.club_id = mr.club_id
+                AND cm.player_id = $1
+                AND LOWER(cm.role) IN ('admin', 'organizer', 'president', 'captain', 'vice-captain')
+            )
+            OR mr.club_id IS NULL
+            AND EXISTS (
+              SELECT 1 FROM Club_Memberships cm_official
+              WHERE cm_official.player_id = $1
+                AND LOWER(cm_official.role) IN ('admin', 'organizer', 'president', 'captain', 'vice-captain')
+                AND EXISTS (
+                  SELECT 1 FROM Club_Memberships cm_player
+                  WHERE cm_player.player_id = mr.player_id
+                    AND cm_player.club_id = cm_official.club_id
+                )
+            )
+          )
         ORDER BY md.created_at DESC
         LIMIT 50
         "#,
     )
+    .bind(user_id)
     .fetch_all(pool)
     .await?;
 
@@ -844,6 +841,7 @@ pub async fn save_dispute(
 #[derive(FromRow, Serialize)]
 pub struct TMatchRow {
     pub id: Uuid,
+    pub match_record_id: Option<Uuid>,
     pub player_1_id: Option<Uuid>,
     pub player_1_name: Option<String>,
     pub player_2_id: Option<Uuid>,
@@ -868,6 +866,7 @@ pub async fn get_tournament_bracket(
         r#"
         SELECT
             m.id,
+            m.match_record_id,
             m.player_1_id,
             u1.username AS player_1_name,
             m.player_2_id,
@@ -1140,7 +1139,7 @@ pub async fn get_player_match_history(
                m.created_at
         FROM Match_Records m
         LEFT JOIN Users u ON m.opponent_id = u.id
-        WHERE m.player_id = $1 AND m.deleted_at IS NULL
+        WHERE m.player_id = $1 AND m.deleted_at IS NULL AND m.verification_status = 'approved'
         ORDER BY m.created_at DESC
         LIMIT $2 OFFSET $3
         "#,
@@ -1396,7 +1395,7 @@ pub async fn get_league_standings(
         FROM League_Standings ls
         LEFT JOIN Users u ON ls.player_id = u.id
         WHERE ls.tournament_id = $1
-        ORDER BY ls.points DESC, ls.goal_diff DESC, ls.goals_for DESC
+        ORDER BY ls.group_name ASC NULLS FIRST, ls.points DESC, ls.goal_diff DESC, ls.goals_for DESC
         "#,
     )
     .bind(tournament_id)
@@ -1569,24 +1568,16 @@ pub async fn advance_knockout_winner(
     current_match_number: i32,
     winner_id: Uuid,
 ) -> Result<(), sqlx::Error> {
-    // 1. Calculate total rounds to prevent advancing past the final
-    let r1_max: Option<i32> = sqlx::query_scalar(
-        "SELECT MAX(match_number) FROM T_Matches WHERE tournament_id = $1 AND round_number = 1"
+    // If this round only has 1 match, it's the final.
+    let max_match: Option<i32> = sqlx::query_scalar(
+        "SELECT MAX(match_number) FROM T_Matches WHERE tournament_id = $1 AND round_number = $2"
     )
     .bind(tournament_id)
+    .bind(current_round)
     .fetch_one(pool)
     .await?;
 
-    let r1_matches = r1_max.unwrap_or(1);
-    
-    let mut bracket_size = 1;
-    let mut total_rounds = 0;
-    while bracket_size < (r1_matches * 2) {
-        bracket_size *= 2;
-        total_rounds += 1;
-    }
-
-    if current_round >= total_rounds {
+    if max_match.unwrap_or(1) == 1 {
         // Tournament is complete! Mark it as completed.
         sqlx::query("UPDATE Tournaments SET status = 'completed', updated_at = NOW() WHERE id = $1")
             .bind(tournament_id)
@@ -1926,6 +1917,7 @@ pub async fn check_knockout_stage_generated(
             SELECT 1 FROM T_Matches
             WHERE tournament_id = $1
               AND group_name IS NULL
+              AND player_2_id IS NOT NULL
         )
         "#,
     )
@@ -1955,4 +1947,266 @@ pub async fn get_tournament_advancing_count(
         }
     }
     Ok(2)
+}
+pub async fn void_match(
+    pool: &PgPool,
+    match_id: Uuid,
+) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await?;
+
+    let row = sqlx::query(
+        r#"
+        SELECT t_match_id, player_id, opponent_id, goals_for, goals_against
+        FROM Match_Records
+        WHERE id = $1
+        "#,
+    )
+    .bind(match_id)
+    .fetch_optional(&mut *tx)
+    .await?;
+
+    let Some(row) = row else {
+        return Ok(());
+    };
+
+    let t_match_id: Option<Uuid> = row.try_get("t_match_id").ok();
+    let player_id: Uuid = row.get("player_id");
+    let opponent_id: Uuid = row.get("opponent_id");
+    let goals_for: i32 = row.get("goals_for");
+    let goals_against: i32 = row.get("goals_against");
+
+    if let Some(tm_id) = t_match_id {
+        sqlx::query(
+            "UPDATE T_Matches SET match_record_id = NULL, status = 'scheduled', player_1_score = NULL, player_2_score = NULL WHERE id = $1"
+        )
+        .bind(tm_id)
+        .execute(&mut *tx)
+        .await?;
+        
+        let t_row = sqlx::query("SELECT tournament_id FROM T_Matches WHERE id = $1")
+            .bind(tm_id)
+            .fetch_optional(&mut *tx)
+            .await?;
+            
+        if let Some(tr) = t_row {
+            let tournament_id: Uuid = tr.get("tournament_id");
+
+            let (won, drawn, lost, points) = if goals_for > goals_against {
+                (1, 0, 0, 3)
+            } else if goals_for == goals_against {
+                (0, 1, 0, 1)
+            } else {
+                (0, 0, 1, 0)
+            };
+            
+            sqlx::query(
+                r#"
+                UPDATE League_Standings
+                SET played = GREATEST(0, played - 1),
+                    won = GREATEST(0, won - $1),
+                    drawn = GREATEST(0, drawn - $2),
+                    lost = GREATEST(0, lost - $3),
+                    goals_for = GREATEST(0, goals_for - $4),
+                    goals_against = GREATEST(0, goals_against - $5),
+                    goal_diff = goal_diff - ($4 - $5),
+                    points = GREATEST(0, points - $6),
+                    last_processed_match_id = NULL,
+                    updated_at = NOW()
+                WHERE tournament_id = $7 AND player_id = $8
+                "#
+            )
+            .bind(won)
+            .bind(drawn)
+            .bind(lost)
+            .bind(goals_for)
+            .bind(goals_against)
+            .bind(points)
+            .bind(tournament_id)
+            .bind(player_id)
+            .execute(&mut *tx)
+            .await?;
+            
+            let (o_won, o_drawn, o_lost, o_points) = if goals_against > goals_for {
+                (1, 0, 0, 3)
+            } else if goals_against == goals_for {
+                (0, 1, 0, 1)
+            } else {
+                (0, 0, 1, 0)
+            };
+            
+            sqlx::query(
+                r#"
+                UPDATE League_Standings
+                SET played = GREATEST(0, played - 1),
+                    won = GREATEST(0, won - $1),
+                    drawn = GREATEST(0, drawn - $2),
+                    lost = GREATEST(0, lost - $3),
+                    goals_for = GREATEST(0, goals_for - $4),
+                    goals_against = GREATEST(0, goals_against - $5),
+                    goal_diff = goal_diff - ($4 - $5),
+                    points = GREATEST(0, points - $6),
+                    last_processed_match_id = NULL,
+                    updated_at = NOW()
+                WHERE tournament_id = $7 AND player_id = $8
+                "#
+            )
+            .bind(o_won)
+            .bind(o_drawn)
+            .bind(o_lost)
+            .bind(goals_against)
+            .bind(goals_for)
+            .bind(o_points)
+            .bind(tournament_id)
+            .bind(opponent_id)
+            .execute(&mut *tx)
+            .await?;
+        }
+    }
+
+    let elo_rows = sqlx::query(
+        "SELECT player_id, club_id, rating_before, rating_after FROM Elo_History WHERE match_record_id = $1"
+    )
+    .bind(match_id)
+    .fetch_all(&mut *tx)
+    .await?;
+
+    for hist in elo_rows {
+        let p_id: Uuid = hist.get("player_id");
+        let c_id: Option<Uuid> = hist.try_get("club_id").ok();
+        let rating_before: i32 = hist.get("rating_before");
+        let rating_after: i32 = hist.get("rating_after");
+        let delta = rating_after - rating_before;
+        if let Some(club_id) = c_id {
+            sqlx::query(
+                "UPDATE Club_Memberships SET skill_rating = skill_rating - $1 WHERE player_id = $2 AND club_id = $3"
+            )
+            .bind(delta)
+            .bind(p_id)
+            .bind(club_id)
+            .execute(&mut *tx)
+            .await?;
+        }
+    }
+    
+    sqlx::query("DELETE FROM Elo_History WHERE match_record_id = $1")
+        .bind(match_id)
+        .execute(&mut *tx)
+        .await?;
+
+    let player_win = if goals_for > goals_against { 1 } else { 0 };
+    sqlx::query(
+        "UPDATE Player_Profiles SET lifetime_matches = GREATEST(0, lifetime_matches - 1), lifetime_wins = GREATEST(0, lifetime_wins - $1) WHERE user_id = $2"
+    )
+    .bind(player_win)
+    .bind(player_id)
+    .execute(&mut *tx)
+    .await?;
+
+    let opponent_win = if goals_against > goals_for { 1 } else { 0 };
+    sqlx::query(
+        "UPDATE Player_Profiles SET lifetime_matches = GREATEST(0, lifetime_matches - 1), lifetime_wins = GREATEST(0, lifetime_wins - $1) WHERE user_id = $2"
+    )
+    .bind(opponent_win)
+    .bind(opponent_id)
+    .execute(&mut *tx)
+    .await?;
+
+    sqlx::query(
+        "UPDATE Match_Records SET verification_status = 'voided', deleted_at = NOW() WHERE id = $1"
+    )
+    .bind(match_id)
+    .execute(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+    Ok(())
+}
+
+pub async fn apply_match_stats(
+    pool: &sqlx::PgPool,
+    match_id: Uuid,
+) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await?;
+
+    let match_row = sqlx::query(
+        r#"
+        SELECT player_id, opponent_id, club_id, goals_for, goals_against
+        FROM Match_Records
+        WHERE id = $1
+        "#
+    )
+    .bind(match_id)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    let player_id: Uuid = match_row.get("player_id");
+    let opponent_id: Uuid = match_row.get("opponent_id");
+    let club_id: Option<Uuid> = match_row.get("club_id");
+    let goals_for: i32 = match_row.get("goals_for");
+    let goals_against: i32 = match_row.get("goals_against");
+
+    let is_player_win = goals_for > goals_against;
+    let is_draw = goals_for == goals_against;
+
+    if let Some(c_id) = club_id {
+        let p1_rating: i32 = sqlx::query_scalar("SELECT skill_rating FROM Club_Memberships WHERE player_id = $1 AND club_id = $2")
+            .bind(player_id).bind(c_id).fetch_optional(&mut *tx).await?.unwrap_or(1000);
+        let p2_rating: i32 = sqlx::query_scalar("SELECT skill_rating FROM Club_Memberships WHERE player_id = $1 AND club_id = $2")
+            .bind(opponent_id).bind(c_id).fetch_optional(&mut *tx).await?.unwrap_or(1000);
+
+        let p1_elo = crate::domain::elo::calculate_elo(&crate::domain::elo::EloInput {
+            player_rating: p1_rating,
+            opponent_rating: p2_rating,
+            goals_for: goals_for,
+            goals_against: goals_against,
+            match_type: crate::domain::elo::MatchType::Friendly,
+            is_provisional: false,
+        });
+        
+        let p2_elo = crate::domain::elo::calculate_elo(&crate::domain::elo::EloInput {
+            player_rating: p2_rating,
+            opponent_rating: p1_rating,
+            goals_for: goals_against,
+            goals_against: goals_for,
+            match_type: crate::domain::elo::MatchType::Friendly,
+            is_provisional: false,
+        });
+
+        sqlx::query("UPDATE Club_Memberships SET skill_rating = $1 WHERE player_id = $2 AND club_id = $3")
+        .bind(p1_elo.new_rating).bind(player_id).bind(c_id).execute(&mut *tx).await?;
+
+        sqlx::query("UPDATE Club_Memberships SET skill_rating = $1 WHERE player_id = $2 AND club_id = $3")
+        .bind(p2_elo.new_rating).bind(opponent_id).bind(c_id).execute(&mut *tx).await?;
+
+        sqlx::query("INSERT INTO Elo_History (club_id, player_id, match_record_id, rating_before, rating_after) VALUES ($1, $2, $3, $4, $5)")
+        .bind(c_id).bind(player_id).bind(match_id).bind(p1_rating).bind(p1_elo.new_rating).execute(&mut *tx).await?;
+
+        sqlx::query("INSERT INTO Elo_History (club_id, player_id, match_record_id, rating_before, rating_after) VALUES ($1, $2, $3, $4, $5)")
+        .bind(c_id).bind(opponent_id).bind(match_id).bind(p2_rating).bind(p2_elo.new_rating).execute(&mut *tx).await?;
+    }
+
+    sqlx::query(
+        r#"
+        INSERT INTO Player_Profiles (user_id, lifetime_matches, lifetime_wins)
+        VALUES ($1, 1, $2)
+        ON CONFLICT (user_id) DO UPDATE SET
+            lifetime_matches = Player_Profiles.lifetime_matches + 1,
+            lifetime_wins    = Player_Profiles.lifetime_wins + $2,
+            updated_at       = NOW()
+        "#
+    ).bind(player_id).bind(if is_player_win { 1 } else { 0 }).execute(&mut *tx).await?;
+
+    sqlx::query(
+        r#"
+        INSERT INTO Player_Profiles (user_id, lifetime_matches, lifetime_wins)
+        VALUES ($1, 1, $2)
+        ON CONFLICT (user_id) DO UPDATE SET
+            lifetime_matches = Player_Profiles.lifetime_matches + 1,
+            lifetime_wins    = Player_Profiles.lifetime_wins + $2,
+            updated_at       = NOW()
+        "#
+    ).bind(opponent_id).bind(if !is_player_win && !is_draw { 1 } else { 0 }).execute(&mut *tx).await?;
+
+    tx.commit().await?;
+    Ok(())
 }

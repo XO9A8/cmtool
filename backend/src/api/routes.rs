@@ -14,6 +14,7 @@ use axum::{
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
+use sqlx::Row;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use uuid::Uuid;
 
@@ -348,7 +349,7 @@ async fn ocr_submit(
     let player_rating = payload.player_rating.unwrap_or(1000);
     let opponent_rating = payload.opponent_rating.unwrap_or(1000);
 
-    let actual_player_id = payload.player_id.unwrap_or(auth.user_id);
+    let actual_player_id = auth.user_id;
 
     // --- Opponent Match Confirmation Check ---
     let pending_match = db::find_pending_opponent_match(
@@ -363,9 +364,16 @@ async fn ocr_submit(
 
     if let Some(opponent_match_id) = pending_match {
         // We found the opponent's match! We should mark theirs as approved.
-        db::approve_match(&state.pool, opponent_match_id, actual_player_id)
+        db::approve_match(&state.pool, opponent_match_id, actual_player_id, true)
             .await
             .map_err(|e| internal_error(e))?;
+            
+        // Trigger tournament advancement for the canonical match if it's a tournament
+        if let Some(tm_id) = payload.t_match_id {
+            if let Err(e) = crate::domain::tournament::process_tournament_advancement(&state.pool, tm_id).await {
+                println!("Error processing tournament advancement: {}", e);
+            }
+        }
     }
 
     let verification_status = if pending_match.is_none() {
@@ -488,7 +496,7 @@ async fn ocr_submit(
         },
     )
     .await
-    .unwrap_or_else(|_| Uuid::new_v4()); // graceful degradation if DB is down
+    .map_err(|e| internal_error(e))?;
 
     Ok(Json(OcrSubmitResponse {
         match_id,
@@ -851,20 +859,133 @@ async fn submit_dispute(
     auth: AuthenticatedUser,
     Json(payload): Json<SubmitDisputeRequest>,
 ) -> Result<Json<DisputeResponse>, (StatusCode, Json<ApiErrorResponse>)> {
-    let _ = raise_match_dispute(payload.match_record_id, auth.user_id, payload.reason.clone(), None);
+    
+    // Check if Match_Records row exists directly or via t_match_id
+    let record_row = sqlx::query(
+        "SELECT id, verification_status, player_id, opponent_id FROM Match_Records WHERE id = $1 OR t_match_id = $1"
+    )
+    .bind(payload.match_record_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|_| internal_error("Failed to fetch match record"))?;
+
+    let t_match_row = if record_row.is_none() {
+        sqlx::query(
+            "SELECT id, tournament_id, player_1_id, player_2_id, player_1_score, player_2_score FROM T_Matches WHERE id = $1"
+        )
+        .bind(payload.match_record_id)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|_| internal_error("Failed to fetch tournament match"))?
+    } else {
+        None
+    };
+
+    let (match_record_id, verification_status, player_id, opponent_id) = if let Some(row) = record_row {
+        let m_id: Uuid = row.get("id");
+        let v_status: String = row.get::<Option<String>, _>("verification_status").unwrap_or_default();
+        let p_id: Uuid = row.get("player_id");
+        let o_id: Uuid = row.get("opponent_id");
+        (m_id, v_status, p_id, o_id)
+    } else if let Some(t_row) = t_match_row {
+        let tm_id: Uuid = t_row.get("id");
+        let p1_id: Option<Uuid> = t_row.try_get("player_1_id").ok().flatten();
+        let p2_id: Option<Uuid> = t_row.try_get("player_2_id").ok().flatten();
+        let p1_score: i32 = t_row.try_get::<Option<i32>, _>("player_1_score").ok().flatten().unwrap_or(0);
+        let p2_score: i32 = t_row.try_get::<Option<i32>, _>("player_2_score").ok().flatten().unwrap_or(0);
+
+        let p1 = p1_id.unwrap_or(auth.user_id);
+        let p2 = p2_id.unwrap_or(auth.user_id);
+
+        let new_m_id = Uuid::new_v4();
+        let res_str = if p1_score > p2_score { "win" } else if p1_score < p2_score { "loss" } else { "draw" };
+        let hash_str = format!("manual_dispute_{}", new_m_id);
+
+        sqlx::query(
+            r#"
+            INSERT INTO Match_Records (
+                id, t_match_id, player_id, opponent_id, goals_for, goals_against,
+                result, possession, passes_completed, passes_attempted,
+                shots_on_target, shots_total, interceptions, screenshot_hash,
+                verification_status
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, 50.0, 0, 0, 0, 0, 0, $8, 'approved')
+            "#
+        )
+        .bind(new_m_id)
+        .bind(tm_id)
+        .bind(p1)
+        .bind(p2)
+        .bind(p1_score)
+        .bind(p2_score)
+        .bind(res_str)
+        .bind(hash_str)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| internal_error(e))?;
+
+        sqlx::query("UPDATE T_Matches SET match_record_id = $1 WHERE id = $2")
+            .bind(new_m_id)
+            .bind(tm_id)
+            .execute(&state.pool)
+            .await
+            .map_err(|e| internal_error(e))?;
+
+        (new_m_id, "approved".to_string(), p1, p2)
+    } else {
+        return Err(bad_request("NOT_FOUND", "Match record not found."));
+    };
+
+    let is_official_result = sqlx::query(
+        r#"
+        SELECT EXISTS (
+            SELECT 1 
+            FROM Club_Memberships cm_off
+            JOIN Club_Memberships cm_player ON cm_off.club_id = cm_player.club_id
+            WHERE cm_off.player_id = $1
+              AND LOWER(cm_off.role) IN ('admin', 'organizer', 'president', 'captain', 'vice-captain')
+              AND (cm_player.player_id = $2 OR cm_player.player_id = $3)
+        ) AS is_official
+        "#
+    )
+    .bind(auth.user_id)
+    .bind(player_id)
+    .bind(opponent_id)
+    .fetch_one(&state.pool)
+    .await;
+
+    let is_official = is_official_result.map(|r| r.get::<Option<bool>, _>("is_official").unwrap_or(false)).unwrap_or(false);
+
+    if auth.user_id != player_id && auth.user_id != opponent_id && !is_official {
+        return Err(bad_request("UNAUTHORIZED", "Only participants or club officials can dispute a match."));
+    }
+
+    if verification_status == "approved" && !is_official {
+        return Err(bad_request("UNAUTHORIZED", "Only officials can dispute a verified match."));
+    }
+
+    let _ = raise_match_dispute(match_record_id, auth.user_id, payload.reason.clone(), None);
 
     let dispute_id = db::save_dispute(
         &state.pool,
-        payload.match_record_id,
+        match_record_id,
         auth.user_id,
         &payload.reason,
     )
     .await
     .unwrap_or_else(|_| Uuid::new_v4());
 
+    // Update Match_Records verification_status to 'disputed'
+    let _ = sqlx::query(
+        "UPDATE Match_Records SET verification_status = 'disputed', updated_at = NOW() WHERE id = $1"
+    )
+    .bind(match_record_id)
+    .execute(&state.pool)
+    .await;
+
     Ok(Json(DisputeResponse {
         dispute_id,
-        match_record_id: payload.match_record_id,
+        match_record_id,
         raised_by:       auth.user_id,
         reason:          payload.reason,
         status:          "open".into(),
@@ -985,10 +1106,17 @@ pub struct UpdateRoleRequest {
 /// Updates a club member's role (admin, organizer, player).
 async fn update_member_role(
     State(state): State<Arc<AppState>>,
-    _auth: AuthenticatedUser,
+    auth: AuthenticatedUser,
     Path((club_id, player_id)): Path<(Uuid, Uuid)>,
     Json(payload): Json<UpdateRoleRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ApiErrorResponse>)> {
+    let is_official = db::is_club_official(&state.pool, club_id, auth.user_id)
+        .await
+        .map_err(|e| internal_error(e))?;
+    if !is_official {
+        return Err(forbidden("FORBIDDEN", "Only club officials can update roles."));
+    }
+
     let valid_roles = ["admin", "organizer", "player"];
     if !valid_roles.contains(&payload.role.as_str()) {
         return Err(bad_request("INVALID_ROLE", "Role must be admin, organizer, or player"));
@@ -1395,20 +1523,24 @@ async fn start_tournament(
     let mut players = payload.players;
 
     let tourney = sqlx::query!(
-        "SELECT club_id, format_type, rules_config FROM Tournaments WHERE id = $1 AND deleted_at IS NULL",
+        "SELECT club_id, format_type, rules_config, status FROM Tournaments WHERE id = $1 AND deleted_at IS NULL",
         tournament_id
     )
     .fetch_optional(&state.pool)
     .await
     .map_err(|e| internal_error(e))?;
 
-    let (club_id, format_type, rules_config) = match tourney {
+    let (club_id, format_type, rules_config, status) = match tourney {
         Some(t) => match t.club_id {
-            Some(cid) => (cid, t.format_type, t.rules_config.unwrap_or(serde_json::json!({}))),
+            Some(cid) => (cid, t.format_type, t.rules_config.unwrap_or(serde_json::json!({})), t.status),
             None => return Err(bad_request("NO_CLUB", "Tournament is not associated with a club")),
         },
         None => return Err(bad_request("TOURNAMENT_NOT_FOUND", "Tournament not found")),
     };
+
+    if status.as_deref() != Some("draft") {
+        return Err(bad_request("INVALID_STATUS", "Only draft tournaments can be started."));
+    }
 
     let is_official = db::is_club_official(&state.pool, club_id, auth.user_id)
         .await
@@ -1477,9 +1609,7 @@ async fn start_tournament(
                 .map_err(|e| internal_error(e))?;
             }
         }
-        db::initialize_league_standings(&state.pool, tournament_id, &player_ids)
-            .await
-            .map_err(|e| internal_error(e))?;
+
     } else if format_type == "group_knockout" {
         let groups_count = rules_config.get("groups_count").and_then(|v| v.as_u64()).unwrap_or(2) as usize;
         let (group_fixtures, player_groups) = generate_group_knockout_fixtures(tournament_id, players, groups_count, legs);
@@ -1550,13 +1680,26 @@ pub struct UpdateStatusRequest {
 /// Updates a tournament's status.
 async fn update_tournament_status(
     State(state): State<Arc<AppState>>,
-    _auth: AuthenticatedUser,
+    auth: AuthenticatedUser,
     Path(tournament_id): Path<Uuid>,
     Json(payload): Json<UpdateStatusRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ApiErrorResponse>)> {
     let valid_statuses = ["draft", "active", "completed"];
     if !valid_statuses.contains(&payload.status.as_str()) {
         return Err(bad_request("INVALID_STATUS", "Status must be draft, active, or completed"));
+    }
+
+    let club_id = db::get_tournament_club_id(&state.pool, tournament_id)
+        .await
+        .map_err(|e| internal_error(e))?
+        .ok_or_else(|| bad_request("NOT_FOUND", "Tournament not found"))?;
+
+    let is_official = db::is_club_official(&state.pool, club_id, auth.user_id)
+        .await
+        .map_err(|e| internal_error(e))?;
+    
+    if !is_official {
+        return Err(forbidden("FORBIDDEN", "Only club officials can update tournament status."));
     }
 
     db::update_tournament_status(&state.pool, tournament_id, &payload.status)
@@ -1630,9 +1773,9 @@ async fn get_league_standings(
 
 async fn get_admin_disputes(
     State(state): State<Arc<AppState>>,
-    _auth: AuthenticatedUser,
+    auth: AuthenticatedUser,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ApiErrorResponse>)> {
-    let disputes = db::get_admin_disputes_db(&state.pool)
+    let disputes = db::get_admin_disputes_db(&state.pool, auth.user_id)
         .await
         .map_err(|e| internal_error(e))?;
 
@@ -1645,6 +1788,7 @@ async fn get_admin_disputes(
 struct ResolveDisputeRequest {
     dismiss: bool,
     resolution_notes: Option<String>,
+    void_match: Option<bool>,
 }
 
 async fn resolve_admin_dispute(
@@ -1655,6 +1799,43 @@ async fn resolve_admin_dispute(
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ApiErrorResponse>)> {
     let status = if payload.dismiss { "dismissed" } else { "resolved" };
     
+    let is_official_result = sqlx::query(
+        r#"
+        SELECT EXISTS (
+            SELECT 1 FROM Match_Disputes md
+            LEFT JOIN Match_Records mr ON md.match_record_id = mr.id
+            WHERE md.id = $1
+              AND (
+                (mr.club_id IS NOT NULL AND EXISTS (
+                    SELECT 1 FROM Club_Memberships cm
+                    WHERE cm.club_id = mr.club_id AND cm.player_id = $2
+                      AND LOWER(cm.role) IN ('admin', 'organizer', 'president', 'captain', 'vice-captain')
+                ))
+                OR (mr.club_id IS NULL AND EXISTS (
+                    SELECT 1 FROM Club_Memberships cm_official
+                    WHERE cm_official.player_id = $2
+                      AND LOWER(cm_official.role) IN ('admin', 'organizer', 'president', 'captain', 'vice-captain')
+                      AND EXISTS (
+                          SELECT 1 FROM Club_Memberships cm_player
+                          WHERE cm_player.player_id = mr.player_id AND cm_player.club_id = cm_official.club_id
+                      )
+                ))
+              )
+        ) AS is_official
+        "#
+    )
+    .bind(dispute_id)
+    .bind(auth.user_id)
+    .fetch_one(&state.pool)
+    .await;
+
+    let is_official = is_official_result.map(|r| r.get::<Option<bool>, _>("is_official").unwrap_or(false)).unwrap_or(false);
+
+    if !is_official {
+        return Err(forbidden("FORBIDDEN", "Only club officials can resolve disputes."));
+    }
+
+    // First, resolve the dispute ticket
     sqlx::query(
         r#"
         UPDATE Match_Disputes
@@ -1664,16 +1845,54 @@ async fn resolve_admin_dispute(
     )
     .bind(status)
     .bind(auth.user_id)
-    .bind(payload.resolution_notes)
+    .bind(&payload.resolution_notes)
     .bind(dispute_id)
     .execute(&state.pool)
     .await
     .map_err(|e| internal_error(e))?;
 
+    // If void_match is requested, execute the voiding logic
+    if payload.void_match.unwrap_or(false) && status == "resolved" {
+        let dispute_row = sqlx::query("SELECT match_record_id FROM Match_Disputes WHERE id = $1")
+            .bind(dispute_id)
+            .fetch_optional(&state.pool)
+            .await
+            .map_err(|e| internal_error(e))?;
+            
+        if let Some(d) = dispute_row {
+            let m_rec_id: Option<Uuid> = d.try_get("match_record_id").ok();
+            if let Some(match_record_id) = m_rec_id {
+                if let Err(e) = db::void_match(&state.pool, match_record_id).await {
+                    println!("Error voiding match: {}", e);
+                    return Err(internal_error("Failed to void match."));
+                }
+            }
+        }
+    } else if payload.dismiss {
+        let dispute_row = sqlx::query("SELECT match_record_id FROM Match_Disputes WHERE id = $1")
+            .bind(dispute_id)
+            .fetch_optional(&state.pool)
+            .await
+            .map_err(|e| internal_error(e))?;
+            
+        if let Some(d) = dispute_row {
+            let m_rec_id: Option<Uuid> = d.try_get("match_record_id").ok();
+            if let Some(match_record_id) = m_rec_id {
+                let _ = sqlx::query(
+                    "UPDATE Match_Records SET verification_status = 'approved', updated_at = NOW() WHERE id = $1 AND verification_status = 'disputed'"
+                )
+                .bind(match_record_id)
+                .execute(&state.pool)
+                .await;
+            }
+        }
+    }
+
     Ok(Json(serde_json::json!({
         "status": "success",
         "dispute_id": dispute_id,
-        "new_status": status
+        "new_status": status,
+        "voided": payload.void_match.unwrap_or(false)
     })))
 }
 
@@ -1750,8 +1969,8 @@ async fn claim_tournament_forfeit(
     .map_err(|e| internal_error(e))?;
 
     // Update standings for round-robin/group-stage (idempotent)
-    let _ = db::update_league_standing(&state.pool, tournament_id, winner_id, 3, 0).await;
-    let _ = db::update_league_standing(&state.pool, tournament_id, loser_id, 0, 3).await;
+    let _ = db::update_league_standing_guarded(&state.pool, tournament_id, match_id, winner_id, 3, 0).await;
+    let _ = db::update_league_standing_guarded(&state.pool, tournament_id, match_id, loser_id, 0, 3).await;
 
     // Advance knockout bracket
     let format: Option<String> = sqlx::query_scalar!(
