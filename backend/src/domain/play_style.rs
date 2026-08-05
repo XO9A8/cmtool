@@ -55,62 +55,6 @@ pub fn classify_play_style(stats: &PlayerMatchStatsSummary) -> PlayStyleTag {
     }
 }
 
-/// Milestone badge definition.
-#[allow(dead_code)]
-pub struct BadgeDefinition {
-    /// Unique badge code.
-    pub code: &'static str,
-    /// Display name.
-    pub title: &'static str,
-    /// Detailed description.
-    pub description: &'static str,
-}
-
-/// Badge awarded for reaching 50 official club matches.
-#[allow(dead_code)]
-pub const BADGE_FIRST_50: BadgeDefinition = BadgeDefinition {
-    code: "CLUB_VETERAN_50",
-    title: "Club Veteran",
-    description: "Recorded 50 official club matches",
-};
-
-/// Badge awarded for achieving a 10-match winning streak.
-#[allow(dead_code)]
-pub const BADGE_10_WIN_STREAK: BadgeDefinition = BadgeDefinition {
-    code: "UNSTOPPABLE_10",
-    title: "Unstoppable Force",
-    description: "Achieved a 10-match winning streak",
-};
-
-/// Badge awarded for conceding 0 goals in 5 consecutive matches.
-#[allow(dead_code)]
-pub const BADGE_CLEAN_SHEET_MASTER: BadgeDefinition = BadgeDefinition {
-    code: "CLEAN_SHEET_5",
-    title: "Clean Sheet Master",
-    description: "Conceded 0 goals in 5 consecutive matches",
-};
-
-/// Evaluates player stats and returns earned milestone badge codes.
-#[allow(dead_code)]
-pub fn evaluate_badges(
-    matches_played: u32,
-    current_win_streak: u32,
-    consecutive_clean_sheets: u32,
-) -> Vec<&'static str> {
-    let mut badges = Vec::new();
-
-    if matches_played >= 50 {
-        badges.push(BADGE_FIRST_50.code);
-    }
-    if current_win_streak >= 10 {
-        badges.push(BADGE_10_WIN_STREAK.code);
-    }
-    if consecutive_clean_sheets >= 5 {
-        badges.push(BADGE_CLEAN_SHEET_MASTER.code);
-    }
-
-    badges
-}
 
 #[cfg(test)]
 mod tests {
@@ -136,13 +80,5 @@ mod tests {
             avg_interceptions: 4.0,
         };
         assert_eq!(classify_play_style(&stats), PlayStyleTag::CounterAttacker);
-    }
-
-    #[test]
-    fn test_badge_evaluation() {
-        let badges = evaluate_badges(55, 12, 2);
-        assert_eq!(badges.len(), 2);
-        assert!(badges.contains(&"CLUB_VETERAN_50"));
-        assert!(badges.contains(&"UNSTOPPABLE_10"));
     }
 }

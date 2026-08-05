@@ -4,7 +4,7 @@
 //! Includes expected score calculation, dynamic K-factor scaling based on margin of victory and
 //! provisional status, and inverse-weighted 2v2 rating distribution.
 
-/// Match categories determining the baseline K-factor multiplier.
+#[derive(Clone, Copy)]
 pub enum MatchType {
     /// Friendly match (Base K = 16)
     Friendly,

@@ -121,6 +121,17 @@ class ApiClient {
     }
   }
 
+  /// Clears all cached GET requests from SharedPreferences
+  Future<void> clearAllCache() async {
+    final prefs = await SharedPreferences.getInstance();
+    final keys = prefs.getKeys();
+    for (final key in keys) {
+      if (key.startsWith('cache_')) {
+        await prefs.remove(key);
+      }
+    }
+  }
+
   /// Checks if backend is online and reachable.
   Future<bool> healthCheck() async {
     try {
@@ -187,7 +198,7 @@ class ApiClient {
   }
 
   /// Fetches all members of a club with their ratings and roles.
-  Future<Map<String, dynamic>> getClubMembers(String clubId) async {
+  Future<Map<String, dynamic>> getClubMembers(String clubId, ) async {
     final response = await _getWithCache('/api/v1/clubs/$clubId/members');
     return response.data as Map<String, dynamic>;
   }
@@ -217,7 +228,7 @@ class ApiClient {
   }
 
   /// Fetches all tournaments for a club.
-  Future<Map<String, dynamic>> getClubTournaments(String clubId) async {
+  Future<Map<String, dynamic>> getClubTournaments(String clubId, ) async {
     final response = await _getWithCache('/api/v1/clubs/$clubId/tournaments');
     return response.data as Map<String, dynamic>;
   }
@@ -281,7 +292,7 @@ class ApiClient {
   // ─────────────────────────────────────────────────────────────────────────
 
   /// Fetches full player profile (analytics, clubs, badges combined).
-  Future<Map<String, dynamic>> getPlayerProfile(String playerId) async {
+  Future<Map<String, dynamic>> getPlayerProfile(String playerId, ) async {
     final response = await _getWithCache('/api/v1/players/$playerId/profile');
     return response.data as Map<String, dynamic>;
   }
@@ -326,8 +337,7 @@ class ApiClient {
 
   /// Fetches badges earned by a player.
   Future<Map<String, dynamic>> getPlayerBadges(String playerId) async {
-    final response = await _getWithCache('/api/v1/players/$playerId/badges');
-    return response.data as Map<String, dynamic>;
+    return {'badges': []};
   }
 
   /// Fetches Head-to-Head rivalry stats between two players.
@@ -341,7 +351,7 @@ class ApiClient {
   // ─────────────────────────────────────────────────────────────────────────
 
   /// Fetches club player rankings sorted by Elo rating.
-  Future<List<dynamic>> getLeaderboard(String clubId) async {
+  Future<List<dynamic>> getLeaderboard(String clubId, ) async {
     final response = await _getWithCache('/api/v1/leaderboards/$clubId');
     return response.data as List<dynamic>;
   }
@@ -367,7 +377,7 @@ class ApiClient {
   }
 
   /// Fetches live bracket state for a tournament.
-  Future<Map<String, dynamic>> getTournamentBracket(String tournamentId) async {
+  Future<Map<String, dynamic>> getTournamentBracket(String tournamentId, ) async {
     final response = await _getWithCache('/api/v1/tournaments/$tournamentId/bracket');
     return response.data as Map<String, dynamic>;
   }
@@ -391,7 +401,7 @@ class ApiClient {
   }
 
   /// Fetches live league standings for a tournament.
-  Future<Map<String, dynamic>> getLeagueStandings(String tournamentId) async {
+  Future<Map<String, dynamic>> getLeagueStandings(String tournamentId, ) async {
     final response = await _getWithCache('/api/v1/tournaments/$tournamentId/standings');
     return response.data as Map<String, dynamic>;
   }
@@ -429,12 +439,14 @@ class ApiClient {
   Future<Map<String, dynamic>> resolveAdminDispute({
     required String disputeId,
     required bool dismiss,
+    bool? voidMatch,
     String? resolutionNotes,
   }) async {
     final response = await _dio.post(
       '/api/v1/admin/disputes/$disputeId/resolve',
       data: {
         'dismiss': dismiss,
+        if (voidMatch != null) 'void_match': voidMatch,
         if (resolutionNotes != null) 'resolution_notes': resolutionNotes,
       },
     );
@@ -445,19 +457,18 @@ class ApiClient {
   // Activity Feed & Seasons
   // ─────────────────────────────────────────────────────────────────────────
 
-  Future<List<dynamic>> getClubActivity(String clubId) async {
+  Future<List<dynamic>> getClubActivity(String clubId, ) async {
     final response = await _getWithCache('/api/v1/clubs/$clubId/activity');
     return response.data as List<dynamic>;
   }
 
-  Future<List<dynamic>> getClubResolvedActivity(String clubId) async {
+  Future<List<dynamic>> getClubResolvedActivity(String clubId, ) async {
     final response = await _getWithCache('/api/v1/clubs/$clubId/resolved-activity');
     return response.data as List<dynamic>;
   }
 
   Future<List<dynamic>> getClubSeasons(String clubId) async {
-    final response = await _getWithCache('/api/v1/clubs/$clubId/seasons');
-    return response.data as List<dynamic>;
+    return [];
   }
 
   Future<Map<String, dynamic>> snapshotSeason(String seasonId) async {

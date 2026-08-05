@@ -629,8 +629,9 @@ class _InviteCodeChip extends StatelessWidget {
 
   const _InviteCodeChip({required this.code});
 
-  void _copy(BuildContext context) {
-    Clipboard.setData(ClipboardData(text: code));
+  void _copy(BuildContext context) async {
+    await Clipboard.setData(ClipboardData(text: code));
+    if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(

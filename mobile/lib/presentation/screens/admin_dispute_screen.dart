@@ -223,7 +223,7 @@ class AdminDisputeScreen extends ConsumerWidget {
         content: Text(
           dismiss
               ? 'Mark this dispute as dismissed? No rating changes will be applied.'
-              : 'Uphold this dispute and apply the necessary rating correction?',
+              : 'Uphold this dispute and VOID the match? This will reverse all Elo and Standings updates so players can resubmit.',
           style: const TextStyle(color: Colors.white70, fontSize: 13),
         ),
         actions: [
@@ -240,6 +240,7 @@ class AdminDisputeScreen extends ConsumerWidget {
                 await client.resolveAdminDispute(
                   disputeId: disputeId,
                   dismiss: dismiss,
+                  voidMatch: !dismiss,
                 );
                 ref.invalidate(adminDisputesProvider);
                 if (context.mounted) {

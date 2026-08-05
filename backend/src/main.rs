@@ -97,24 +97,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     tracing::info!("🚀 eFootball Management API Backend running on http://{}", addr);
 
-    // --- Background Cron Job: Badge Evaluation ---
-    let _cron_pool = pool.clone();
-    tokio::spawn(async move {
-        tracing::info!("Starting background badge evaluation cron job...");
-        // Run every 10 seconds for demonstration (normally would be daily or hourly)
-        let mut interval = tokio::time::interval(std::time::Duration::from_secs(10));
-        loop {
-            interval.tick().await;
-            tracing::info!("Running periodic badge evaluation for all players...");
-            // In a full implementation, this would query player stats from cron_pool.
-            // For now, we invoke the evaluate_badges domain logic to demonstrate the background task.
-            let badges = crate::domain::play_style::evaluate_badges(55, 12, 6);
-            if !badges.is_empty() {
-                tracing::info!("Simulated player earned badges: {:?}", badges);
-            }
-        }
-    });
-
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
 

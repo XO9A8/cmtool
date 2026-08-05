@@ -130,7 +130,10 @@ class _TournamentDetailScreenState extends ConsumerState<TournamentDetailScreen>
 
   bool get _isKnockout => widget.formatType == 'knockout';
 
-  void _refresh() {
+  Future<void> _refresh() async {
+    final apiClient = ref.read(apiClientProvider);
+    await apiClient.clearAllCache();
+    
     ref.invalidate(tournamentBracketProvider(widget.tournamentId));
     ref.invalidate(leagueStandingsProvider(widget.tournamentId));
     ref.invalidate(clubTournamentsProvider);
@@ -1211,23 +1214,33 @@ class _MatchFixtureTile extends ConsumerWidget {
                   },
                 ),
                 const SizedBox(width: 6),
-                // Report button
-                _IconActionButton(
-                  icon: Icons.upload_file,
-                  label: 'REPORT',
-                  color: AppColors.cyan,
-                  onTap: () => showDialog(
-                    context: context,
-                    builder: (_) => OcrUploadModal(
-                      tMatchId: matchId,
-                      defaultPlayerId: p1Id,
-                      defaultOpponentId: p2Id,
-                      defaultPlayerName: p1Name,
-                      defaultOpponentName: p2Name,
+                // If fixture is completed or has match record, show DISPUTE button; else show REPORT (OCR Upload) & FORFEIT
+                if (isCompleted || (fixture['match_record_id'] != null)) ...[
+                  _IconActionButton(
+                    icon: Icons.flag_outlined,
+                    label: 'DISPUTE',
+                    color: AppColors.lossRed,
+                    onTap: () {
+                      final recId = fixture['match_record_id']?.toString() ?? matchId;
+                      _showDisputeDialog(context, ref, recId, '$p1Name vs $p2Name');
+                    },
+                  ),
+                ] else ...[
+                  _IconActionButton(
+                    icon: Icons.upload_file,
+                    label: 'REPORT',
+                    color: AppColors.cyan,
+                    onTap: () => showDialog(
+                      context: context,
+                      builder: (_) => OcrUploadModal(
+                        tMatchId: matchId,
+                        defaultPlayerId: p1Id,
+                        defaultOpponentId: p2Id,
+                        defaultPlayerName: p1Name,
+                        defaultOpponentName: p2Name,
+                      ),
                     ),
                   ),
-                ),
-                if (!isCompleted) ...[
                   const SizedBox(width: 6),
                   _IconActionButton(
                     icon: Icons.gavel,
@@ -1335,6 +1348,82 @@ class _MatchFixtureTile extends ConsumerWidget {
       isScrollControlled: true,
       builder: (ctx) => _PredictionSheet(p1Name: p1Name, p2Name: p2Name, p1Rating: p1Rating, p2Rating: p2Rating),
     );
+  }
+
+  void _showDisputeDialog(BuildContext context, WidgetRef ref, String matchRecordId, String matchTitle) {
+    final reasonCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppColors.lossRed),
+        ),
+        title: Text('RAISE DISPUTE', style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Raise a formal dispute for match: $matchTitle.', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+            const SizedBox(height: 16),
+            TextField(
+              controller: reasonCtrl,
+              decoration: InputDecoration(
+                labelText: 'Reason for dispute',
+                labelStyle: const TextStyle(color: Colors.white54),
+                filled: true,
+                fillColor: Colors.white.withValues(alpha: 0.05),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              maxLines: 3,
+              style: const TextStyle(color: Colors.white),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('CANCEL', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.lossRed),
+            onPressed: () async {
+              final reason = reasonCtrl.text.trim();
+              if (reason.isEmpty) return;
+              Navigator.pop(ctx);
+              try {
+                final client = ref.read(apiClientProvider);
+                await client.submitDispute(
+                  matchRecordId: matchRecordId,
+                  reason: reason,
+                );
+                ref.invalidate(adminDisputesProvider);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Dispute raised for $matchTitle. Logged for admin review.'),
+                      backgroundColor: AppColors.lossRed,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to submit dispute: $e'),
+                      backgroundColor: AppColors.lossRed,
+                    ),
+                  );
+                }
+              }
+            },
+            child: Text('SUBMIT DISPUTE', style: GoogleFonts.rajdhani(color: Colors.black, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    ).then((_) => reasonCtrl.dispose());
   }
 }
 

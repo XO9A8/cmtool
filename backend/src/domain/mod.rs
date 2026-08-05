@@ -6,5 +6,4 @@ pub mod fallback_insights;
 pub mod feature_flags;
 pub mod mps;
 pub mod play_style;
-pub mod seasons;
 pub mod tournament;

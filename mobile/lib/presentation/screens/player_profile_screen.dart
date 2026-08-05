@@ -546,29 +546,29 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
         : (data['system_device'] as String? ?? 'PlayStation 5');
     final facebook = isOwnProfile && profilePrefs.facebookLink.isNotEmpty
         ? profilePrefs.facebookLink
-        : (data['facebook_link'] as String? ?? 'N/A');
+        : (data['contact_info']?['facebook_link'] as String? ?? 'N/A');
     final district = isOwnProfile && profilePrefs.district.isNotEmpty
         ? profilePrefs.district
-        : (data['district'] as String? ?? 'N/A');
+        : (data['contact_info']?['district'] as String? ?? 'N/A');
     final dob = isOwnProfile && profilePrefs.dateOfBirth.isNotEmpty
         ? profilePrefs.dateOfBirth
-        : (data['date_of_birth'] as String? ?? 'N/A');
+        : (data['contact_info']?['date_of_birth'] as String? ?? 'N/A');
     final email = isOwnProfile && profilePrefs.contactEmail.isNotEmpty
         ? profilePrefs.contactEmail
-        : (data['email_node'] as String? ?? 'N/A');
+        : (data['contact_info']?['email_node'] as String? ?? 'N/A');
     final phone = isOwnProfile && profilePrefs.phoneLine.isNotEmpty
         ? profilePrefs.phoneLine
-        : (data['phone_line'] as String? ?? 'N/A');
+        : (data['contact_info']?['phone_line'] as String? ?? 'N/A');
     final bio = isOwnProfile && profilePrefs.bio.isNotEmpty
         ? profilePrefs.bio
         : (data['bio'] as String? ?? 'No biometric bio profile submitted to registry.');
 
-    final joined = data['registrar_joined'] as String? ?? '2026-01-01';
-    final start = data['contract_start'] as String? ?? '2026-01-01';
-    final end = data['contract_end'] as String? ?? '2026-12-31';
-    final state = data['node_state'] as String? ?? 'ACTIVE NODE';
-    final authStatus = data['auth_status'] as String? ?? 'VERIFIED';
-    final feed = data['source_feed'] as String? ?? 'ENCRYPTED';
+    final joined = data['compliance']?['registrar_joined'] as String? ?? '2026-01-01';
+    final start = data['compliance']?['contract_start'] as String? ?? '2026-01-01';
+    final end = data['compliance']?['contract_end'] as String? ?? '2026-12-31';
+    final state = data['compliance']?['node_state'] as String? ?? 'ACTIVE NODE';
+    final authStatus = data['compliance']?['auth_status'] as String? ?? 'VERIFIED';
+    final feed = data['compliance']?['source_feed'] as String? ?? 'ENCRYPTED';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -889,19 +889,19 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
       text: profilePrefs.safeJerseyNumber.isNotEmpty ? profilePrefs.safeJerseyNumber : (data['jersey_number']?.toString() ?? ''),
     );
     final emailCtrl = TextEditingController(
-      text: profilePrefs.safeContactEmail.isNotEmpty ? profilePrefs.safeContactEmail : (data['email_node'] as String? ?? ''),
+      text: profilePrefs.safeContactEmail.isNotEmpty ? profilePrefs.safeContactEmail : (data['contact_info']?['email_node'] as String? ?? ''),
     );
     final phoneCtrl = TextEditingController(
-      text: profilePrefs.safePhoneLine.isNotEmpty ? profilePrefs.safePhoneLine : (data['phone_line'] as String? ?? ''),
+      text: profilePrefs.safePhoneLine.isNotEmpty ? profilePrefs.safePhoneLine : (data['contact_info']?['phone_line'] as String? ?? ''),
     );
     final facebookCtrl = TextEditingController(
-      text: profilePrefs.safeFacebookLink.isNotEmpty ? profilePrefs.safeFacebookLink : (data['facebook_link'] as String? ?? ''),
+      text: profilePrefs.safeFacebookLink.isNotEmpty ? profilePrefs.safeFacebookLink : (data['contact_info']?['facebook_link'] as String? ?? ''),
     );
     final districtCtrl = TextEditingController(
-      text: profilePrefs.safeDistrict.isNotEmpty ? profilePrefs.safeDistrict : (data['district'] as String? ?? ''),
+      text: profilePrefs.safeDistrict.isNotEmpty ? profilePrefs.safeDistrict : (data['contact_info']?['district'] as String? ?? ''),
     );
     final dobCtrl = TextEditingController(
-      text: profilePrefs.safeDateOfBirth.isNotEmpty ? profilePrefs.safeDateOfBirth : (data['date_of_birth'] as String? ?? ''),
+      text: profilePrefs.safeDateOfBirth.isNotEmpty ? profilePrefs.safeDateOfBirth : (data['contact_info']?['date_of_birth'] as String? ?? ''),
     );
 
     String selectedPlayStyle = profilePrefs.safePlayStyle.isNotEmpty

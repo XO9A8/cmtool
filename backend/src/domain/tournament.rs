@@ -107,7 +107,7 @@ pub fn generate_knockout_bracket(
 
 /// Circle Method Scheduler for Round-Robin / League format (supports Single & Double Round-Robin).
 pub fn generate_round_robin_fixtures(
-    _tournament_id: Uuid,
+    tournament_id: Uuid,
     mut players: Vec<TournamentPlayer>,
     legs: u32,
 ) -> Vec<FixtureNode> {
@@ -347,9 +347,9 @@ pub async fn process_tournament_advancement(
             mr.goals_for  AS "goals_for?: i32",
             mr.goals_against AS "goals_against?: i32"
         FROM T_Matches m
-        LEFT JOIN Match_Records mr ON mr.id = m.match_record_id
+        LEFT JOIN Match_Records mr ON mr.t_match_id = m.id
         LEFT JOIN Tournaments t   ON t.id  = m.tournament_id
-        WHERE m.id = $1 OR m.match_record_id = $1
+        WHERE m.id = $1 OR mr.id = $1
         "#,
         match_id
     )
@@ -367,7 +367,7 @@ pub async fn process_tournament_advancement(
     };
 
     let (tourney_id, p1_id, p2_id) = match (tm.tournament_id, tm.player_1_id, tm.player_2_id) {
-        (Some(t), Some(p1), Some(p2)) => (t, p1, p2),
+        (t, Some(p1), Some(p2)) => (t, p1, p2),
         _ => return Ok(()), // Incomplete fixture data, nothing to advance
     };
 
@@ -388,7 +388,7 @@ pub async fn process_tournament_advancement(
         .map_err(|e| e.to_string())?;
 
         match scores.and_then(|s| Some((s.player_1_score?, s.player_2_score?))) {
-            Some((s1, s2)) => (s1, s2),
+            Some((s1, s2)) => (s1 as i32, s2 as i32),
             None => return Ok(()), // No score data available yet
         }
     };
@@ -412,28 +412,13 @@ pub async fn process_tournament_advancement(
 
     // 5a. League / Group-stage path → update standings with idempotency guard
     if format == "round_robin" || format == "group_knockout" || format.is_empty() {
-        // Guard: check if standings were already updated for this t_match (via last_processed_match_id on League_Standings)
-        let already_processed: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM League_Standings WHERE tournament_id = $1 AND player_id = $2 AND last_processed_match_id = $3)"
-        )
-        .bind(tourney_id)
-        .bind(p1_id)
-        .bind(tm.t_match_id)
-        .fetch_one(pool)
-        .await
-        .unwrap_or(false);
-
-        if already_processed {
-            println!("[tournament] Standings already updated for t_match {}, skipping.", tm.t_match_id);
-            return Ok(());
-        }
 
         crate::infrastructure::postgres_adapter::update_league_standing_guarded(
-            pool, tourney_id, tm.t_match_id, p1_id, p1_goals, p2_goals,
+            pool, tourney_id, tm.t_match_id, p1_id, p1_goals as i32, p2_goals as i32,
         ).await.map_err(|e| e.to_string())?;
 
         crate::infrastructure::postgres_adapter::update_league_standing_guarded(
-            pool, tourney_id, tm.t_match_id, p2_id, p2_goals, p1_goals,
+            pool, tourney_id, tm.t_match_id, p2_id, p2_goals as i32, p1_goals as i32,
         ).await.map_err(|e| e.to_string())?;
     }
 
@@ -445,7 +430,7 @@ pub async fn process_tournament_advancement(
             pool,
             tourney_id,
             tm.t_match_id,
-            tm.round_number,
+            tm.round_number as i32,
             tm.match_number,
             winner_id,
         ).await {

@@ -29,13 +29,12 @@ class _ClubDetailScreenState extends ConsumerState<ClubDetailScreen> {
   int _selectedIndex = 0;
 
   // ── label / icon maps for the nav bar ────────────────────────────────────
-  static const _navLabels = ['OVERVIEW', 'ROSTER', 'LEADERBOARD', 'ACTIVITY', 'SEASONS', 'RESOLVED'];
+  static const _navLabels = ['OVERVIEW', 'ROSTER', 'LEADERBOARD', 'ACTIVITY', 'RESOLVED'];
   static const _navIcons = [
     Icons.dashboard_outlined,
     Icons.group_outlined,
     Icons.leaderboard_outlined,
     Icons.timeline_outlined,
-    Icons.workspace_premium_outlined,
     Icons.verified_outlined,
   ];
   static const _navIconsFilled = [
@@ -43,11 +42,13 @@ class _ClubDetailScreenState extends ConsumerState<ClubDetailScreen> {
     Icons.group,
     Icons.leaderboard,
     Icons.timeline,
-    Icons.workspace_premium,
     Icons.verified,
   ];
 
-  void _refresh() {
+  Future<void> _refresh() async {
+    final apiClient = ref.read(apiClientProvider);
+    await apiClient.clearAllCache();
+
     ref.invalidate(clubMembersProvider(widget.clubId));
     ref.invalidate(leaderboardProvider(widget.clubId));
     ref.invalidate(clubActivityProvider(widget.clubId));
@@ -278,7 +279,7 @@ class _ClubDetailScreenState extends ConsumerState<ClubDetailScreen> {
         _RosterTab(clubId: widget.clubId),
         _LeaderboardTab(clubId: widget.clubId),
         _ActivityTab(clubId: widget.clubId),
-        _SeasonsTab(clubId: widget.clubId),
+        const SizedBox.shrink(),
         _ResolvedTab(clubId: widget.clubId),
       ],
     );
