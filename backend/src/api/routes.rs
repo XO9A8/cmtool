@@ -1660,6 +1660,22 @@ async fn start_tournament(
 
     let legs = rules_config.get("legs").and_then(|v| v.as_u64()).unwrap_or(1) as u32;
 
+    // Clean up any partially generated fixtures/participants from a previous failed start attempt
+    sqlx::query!("DELETE FROM T_Matches WHERE tournament_id = $1", tournament_id)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| internal_error(e))?;
+    
+    sqlx::query!("DELETE FROM League_Standings WHERE tournament_id = $1", tournament_id)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| internal_error(e))?;
+
+    sqlx::query!("DELETE FROM Tournament_Participants WHERE tournament_id = $1", tournament_id)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| internal_error(e))?;
+
     if players.is_empty() {
         let members = db::get_club_members(&state.pool, club_id)
             .await
