@@ -344,13 +344,7 @@ async fn ocr_submit(
     let player_rating = payload.player_rating.unwrap_or(1000);
     let opponent_rating = payload.opponent_rating.unwrap_or(1000);
 
-    let actual_player_id = auth.user_id;
-    
-    if let Some(pid) = payload.player_id {
-        if pid != actual_player_id {
-            return Err(forbidden("FORBIDDEN", "Cannot submit match results on behalf of another player."));
-        }
-    }
+    let actual_player_id = payload.player_id.unwrap_or(auth.user_id);
 
     let club_id = match payload.club_id {
         Some(cid) => cid,
@@ -364,6 +358,16 @@ async fn ocr_submit(
             clubs[0].id
         }
     };
+
+    if actual_player_id != auth.user_id {
+        let is_official = db::is_club_official(&state.pool, club_id, auth.user_id)
+            .await
+            .unwrap_or(false);
+            
+        if !is_official {
+            return Err(forbidden("FORBIDDEN", "Cannot submit match results on behalf of another player unless you are a club official."));
+        }
+    }
 
     // --- T_Match Participant Check ---
     if let Some(tm_id) = payload.t_match_id {
