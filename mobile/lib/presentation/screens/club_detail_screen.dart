@@ -641,7 +641,7 @@ class _RosterTabState extends ConsumerState<_RosterTab> {
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          children: ['admin', 'organizer', 'player'].map((role) {
+          children: ['admin', 'president', 'organizer', 'captain', 'vice-captain', 'player'].map((role) {
             final isCurrent = currentRole == role;
             final rColor = _roleColor(role);
             return Container(
@@ -654,11 +654,16 @@ class _RosterTabState extends ConsumerState<_RosterTab> {
                 ),
               ),
               child: ListTile(
-                leading: Icon(
-                  role == 'admin' ? Icons.star : (role == 'organizer' ? Icons.engineering : Icons.person),
-                  color: isCurrent ? rColor : Colors.white54,
-                ),
-                title: Text(
+                  leading: Icon(
+                    role == 'admin' ? Icons.star : 
+                    (role == 'president' ? Icons.account_balance : 
+                    (role == 'organizer' ? Icons.engineering : 
+                    (role == 'captain' ? Icons.local_police : 
+                    (role == 'vice-captain' ? Icons.shield : Icons.person)))),
+                    color: _roleColor(role),
+                    size: 16,
+                  ),
+                  title: Text(
                   role.toUpperCase(),
                   style: GoogleFonts.rajdhani(
                     color: isCurrent ? rColor : Colors.white,
@@ -1718,8 +1723,11 @@ class _SeasonCard extends StatelessWidget {
 
 Color _roleColor(String role) {
   if (role == 'admin') return AppColors.primary;
-  if (role == 'organizer') return AppColors.purple;
-  return AppColors.cyan;
+  if (role == 'president') return Colors.purpleAccent;
+  if (role == 'organizer') return AppColors.cyan;
+  if (role == 'captain') return Colors.amber;
+  if (role == 'vice-captain') return Colors.orangeAccent;
+  return Colors.white54;
 }
 
 Widget _sectionLabel(String label, Color color) {

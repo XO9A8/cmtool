@@ -172,7 +172,7 @@ pub async fn find_pending_opponent_match(
     let row: Option<(Uuid,)> = sqlx::query_as(
         r#"
         SELECT id FROM Match_Records
-        WHERE player_id = $2 AND opponent_id = $3
+        WHERE club_id = $1 AND player_id = $2 AND opponent_id = $3
           AND goals_for = $4 AND goals_against = $5
           AND created_at >= NOW() - INTERVAL '2 hours'
           AND verification_status = 'pending'
@@ -639,16 +639,39 @@ pub async fn create_club(
 pub async fn join_club_by_invite(
     pool: &PgPool,
     player_id: Uuid,
+    username: &str,
     invite_code: &str,
 ) -> Result<Uuid, sqlx::Error> {
-    let row: (Uuid,) = sqlx::query_as(
+    let mut tx = pool.begin().await?;
+
+    let row: Option<(Uuid,)> = sqlx::query_as(
         r#"SELECT id FROM Clubs WHERE invite_code = $1 AND deleted_at IS NULL"#,
     )
     .bind(invite_code)
-    .fetch_one(pool)
+    .fetch_optional(&mut *tx)
     .await?;
 
+    let row = row.ok_or(sqlx::Error::RowNotFound)?;
     let club_id = row.0;
+
+    sqlx::query(r#"
+        INSERT INTO Users (id, username)
+        VALUES ($1, $2)
+        ON CONFLICT (id) DO NOTHING
+    "#)
+    .bind(player_id)
+    .bind(username)
+    .execute(&mut *tx)
+    .await?;
+
+    sqlx::query(r#"
+        INSERT INTO Player_Profiles (user_id)
+        VALUES ($1)
+        ON CONFLICT (user_id) DO NOTHING
+    "#)
+    .bind(player_id)
+    .execute(&mut *tx)
+    .await?;
 
     sqlx::query(
         r#"
@@ -659,8 +682,10 @@ pub async fn join_club_by_invite(
     )
     .bind(player_id)
     .bind(club_id)
-    .execute(pool)
+    .execute(&mut *tx)
     .await?;
+
+    tx.commit().await?;
 
     Ok(club_id)
 }
@@ -1622,7 +1647,7 @@ pub async fn advance_knockout_winner(
 ) -> Result<(), sqlx::Error> {
     // If this round only has 1 match, it's the final.
     let max_match: Option<i32> = sqlx::query_scalar(
-        "SELECT MAX(match_number) FROM T_Matches WHERE tournament_id = $1 AND round_number = $2"
+        "SELECT MAX(match_number) FROM T_Matches WHERE tournament_id = $1 AND round_number = $2 AND group_name IS NULL"
     )
     .bind(tournament_id)
     .bind(current_round)
@@ -2026,7 +2051,7 @@ pub async fn void_match(
         .execute(&mut *tx)
         .await?;
         
-        let t_row = sqlx::query("SELECT tournament_id, round_number::INT4 AS round_number, match_number::INT4 AS match_number, group_name FROM T_Matches WHERE id = $1")
+        let t_row = sqlx::query("SELECT tournament_id, round_number::INT4 AS round_number, match_number::INT4 AS match_number, group_name, player_1_id, player_2_id, player_1_score::INT4 AS player_1_score, player_2_score::INT4 AS player_2_score FROM T_Matches WHERE id = $1")
             .bind(tm_id)
             .fetch_optional(&mut *tx)
             .await?;
@@ -2036,6 +2061,10 @@ pub async fn void_match(
             let round_number: i32 = tr.get("round_number");
             let match_number: i32 = tr.get("match_number");
             let group_name: Option<String> = tr.try_get("group_name").ok().flatten();
+            let p1_id: Option<Uuid> = tr.try_get("player_1_id").ok().flatten();
+            let p2_id: Option<Uuid> = tr.try_get("player_2_id").ok().flatten();
+            let p1_score: Option<i32> = tr.try_get("player_1_score").ok().flatten();
+            let p2_score: Option<i32> = tr.try_get("player_2_score").ok().flatten();
 
             let status: String = sqlx::query_scalar("SELECT status FROM Tournaments WHERE id = $1")
                 .bind(tournament_id)
@@ -2053,7 +2082,14 @@ pub async fn void_match(
             if group_name.is_none() {
                 let next_round = round_number + 1;
                 let next_slot = (match_number + 1) / 2;
-                let winner_id = if goals_for > goals_against { player_id } else { opponent_id };
+                
+                let mut winner_id = Uuid::nil();
+                if let (Some(p1), Some(p2), Some(s1), Some(s2)) = (p1_id, p2_id, p1_score, p2_score) {
+                    winner_id = if s1 > s2 { p1 } else { p2 };
+                } else {
+                    // Fallback just in case
+                    winner_id = if goals_for > goals_against { player_id } else { opponent_id };
+                }
 
                 let next_match = sqlx::query("SELECT id, player_1_id, player_2_id FROM T_Matches WHERE tournament_id = $1 AND round_number = $2 AND match_number = $3")
                     .bind(tournament_id)

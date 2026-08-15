@@ -262,6 +262,10 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
       setState(() => _errorMessage = 'Shots on target cannot exceed total shots.');
       return;
     }
+    if (goalsFor == goalsAgainst && (_selectedMatchType == 'knockout' || _selectedMatchType == 'tournament_final' || _selectedMatchType == 'tournament_knockout')) {
+      setState(() => _errorMessage = 'Knockout matches cannot end in a draw. Please resolve via extra time/penalties.');
+      return;
+    }
 
     setState(() => _errorMessage = null);
 
@@ -312,12 +316,21 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
         _showSuccessDialog(context, res);
       },
       loading: () {},
-      error: (e, _) => ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Submission failed: ${e.toString()}'),
-          backgroundColor: AppColors.lossRed,
-        ),
-      ),
+      error: (e, _) {
+        final errorMsg = e.toString();
+        String displayMsg = 'Submission failed: $errorMsg';
+        if (errorMsg.contains('INVALID_OPPONENT')) {
+          displayMsg = 'Invalid Opponent. Please select the correct opponent for this tournament match.';
+        } else if (errorMsg.contains('INVALID_KNOCKOUT_DRAW')) {
+          displayMsg = 'Knockout matches cannot end in a draw. Please resolve via extra time/penalties.';
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(displayMsg),
+            backgroundColor: AppColors.lossRed,
+          ),
+        );
+      },
     );
   }
 
@@ -360,7 +373,10 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _buildResultStat('SKILL RATING', '${res.newSkillRating}', delta: res.ratingDelta),
+                  if (res.ratingDelta == 0)
+                    _buildResultStat('SKILL RATING', 'PENDING')
+                  else
+                    _buildResultStat('SKILL RATING', '${res.newSkillRating}', delta: res.ratingDelta),
                   _buildResultStat('MPS SCORE', res.matchPerformanceScore.toStringAsFixed(1)),
                 ],
               ),

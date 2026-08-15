@@ -72,7 +72,7 @@ CREATE TABLE public.club_memberships (
     club_id      UUID         NOT NULL REFERENCES public.clubs(id)  ON DELETE CASCADE,
     player_id    UUID         NOT NULL REFERENCES public.users(id)  ON DELETE CASCADE,
     role         TEXT         NOT NULL DEFAULT 'player'
-                              CHECK (role IN ('admin', 'organizer', 'player')),
+                              CHECK (role IN ('admin', 'organizer', 'president', 'captain', 'vice-captain', 'player')),
     skill_rating INT          NOT NULL DEFAULT 1000,
     form_rating  NUMERIC(5,2) NOT NULL DEFAULT 50.00,
     play_style   TEXT         NOT NULL DEFAULT 'Unclassified',
@@ -180,7 +180,7 @@ CREATE TABLE public.t_matches (
                                 CHECK (status IN ('scheduled', 'completed', 'disputed', 'forfeit', 'bye')),
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT t_matches_unique_slot UNIQUE (tournament_id, match_number)
+    CONSTRAINT t_matches_unique_slot UNIQUE (tournament_id, round_number, match_number)
 );
 
 COMMENT ON TABLE public.t_matches IS 'Circular FK removed. FK direction: match_records.t_match_id → t_matches.id (one-way only).';

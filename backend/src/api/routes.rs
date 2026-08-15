@@ -49,7 +49,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
     let protected = Router::new()
         .route("/api/v1/auth/sync", post(sync_user))
         .route("/api/v1/clubs", post(create_club))
-        .route("/api/v1/clubs/:id/join", post(join_club))
+        .route("/api/v1/clubs/join", post(join_club))
         .route("/api/v1/clubs/my", get(get_my_clubs))
         .route("/api/v1/clubs/:id/members", get(get_club_members))
         .route("/api/v1/clubs/:id/members/:player_id/role", axum::routing::put(update_member_role))
@@ -249,7 +249,7 @@ async fn join_club(
     auth: AuthenticatedUser,
     Json(payload): Json<JoinClubRequest>,
 ) -> Result<Json<JoinClubResponse>, (StatusCode, Json<ApiErrorResponse>)> {
-    let club_id = db::join_club_by_invite(&state.pool, auth.user_id, &payload.invite_code)
+    let joined_club_id = db::join_club_by_invite(&state.pool, auth.user_id, &auth.username, &payload.invite_code)
         .await
         .map_err(|_| {
             (
@@ -264,7 +264,7 @@ async fn join_club(
         })?;
 
     Ok(Json(JoinClubResponse {
-        club_id,
+        club_id: joined_club_id,
         message: "Successfully joined club".into(),
     }))
 }
@@ -332,6 +332,12 @@ async fn ocr_submit(
     if payload.shots_on_target > payload.shots_total {
         return Err(bad_request("INVALID_SHOT_STATS", "shots_on_target cannot exceed shots_total"));
     }
+    
+    if payload.goals_for == payload.goals_against {
+        if payload.match_type == "knockout" || payload.match_type == "tournament_final" || payload.match_type == "tournament_knockout" {
+            return Err(bad_request("INVALID_KNOCKOUT_DRAW", "Knockout matches cannot end in a draw. Please resolve via extra time/penalties."));
+        }
+    }
 
     let is_duplicate = db::check_screenshot_exists(&state.pool, &payload.screenshot_hash)
         .await
@@ -379,6 +385,9 @@ async fn ocr_submit(
             }
             if tm.player_1_id != Some(actual_player_id) && tm.player_2_id != Some(actual_player_id) {
                 return Err(forbidden("FORBIDDEN", "You are not a participant in this match."));
+            }
+            if tm.player_1_id != Some(payload.opponent_id) && tm.player_2_id != Some(payload.opponent_id) {
+                return Err(bad_request("INVALID_OPPONENT", "The specified opponent does not match the scheduled tournament fixture."));
             }
         }
     }
@@ -571,8 +580,8 @@ async fn ocr_submit(
     .await
     .map_err(|e| internal_error(e))?;
 
-    let final_new_rating = elo_res.new_rating;
-    let final_rating_delta = elo_res.rating_delta;
+    let final_new_rating = if verification_status == "pending" { player_rating } else { elo_res.new_rating };
+    let final_rating_delta = if verification_status == "pending" { 0 } else { elo_res.rating_delta };
 
     Ok(Json(OcrSubmitResponse {
         match_id,
