@@ -249,19 +249,29 @@ async fn join_club(
     auth: AuthenticatedUser,
     Json(payload): Json<JoinClubRequest>,
 ) -> Result<Json<JoinClubResponse>, (StatusCode, Json<ApiErrorResponse>)> {
+    let club = sqlx::query!("SELECT id FROM Clubs WHERE invite_code = $1 AND deleted_at IS NULL", payload.invite_code)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|e| internal_error(e))?;
+        
+    let club_id = match club {
+        Some(c) => c.id,
+        None => return Err(bad_request("INVALID_INVITE_CODE", "No club found with that invite code")),
+    };
+    
+    let is_member = sqlx::query_scalar!("SELECT EXISTS(SELECT 1 FROM Club_Memberships WHERE club_id = $1 AND player_id = $2)", club_id, auth.user_id)
+        .fetch_one(&state.pool)
+        .await
+        .unwrap_or(Some(false))
+        .unwrap_or(false);
+        
+    if is_member {
+        return Err(bad_request("ALREADY_MEMBER", "You are already a member of this club."));
+    }
+
     let joined_club_id = db::join_club_by_invite(&state.pool, auth.user_id, &auth.username, &payload.invite_code)
         .await
-        .map_err(|_| {
-            (
-                StatusCode::NOT_FOUND,
-                Json(ApiErrorResponse {
-                    error: ApiErrorDetail {
-                        code: "INVALID_INVITE_CODE".into(),
-                        message: "No club found with that invite code".into(),
-                    },
-                }),
-            )
-        })?;
+        .map_err(|e| internal_error(e))?;
 
     Ok(Json(JoinClubResponse {
         club_id: joined_club_id,
@@ -419,6 +429,47 @@ async fn ocr_submit(
     }
 
     if let Some(opponent_match_id) = auto_match_id {
+        // Bug 4 Fix: Create a mirror match record for the current player
+        let new_m_id = Uuid::new_v4();
+        let hash_str = format!("mirror_{}", new_m_id);
+        let res_str = if payload.goals_for > payload.goals_against { "win" } else if payload.goals_for == payload.goals_against { "draw" } else { "loss" };
+        let _ = sqlx::query(
+            r#"
+            INSERT INTO Match_Records (
+                id, club_id, t_match_id, player_id, opponent_id, goals_for, goals_against,
+                result, possession, passes_completed, passes_attempted,
+                shots_on_target, shots_total, interceptions, fouls, offsides,
+                corners, free_kicks, crosses, tackles, saves, screenshot_hash,
+                verification_status, verified_by_id
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, 'approved', $5)
+            "#
+        )
+        .bind(new_m_id)
+        .bind(club_id)
+        .bind(payload.t_match_id)
+        .bind(actual_player_id)
+        .bind(payload.opponent_id)
+        .bind(payload.goals_for as i32)
+        .bind(payload.goals_against as i32)
+        .bind(res_str)
+        .bind(payload.possession)
+        .bind(payload.passes_completed as i32)
+        .bind(payload.passes_attempted as i32)
+        .bind(payload.shots_on_target as i32)
+        .bind(payload.shots_total as i32)
+        .bind(payload.interceptions as i32)
+        .bind(payload.fouls as i32)
+        .bind(payload.offsides as i32)
+        .bind(payload.corners as i32)
+        .bind(payload.free_kicks as i32)
+        .bind(payload.crosses as i32)
+        .bind(payload.tackles as i32)
+        .bind(payload.saves as i32)
+        .bind(hash_str)
+        .execute(&state.pool)
+        .await;
+
         // We found the opponent's match! Mark it as approved and apply stats.
         db::confirm_match(&state.pool, opponent_match_id, actual_player_id)
             .await
@@ -1272,6 +1323,14 @@ async fn remove_member(
         return Err(forbidden("FORBIDDEN", "Only club officials can remove members."));
     }
 
+    let is_owner = db::is_club_owner(&state.pool, club_id, player_id)
+        .await
+        .map_err(|e| internal_error(e))?;
+        
+    if is_owner {
+        return Err(bad_request("FORBIDDEN", "Cannot remove the club owner."));
+    }
+
     db::remove_club_member(&state.pool, club_id, player_id)
         .await
         .map_err(|e| internal_error(e))?;
@@ -1727,7 +1786,7 @@ async fn start_tournament(
         for (i, f) in fixtures.iter().enumerate() {
             let p1_id = f.player_1.as_ref().map(|p| p.id);
             let p2_id = f.player_2.as_ref().map(|p| p.id);
-            db::insert_tournament_match(
+            let inserted_match_id = db::insert_tournament_match(
                 &state.pool,
                 tournament_id,
                 p1_id,
@@ -1738,6 +1797,26 @@ async fn start_tournament(
             )
             .await
             .map_err(|e| internal_error(e))?;
+            
+            if let Some(winner_id) = f.winner_id {
+                // Bug 3 Fix: Complete bye matches and advance the winner immediately
+                sqlx::query("UPDATE T_Matches SET status = 'completed', player_1_score = 0, player_2_score = 0 WHERE id = $1")
+                    .bind(inserted_match_id)
+                    .execute(&state.pool)
+                    .await
+                    .map_err(|e| internal_error(e))?;
+                
+                db::advance_knockout_winner(
+                    &state.pool,
+                    tournament_id,
+                    inserted_match_id,
+                    f.round_number as i32,
+                    (i + 1) as i32,
+                    winner_id,
+                )
+                .await
+                .map_err(|e| internal_error(e))?;
+            }
         }
 
     } else if format_type == "group_knockout" {
