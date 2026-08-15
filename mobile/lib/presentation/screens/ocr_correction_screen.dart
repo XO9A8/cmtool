@@ -5,11 +5,13 @@ import '../theme/app_theme.dart';
 class OcrCorrectionScreen extends StatefulWidget {
   final Map<String, dynamic> parsedData;
   final String screenshotPath;
+  final bool isKnockout;
 
   const OcrCorrectionScreen({
     super.key,
     required this.parsedData,
     required this.screenshotPath,
+    this.isKnockout = false,
   });
 
   @override
@@ -48,6 +50,20 @@ class _OcrCorrectionScreenState extends State<OcrCorrectionScreen> {
 
   void _submit() {
     if (_formKey.currentState!.validate()) {
+      final gf = double.tryParse(_controllers['goals_for']?.text ?? '0') ?? 0;
+      final ga = double.tryParse(_controllers['goals_against']?.text ?? '0') ?? 0;
+
+      if (widget.isKnockout && gf == ga) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('⚠️ Knockout matches cannot end in a draw. Please input the score after penalties or extra time.'),
+            backgroundColor: AppColors.lossRed,
+            duration: Duration(seconds: 4),
+          ),
+        );
+        return;
+      }
+
       final updatedData = {
         for (var entry in _controllers.entries)
           entry.key: double.tryParse(entry.value.text) ?? 0,

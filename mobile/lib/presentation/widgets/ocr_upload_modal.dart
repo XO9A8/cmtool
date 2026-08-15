@@ -19,6 +19,7 @@ class OcrUploadModal extends ConsumerStatefulWidget {
   final String? defaultOpponentId;
   final String? defaultPlayerName;
   final String? defaultOpponentName;
+  final bool isKnockout;
 
   const OcrUploadModal({
     super.key,
@@ -27,6 +28,7 @@ class OcrUploadModal extends ConsumerStatefulWidget {
     this.defaultOpponentId,
     this.defaultPlayerName,
     this.defaultOpponentName,
+    this.isKnockout = false,
   });
 
   @override
@@ -262,7 +264,7 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
       setState(() => _errorMessage = 'Shots on target cannot exceed total shots.');
       return;
     }
-    if (goalsFor == goalsAgainst && (_selectedMatchType == 'knockout' || _selectedMatchType == 'tournament_final' || _selectedMatchType == 'tournament_knockout')) {
+    if (goalsFor == goalsAgainst && (widget.isKnockout || _selectedMatchType == 'knockout' || _selectedMatchType == 'tournament_final' || _selectedMatchType == 'tournament_knockout')) {
       setState(() => _errorMessage = 'Knockout matches cannot end in a draw. Please resolve via extra time/penalties.');
       return;
     }

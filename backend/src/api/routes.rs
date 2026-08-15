@@ -1146,7 +1146,7 @@ pub struct SnapshotSeasonRequest {
 
 async fn snapshot_season(
     State(state): State<Arc<AppState>>,
-    auth: AuthenticatedUser,
+    _auth: AuthenticatedUser,
     Json(payload): Json<SnapshotSeasonRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ApiErrorResponse>)> {
     let mut tx = state.pool.begin().await.map_err(|e| internal_error(e))?;
@@ -1783,7 +1783,7 @@ async fn start_tournament(
     if format_type == "knockout" {
         let fixtures = generate_knockout_bracket(tournament_id, players).fixtures;
         fixtures_count = fixtures.len();
-        for (i, f) in fixtures.iter().enumerate() {
+        for f in fixtures.iter() {
             let p1_id = f.player_1.as_ref().map(|p| p.id);
             let p2_id = f.player_2.as_ref().map(|p| p.id);
             let inserted_match_id = db::insert_tournament_match(
@@ -1792,7 +1792,7 @@ async fn start_tournament(
                 p1_id,
                 p2_id,
                 f.round_number as i32,
-                (i + 1) as i32,
+                f.match_number as i32,
                 None,
             )
             .await
@@ -1811,7 +1811,7 @@ async fn start_tournament(
                     tournament_id,
                     inserted_match_id,
                     f.round_number as i32,
-                    (i + 1) as i32,
+                    f.match_number as i32,
                     winner_id,
                 )
                 .await

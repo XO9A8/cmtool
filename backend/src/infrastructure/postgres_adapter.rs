@@ -1684,6 +1684,10 @@ pub async fn advance_knockout_winner(
     .await?;
 
     if let Some((row_id, p1, p2)) = existing {
+        // Prevent double advancement if winner is already assigned
+        if p1 == Some(winner_id) || p2 == Some(winner_id) {
+            return Ok(());
+        }
         // Fill the empty slot
         if p1.is_none() {
             sqlx::query(
@@ -2085,13 +2089,13 @@ pub async fn void_match(
                 let next_round = round_number + 1;
                 let next_slot = (match_number + 1) / 2;
                 
-                let mut winner_id = Uuid::nil();
-                if let (Some(p1), Some(p2), Some(s1), Some(s2)) = (p1_id, p2_id, p1_score, p2_score) {
-                    winner_id = if s1 > s2 { p1 } else { p2 };
+                let winner_id = if let (Some(p1), Some(p2), Some(s1), Some(s2)) = (p1_id, p2_id, p1_score, p2_score) {
+                    if s1 > s2 { p1 } else { p2 }
+                } else if goals_for > goals_against {
+                    player_id
                 } else {
-                    // Fallback just in case
-                    winner_id = if goals_for > goals_against { player_id } else { opponent_id };
-                }
+                    opponent_id
+                };
 
                 let next_match = sqlx::query("SELECT id, player_1_id, player_2_id FROM T_Matches WHERE tournament_id = $1 AND round_number = $2 AND match_number = $3")
                     .bind(tournament_id)
@@ -2136,6 +2140,8 @@ pub async fn void_match(
                     lost = GREATEST(0, lost - $3),
                     goals_for = GREATEST(0, goals_for - $4),
                     goals_against = GREATEST(0, goals_against - $5),
+                    goal_diff = GREATEST(0, goals_for - $4) - GREATEST(0, goals_against - $5),
+                    points = GREATEST(0, won - $1) * 3 + GREATEST(0, drawn - $2),
                     last_processed_match_id = NULL,
                     updated_at = NOW()
                 WHERE tournament_id = $6 AND player_id = $7
@@ -2168,6 +2174,8 @@ pub async fn void_match(
                     lost = GREATEST(0, lost - $3),
                     goals_for = GREATEST(0, goals_for - $4),
                     goals_against = GREATEST(0, goals_against - $5),
+                    goal_diff = GREATEST(0, goals_for - $5) - GREATEST(0, goals_against - $4),
+                    points = GREATEST(0, won - $1) * 3 + GREATEST(0, drawn - $2),
                     last_processed_match_id = NULL,
                     updated_at = NOW()
                 WHERE tournament_id = $6 AND player_id = $7

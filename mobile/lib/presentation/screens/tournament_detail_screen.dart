@@ -1564,6 +1564,7 @@ class _BracketVersusPill extends ConsumerWidget {
           defaultOpponentId: p2Id,
           defaultPlayerName: p1Name,
           defaultOpponentName: p2Name,
+          isKnockout: true,
         ),
       ),
       child: Container(

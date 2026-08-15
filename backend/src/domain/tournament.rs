@@ -107,7 +107,7 @@ pub fn generate_knockout_bracket(
 
 /// Circle Method Scheduler for Round-Robin / League format (supports Single & Double Round-Robin).
 pub fn generate_round_robin_fixtures(
-    tournament_id: Uuid,
+    _tournament_id: Uuid,
     mut players: Vec<TournamentPlayer>,
     legs: u32,
 ) -> Vec<FixtureNode> {
@@ -341,6 +341,8 @@ pub async fn process_tournament_advancement(
             m.player_2_id,
             m.round_number,
             m.match_number,
+            m.group_name,
+            m.status      AS "match_status: String",
             t.format_type,
             mr.id         AS "mr_id?: Uuid",
             mr.player_id  AS "mr_player_id?: Uuid",
@@ -365,6 +367,12 @@ pub async fn process_tournament_advancement(
             return Ok(());
         }
     };
+
+    // Idempotency: skip already completed tournament matches
+    if tm.match_status == "completed" {
+        println!("[tournament] match_id {} is already completed, skipping auto-advancement.", tm.t_match_id);
+        return Ok(());
+    }
 
     let (tourney_id, p1_id, p2_id) = match (tm.tournament_id, tm.player_1_id, tm.player_2_id) {
         (t, Some(p1), Some(p2)) => (t, p1, p2),
@@ -393,6 +401,16 @@ pub async fn process_tournament_advancement(
         }
     };
 
+    let is_draw = p1_goals == p2_goals;
+    let format = tm.format_type.as_str();
+    let is_knockout_match = format == "knockout" || (format == "group_knockout" && tm.group_name.is_none());
+    let is_group_or_league = format == "round_robin" || format == "league" || (format == "group_knockout" && tm.group_name.is_some()) || (format.is_empty() && tm.group_name.is_some());
+
+    // Knockout matches MUST have a winner (no draws permitted)
+    if is_knockout_match && is_draw {
+        return Err(format!("Knockout match {} cannot end in a draw. Please resolve via extra time/penalties.", tm.t_match_id));
+    }
+
     // 3. Mark T_Match as completed with final scores
     sqlx::query(
         "UPDATE T_Matches SET player_1_score = $1, player_2_score = $2, status = 'completed' WHERE id = $3"
@@ -406,13 +424,9 @@ pub async fn process_tournament_advancement(
 
     // 4. Determine winner
     let winner_id = if p1_goals > p2_goals { p1_id } else { p2_id };
-    let is_draw   = p1_goals == p2_goals;
-
-    let format = tm.format_type.as_str();
 
     // 5a. League / Group-stage path → update standings with idempotency guard
-    if format == "round_robin" || format == "group_knockout" || format == "league" || format.is_empty() {
-
+    if is_group_or_league {
         crate::infrastructure::postgres_adapter::update_league_standing_guarded(
             pool, tourney_id, tm.t_match_id, p1_id, p1_goals as i32, p2_goals as i32,
         ).await.map_err(|e| e.to_string())?;
@@ -422,10 +436,8 @@ pub async fn process_tournament_advancement(
         ).await.map_err(|e| e.to_string())?;
     }
 
-    // 5b. Knockout path → advance winner to next round (skip draws — no draws in knockout)
-    // Only call advance_knockout_winner for actual knockout matches (where group_name is None).
-    // For now, we rely on advance_knockout_winner ignoring matches that don't have a linked next match.
-    if (format == "knockout" || format == "group_knockout") && !is_draw {
+    // 5b. Knockout path → advance winner to next round
+    if is_knockout_match && !is_draw {
         if let Err(e) = crate::infrastructure::postgres_adapter::advance_knockout_winner(
             pool,
             tourney_id,
@@ -439,8 +451,8 @@ pub async fn process_tournament_advancement(
         }
     }
 
-    // 5c. Group Knockout Phase Transition Check
-    if format == "group_knockout" {
+    // 5c. Group Knockout Phase Transition Check (only for group stage matches)
+    if format == "group_knockout" && tm.group_name.is_some() {
         // Check if all group stage matches are finished
         if let Ok(true) = crate::infrastructure::postgres_adapter::check_group_stage_completed(pool, tourney_id).await {
             // Ensure we don't generate the bracket twice
