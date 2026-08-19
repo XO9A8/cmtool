@@ -852,6 +852,12 @@ async fn get_tournament_bracket(
 // Head-to-Head Rivalry
 // ─────────────────────────────────────────────────────────────────────────────
 
+#[derive(Deserialize, Debug, Default)]
+pub struct H2hQuery {
+    pub limit: Option<i64>,
+    pub scope: Option<String>,
+}
+
 #[derive(Serialize)]
 pub struct H2hRecordResponse {
     pub player_1_id: Uuid,
@@ -873,6 +879,18 @@ pub struct H2hRecordResponse {
     pub player_2_goals: i64,
     pub avg_goal_diff: f64,
     pub recent_matches: Vec<db::H2hRecentMatch>,
+    pub player_1_overall_matches: i64,
+    pub player_1_overall_wins: i64,
+    pub player_1_overall_draws: i64,
+    pub player_1_overall_losses: i64,
+    pub player_1_overall_goals: i64,
+    pub player_2_overall_matches: i64,
+    pub player_2_overall_wins: i64,
+    pub player_2_overall_draws: i64,
+    pub player_2_overall_losses: i64,
+    pub player_2_overall_goals: i64,
+    pub scope: String,
+    pub match_limit: Option<i64>,
 }
 
 /// Returns live H2H stats from the database between two players.
@@ -880,8 +898,9 @@ async fn get_h2h_record(
     State(state): State<Arc<AppState>>,
     _auth: AuthenticatedUser,
     Path((id, opponent_id)): Path<(Uuid, Uuid)>,
+    Query(query): Query<H2hQuery>,
 ) -> Result<Json<H2hRecordResponse>, (StatusCode, Json<ApiErrorResponse>)> {
-    match db::get_h2h_record_db(&state.pool, id, opponent_id).await {
+    match db::get_h2h_record_db(&state.pool, id, opponent_id, query.limit, query.scope.as_deref()).await {
         Ok(res) => Ok(Json(H2hRecordResponse {
             player_1_id: res.player_1_id,
             player_1_name: res.player_1_name,
@@ -902,6 +921,18 @@ async fn get_h2h_record(
             player_2_goals: res.player_2_goals,
             avg_goal_diff: res.avg_goal_diff,
             recent_matches: res.recent_matches,
+            player_1_overall_matches: res.player_1_overall_matches,
+            player_1_overall_wins: res.player_1_overall_wins,
+            player_1_overall_draws: res.player_1_overall_draws,
+            player_1_overall_losses: res.player_1_overall_losses,
+            player_1_overall_goals: res.player_1_overall_goals,
+            player_2_overall_matches: res.player_2_overall_matches,
+            player_2_overall_wins: res.player_2_overall_wins,
+            player_2_overall_draws: res.player_2_overall_draws,
+            player_2_overall_losses: res.player_2_overall_losses,
+            player_2_overall_goals: res.player_2_overall_goals,
+            scope: res.scope,
+            match_limit: res.match_limit,
         })),
         Err(e) => Err(internal_error(e)),
     }

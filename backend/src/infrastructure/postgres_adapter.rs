@@ -577,14 +577,35 @@ pub struct H2hFullResult {
     pub player_2_goals: i64,
     pub avg_goal_diff: f64,
     pub recent_matches: Vec<H2hRecentMatch>,
+    pub player_1_overall_matches: i64,
+    pub player_1_overall_wins: i64,
+    pub player_1_overall_draws: i64,
+    pub player_1_overall_losses: i64,
+    pub player_1_overall_goals: i64,
+    pub player_2_overall_matches: i64,
+    pub player_2_overall_wins: i64,
+    pub player_2_overall_draws: i64,
+    pub player_2_overall_losses: i64,
+    pub player_2_overall_goals: i64,
+    pub scope: String,
+    pub match_limit: Option<i64>,
 }
 
-/// Queries historical Head-to-Head match records between two players.
+/// Queries historical Head-to-Head match records between two players with optional match limit and scope.
 pub async fn get_h2h_record_db(
     pool: &PgPool,
     p1_id: Uuid,
     p2_id: Uuid,
+    limit: Option<i64>,
+    scope: Option<&str>,
 ) -> Result<H2hFullResult, sqlx::Error> {
+    let effective_scope = match scope {
+        Some("direct") | Some("h2h") => "direct",
+        _ => "overall",
+    };
+    let is_direct = effective_scope == "direct";
+    let effective_limit = limit.unwrap_or(10000);
+
     // 1. Get Player 1 Info
     let p1_row = sqlx::query!(
         r#"
@@ -639,7 +660,7 @@ pub async fn get_h2h_record_db(
 
     let elo_delta = p1_elo - p2_elo;
 
-    // 3. Aggregate Match Records stats
+    // 3. Aggregate Direct Match Records stats (filtered by limit if specified)
     #[derive(FromRow)]
     struct StatsRow {
         total_matches: i64,
@@ -663,19 +684,34 @@ pub async fn get_h2h_record_db(
             COALESCE(SUM(CASE WHEN player_id = $1 THEN goals_for ELSE goals_against END), 0)::INT8 as p1_goals,
             COALESCE(SUM(CASE WHEN player_id = $2 THEN goals_for ELSE goals_against END), 0)::INT8 as p2_goals,
             COALESCE(AVG(ABS(goals_for - goals_against)), 0.0)::FLOAT8 as avg_goal_diff
-        FROM Match_Records
-        WHERE ((player_id = $1 AND opponent_id = $2)
-           OR  (player_id = $2 AND opponent_id = $1))
-          AND deleted_at IS NULL
-          AND (verification_status = 'approved' OR verification_status IS NULL)
+        FROM (
+            SELECT player_id, opponent_id, goals_for, goals_against
+            FROM Match_Records
+            WHERE ((player_id = $1 AND opponent_id = $2)
+               OR  (player_id = $2 AND opponent_id = $1))
+              AND deleted_at IS NULL
+              AND (verification_status = 'approved' OR verification_status IS NULL)
+            ORDER BY created_at DESC
+            LIMIT $3
+        ) sub
         "#,
     )
     .bind(p1_id)
     .bind(p2_id)
+    .bind(effective_limit)
     .fetch_one(pool)
-    .await?;
+    .await
+    .unwrap_or(StatsRow {
+        total_matches: 0,
+        p1_wins: 0,
+        draws: 0,
+        p2_wins: 0,
+        p1_goals: 0,
+        p2_goals: 0,
+        avg_goal_diff: 0.0,
+    });
 
-    // 4. Query recent matches between these two players
+    // 4. Query recent direct matches between these two players
     #[derive(FromRow)]
     struct RecentRow {
         id: Uuid,
@@ -686,6 +722,12 @@ pub async fn get_h2h_record_db(
         match_type: String,
         created_at: Option<chrono::DateTime<chrono::Utc>>,
     }
+
+    let recent_limit = if is_direct && limit.is_some() {
+        effective_limit.min(20)
+    } else {
+        10
+    };
 
     let recent_rows = sqlx::query_as::<_, RecentRow>(
         r#"
@@ -703,11 +745,12 @@ pub async fn get_h2h_record_db(
           AND deleted_at IS NULL
           AND (verification_status = 'approved' OR verification_status IS NULL)
         ORDER BY created_at DESC
-        LIMIT 10
+        LIMIT $3
         "#,
     )
     .bind(p1_id)
     .bind(p2_id)
+    .bind(recent_limit)
     .fetch_all(pool)
     .await?;
 
@@ -739,7 +782,7 @@ pub async fn get_h2h_record_db(
         })
         .collect();
 
-    // 5. Query overall match performance stats for Player 1 & Player 2
+    // 5. Query match performance stats for Player 1 & Player 2 (Direct or Overall based on scope)
     #[derive(FromRow)]
     struct PerfRow {
         possession: Option<f64>,
@@ -748,41 +791,175 @@ pub async fn get_h2h_record_db(
         defending: Option<f64>,
     }
 
-    let p1_perf = sqlx::query_as::<_, PerfRow>(
+    let (p1_perf, p2_perf) = if is_direct {
+        let p1 = sqlx::query_as::<_, PerfRow>(
+            r#"
+            SELECT
+                AVG(CASE WHEN player_id = $1 THEN possession::FLOAT8 ELSE (100.0 - possession::FLOAT8) END) as possession,
+                AVG(CASE WHEN passes_attempted > 0 THEN (passes_completed::FLOAT8 * 100.0 / passes_attempted::FLOAT8) ELSE NULL END) as passing,
+                AVG(CASE WHEN shots_total > 0 THEN (shots_on_target::FLOAT8 * 100.0 / shots_total::FLOAT8) ELSE NULL END) as shooting,
+                AVG(CASE WHEN player_id = $1 THEN (GREATEST(0.0, 10.0 - goals_against::FLOAT8) * 6.0 + LEAST(10.0, interceptions::FLOAT8) * 4.0) ELSE NULL END) as defending
+            FROM (
+                SELECT player_id, opponent_id, possession, passes_attempted, passes_completed, shots_total, shots_on_target, goals_against, interceptions
+                FROM Match_Records
+                WHERE ((player_id = $1 AND opponent_id = $2)
+                   OR  (player_id = $2 AND opponent_id = $1))
+                  AND deleted_at IS NULL
+                  AND (verification_status = 'approved' OR verification_status IS NULL)
+                ORDER BY created_at DESC
+                LIMIT $3
+            ) sub
+            "#,
+        )
+        .bind(p1_id)
+        .bind(p2_id)
+        .bind(effective_limit)
+        .fetch_one(pool)
+        .await
+        .unwrap_or(PerfRow { possession: None, passing: None, shooting: None, defending: None });
+
+        let p2 = sqlx::query_as::<_, PerfRow>(
+            r#"
+            SELECT
+                AVG(CASE WHEN player_id = $2 THEN possession::FLOAT8 ELSE (100.0 - possession::FLOAT8) END) as possession,
+                AVG(CASE WHEN passes_attempted > 0 THEN (passes_completed::FLOAT8 * 100.0 / passes_attempted::FLOAT8) ELSE NULL END) as passing,
+                AVG(CASE WHEN shots_total > 0 THEN (shots_on_target::FLOAT8 * 100.0 / shots_total::FLOAT8) ELSE NULL END) as shooting,
+                AVG(CASE WHEN player_id = $2 THEN (GREATEST(0.0, 10.0 - goals_against::FLOAT8) * 6.0 + LEAST(10.0, interceptions::FLOAT8) * 4.0) ELSE NULL END) as defending
+            FROM (
+                SELECT player_id, opponent_id, possession, passes_attempted, passes_completed, shots_total, shots_on_target, goals_against, interceptions
+                FROM Match_Records
+                WHERE ((player_id = $1 AND opponent_id = $2)
+                   OR  (player_id = $2 AND opponent_id = $1))
+                  AND deleted_at IS NULL
+                  AND (verification_status = 'approved' OR verification_status IS NULL)
+                ORDER BY created_at DESC
+                LIMIT $3
+            ) sub
+            "#,
+        )
+        .bind(p1_id)
+        .bind(p2_id)
+        .bind(effective_limit)
+        .fetch_one(pool)
+        .await
+        .unwrap_or(PerfRow { possession: None, passing: None, shooting: None, defending: None });
+
+        (p1, p2)
+    } else {
+        let p1 = sqlx::query_as::<_, PerfRow>(
+            r#"
+            SELECT
+                AVG(CASE WHEN player_id = $1 THEN possession::FLOAT8 ELSE (100.0 - possession::FLOAT8) END) as possession,
+                AVG(CASE WHEN passes_attempted > 0 THEN (passes_completed::FLOAT8 * 100.0 / passes_attempted::FLOAT8) ELSE NULL END) as passing,
+                AVG(CASE WHEN shots_total > 0 THEN (shots_on_target::FLOAT8 * 100.0 / shots_total::FLOAT8) ELSE NULL END) as shooting,
+                AVG(CASE WHEN player_id = $1 THEN (GREATEST(0.0, 10.0 - goals_against::FLOAT8) * 6.0 + LEAST(10.0, interceptions::FLOAT8) * 4.0) ELSE NULL END) as defending
+            FROM (
+                SELECT player_id, opponent_id, possession, passes_attempted, passes_completed, shots_total, shots_on_target, goals_against, interceptions
+                FROM Match_Records
+                WHERE (player_id = $1 OR opponent_id = $1)
+                  AND deleted_at IS NULL
+                  AND (verification_status = 'approved' OR verification_status IS NULL)
+                ORDER BY created_at DESC
+                LIMIT $2
+            ) sub
+            "#,
+        )
+        .bind(p1_id)
+        .bind(effective_limit)
+        .fetch_one(pool)
+        .await
+        .unwrap_or(PerfRow { possession: None, passing: None, shooting: None, defending: None });
+
+        let p2 = sqlx::query_as::<_, PerfRow>(
+            r#"
+            SELECT
+                AVG(CASE WHEN player_id = $1 THEN possession::FLOAT8 ELSE (100.0 - possession::FLOAT8) END) as possession,
+                AVG(CASE WHEN passes_attempted > 0 THEN (passes_completed::FLOAT8 * 100.0 / passes_attempted::FLOAT8) ELSE NULL END) as passing,
+                AVG(CASE WHEN shots_total > 0 THEN (shots_on_target::FLOAT8 * 100.0 / shots_total::FLOAT8) ELSE NULL END) as shooting,
+                AVG(CASE WHEN player_id = $1 THEN (GREATEST(0.0, 10.0 - goals_against::FLOAT8) * 6.0 + LEAST(10.0, interceptions::FLOAT8) * 4.0) ELSE NULL END) as defending
+            FROM (
+                SELECT player_id, opponent_id, possession, passes_attempted, passes_completed, shots_total, shots_on_target, goals_against, interceptions
+                FROM Match_Records
+                WHERE (player_id = $1 OR opponent_id = $1)
+                  AND deleted_at IS NULL
+                  AND (verification_status = 'approved' OR verification_status IS NULL)
+                ORDER BY created_at DESC
+                LIMIT $2
+            ) sub
+            "#,
+        )
+        .bind(p2_id)
+        .bind(effective_limit)
+        .fetch_one(pool)
+        .await
+        .unwrap_or(PerfRow { possession: None, passing: None, shooting: None, defending: None });
+
+        (p1, p2)
+    };
+
+    // 6. Query overall career records for both players (with match limit if specified)
+    #[derive(FromRow)]
+    struct OverallRow {
+        total_matches: i64,
+        wins: i64,
+        draws: i64,
+        losses: i64,
+        goals_for: i64,
+    }
+
+    let p1_overall = sqlx::query_as::<_, OverallRow>(
         r#"
         SELECT
-            AVG(CASE WHEN player_id = $1 THEN possession::FLOAT8 ELSE (100.0 - possession::FLOAT8) END) as possession,
-            AVG(CASE WHEN passes_attempted > 0 THEN (passes_completed::FLOAT8 * 100.0 / passes_attempted::FLOAT8) ELSE NULL END) as passing,
-            AVG(CASE WHEN shots_total > 0 THEN (shots_on_target::FLOAT8 * 100.0 / shots_total::FLOAT8) ELSE NULL END) as shooting,
-            AVG(CASE WHEN player_id = $1 THEN (GREATEST(0.0, 10.0 - goals_against::FLOAT8) * 6.0 + LEAST(10.0, interceptions::FLOAT8) * 4.0) ELSE NULL END) as defending
-        FROM Match_Records
-        WHERE (player_id = $1 OR opponent_id = $1)
-          AND deleted_at IS NULL
-          AND (verification_status = 'approved' OR verification_status IS NULL)
+            COUNT(*)::INT8 as total_matches,
+            COUNT(*) FILTER (WHERE (player_id = $1 AND goals_for > goals_against)
+                               OR  (opponent_id = $1 AND goals_against > goals_for))::INT8 as wins,
+            COUNT(*) FILTER (WHERE goals_for = goals_against)::INT8 as draws,
+            COUNT(*) FILTER (WHERE (player_id = $1 AND goals_for < goals_against)
+                               OR  (opponent_id = $1 AND goals_against < goals_for))::INT8 as losses,
+            COALESCE(SUM(CASE WHEN player_id = $1 THEN goals_for ELSE goals_against END), 0)::INT8 as goals_for
+        FROM (
+            SELECT player_id, opponent_id, goals_for, goals_against
+            FROM Match_Records
+            WHERE (player_id = $1 OR opponent_id = $1)
+              AND deleted_at IS NULL
+              AND (verification_status = 'approved' OR verification_status IS NULL)
+            ORDER BY created_at DESC
+            LIMIT $2
+        ) sub
         "#,
     )
     .bind(p1_id)
+    .bind(effective_limit)
     .fetch_one(pool)
     .await
-    .unwrap_or(PerfRow { possession: None, passing: None, shooting: None, defending: None });
+    .unwrap_or(OverallRow { total_matches: 0, wins: 0, draws: 0, losses: 0, goals_for: 0 });
 
-    let p2_perf = sqlx::query_as::<_, PerfRow>(
+    let p2_overall = sqlx::query_as::<_, OverallRow>(
         r#"
         SELECT
-            AVG(CASE WHEN player_id = $1 THEN possession::FLOAT8 ELSE (100.0 - possession::FLOAT8) END) as possession,
-            AVG(CASE WHEN passes_attempted > 0 THEN (passes_completed::FLOAT8 * 100.0 / passes_attempted::FLOAT8) ELSE NULL END) as passing,
-            AVG(CASE WHEN shots_total > 0 THEN (shots_on_target::FLOAT8 * 100.0 / shots_total::FLOAT8) ELSE NULL END) as shooting,
-            AVG(CASE WHEN player_id = $1 THEN (GREATEST(0.0, 10.0 - goals_against::FLOAT8) * 6.0 + LEAST(10.0, interceptions::FLOAT8) * 4.0) ELSE NULL END) as defending
-        FROM Match_Records
-        WHERE (player_id = $1 OR opponent_id = $1)
-          AND deleted_at IS NULL
-          AND (verification_status = 'approved' OR verification_status IS NULL)
+            COUNT(*)::INT8 as total_matches,
+            COUNT(*) FILTER (WHERE (player_id = $1 AND goals_for > goals_against)
+                               OR  (opponent_id = $1 AND goals_against > goals_for))::INT8 as wins,
+            COUNT(*) FILTER (WHERE goals_for = goals_against)::INT8 as draws,
+            COUNT(*) FILTER (WHERE (player_id = $1 AND goals_for < goals_against)
+                               OR  (opponent_id = $1 AND goals_against < goals_for))::INT8 as losses,
+            COALESCE(SUM(CASE WHEN player_id = $1 THEN goals_for ELSE goals_against END), 0)::INT8 as goals_for
+        FROM (
+            SELECT player_id, opponent_id, goals_for, goals_against
+            FROM Match_Records
+            WHERE (player_id = $1 OR opponent_id = $1)
+              AND deleted_at IS NULL
+              AND (verification_status = 'approved' OR verification_status IS NULL)
+            ORDER BY created_at DESC
+            LIMIT $2
+        ) sub
         "#,
     )
     .bind(p2_id)
+    .bind(effective_limit)
     .fetch_one(pool)
     .await
-    .unwrap_or(PerfRow { possession: None, passing: None, shooting: None, defending: None });
+    .unwrap_or(OverallRow { total_matches: 0, wins: 0, draws: 0, losses: 0, goals_for: 0 });
 
     let player_1_stats = PlayerPerformanceStats {
         possession: p1_perf.possession.unwrap_or(50.0).clamp(10.0, 100.0),
@@ -820,6 +997,18 @@ pub async fn get_h2h_record_db(
         player_2_goals: stats.p2_goals,
         avg_goal_diff: stats.avg_goal_diff,
         recent_matches,
+        player_1_overall_matches: p1_overall.total_matches,
+        player_1_overall_wins: p1_overall.wins,
+        player_1_overall_draws: p1_overall.draws,
+        player_1_overall_losses: p1_overall.losses,
+        player_1_overall_goals: p1_overall.goals_for,
+        player_2_overall_matches: p2_overall.total_matches,
+        player_2_overall_wins: p2_overall.wins,
+        player_2_overall_draws: p2_overall.draws,
+        player_2_overall_losses: p2_overall.losses,
+        player_2_overall_goals: p2_overall.goals_for,
+        scope: effective_scope.to_string(),
+        match_limit: limit,
     })
 }
 

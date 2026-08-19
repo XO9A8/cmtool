@@ -433,7 +433,15 @@ final matchPredictionProvider = FutureProvider.family<Map<String, dynamic>, Pred
 class H2hParams {
   final String p1Id;
   final String p2Id;
-  const H2hParams({required this.p1Id, required this.p2Id});
+  final int? limit;
+  final String scope; // 'direct' or 'overall'
+
+  const H2hParams({
+    required this.p1Id,
+    required this.p2Id,
+    this.limit,
+    this.scope = 'overall',
+  });
 
   @override
   bool operator ==(Object other) =>
@@ -441,15 +449,23 @@ class H2hParams {
       other is H2hParams &&
           runtimeType == other.runtimeType &&
           p1Id == other.p1Id &&
-          p2Id == other.p2Id;
+          p2Id == other.p2Id &&
+          limit == other.limit &&
+          scope == other.scope;
 
   @override
-  int get hashCode => p1Id.hashCode ^ p2Id.hashCode;
+  int get hashCode =>
+      p1Id.hashCode ^ p2Id.hashCode ^ (limit?.hashCode ?? 0) ^ scope.hashCode;
 }
 
 final h2hProvider = FutureProvider.family<Map<String, dynamic>, H2hParams>((ref, params) async {
   final client = ref.watch(apiClientProvider);
-  return client.getH2hRecord(params.p1Id, params.p2Id);
+  return client.getH2hRecord(
+    params.p1Id,
+    params.p2Id,
+    limit: params.limit,
+    scope: params.scope,
+  );
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

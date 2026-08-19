@@ -154,6 +154,8 @@ class H2hDualRadarChart extends StatelessWidget {
   final String p2Name;
   final Map<String, dynamic> p1Stats;
   final Map<String, dynamic> p2Stats;
+  final String? title;
+  final String? subtitle;
 
   const H2hDualRadarChart({
     super.key,
@@ -161,6 +163,8 @@ class H2hDualRadarChart extends StatelessWidget {
     required this.p2Name,
     required this.p1Stats,
     required this.p2Stats,
+    this.title,
+    this.subtitle,
   });
 
   @override
@@ -188,15 +192,35 @@ class H2hDualRadarChart extends StatelessWidget {
             children: [
               const Icon(Icons.radar, color: AppColors.cyan, size: 16),
               const SizedBox(width: 6),
-              Text(
-                'HEAD-TO-HEAD PERFORMANCE RADAR',
-                style: GoogleFonts.rajdhani(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.4,
-                  color: Colors.white70,
+              Expanded(
+                child: Text(
+                  title ?? 'HEAD-TO-HEAD PERFORMANCE RADAR',
+                  style: GoogleFonts.rajdhani(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.4,
+                    color: Colors.white70,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              if (subtitle != null) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    subtitle!,
+                    style: GoogleFonts.rajdhani(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.cyan,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 12),

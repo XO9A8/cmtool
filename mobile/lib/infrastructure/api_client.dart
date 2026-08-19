@@ -341,8 +341,19 @@ class ApiClient {
   }
 
   /// Fetches Head-to-Head rivalry stats between two players.
-  Future<Map<String, dynamic>> getH2hRecord(String p1Id, String p2Id) async {
-    final response = await _getWithCache('/api/v1/players/$p1Id/h2h/$p2Id');
+  Future<Map<String, dynamic>> getH2hRecord(
+    String p1Id,
+    String p2Id, {
+    int? limit,
+    String? scope,
+  }) async {
+    final response = await _getWithCache(
+      '/api/v1/players/$p1Id/h2h/$p2Id',
+      queryParameters: {
+        if (limit != null) 'limit': limit,
+        if (scope != null) 'scope': scope,
+      },
+    );
     return response.data as Map<String, dynamic>;
   }
 
