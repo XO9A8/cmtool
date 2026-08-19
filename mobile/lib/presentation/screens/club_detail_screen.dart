@@ -1385,16 +1385,41 @@ class _ActivityTab extends ConsumerWidget {
                 final oName = match['opponent_name'] ?? 'Unknown';
                 final gf = (match['goals_for'] ?? match['score_for'] ?? 0) as int;
                 final ga = (match['goals_against'] ?? match['score_against'] ?? 0) as int;
-                final isWin = gf > ga;
-                final isDraw = gf == ga;
+                final isP1Win = gf > ga;
+                final isP2Win = ga > gf;
+                final authUserId = ref.watch(authStateProvider);
+                final isUserP1 = match['player_id']?.toString() == authUserId;
+                final isUserP2 = match['opponent_id']?.toString() == authUserId;
                 final matchType = match['match_type']?.toString() ?? 'MATCH';
 
-                final resultColor = isWin
-                    ? AppColors.winGreen
-                    : isDraw
-                        ? Colors.amber
-                        : AppColors.lossRed;
-                final resultLabel = isWin ? 'WIN' : (isDraw ? 'DRAW' : 'LOSS');
+                String resultLabel;
+                Color resultColor;
+                if (isUserP1) {
+                  if (isP1Win) {
+                    resultLabel = 'WON';
+                    resultColor = AppColors.winGreen;
+                  } else if (isP2Win) {
+                    resultLabel = 'LOST';
+                    resultColor = AppColors.lossRed;
+                  } else {
+                    resultLabel = 'DRAW';
+                    resultColor = Colors.amber;
+                  }
+                } else if (isUserP2) {
+                  if (isP2Win) {
+                    resultLabel = 'WON';
+                    resultColor = AppColors.winGreen;
+                  } else if (isP1Win) {
+                    resultLabel = 'LOST';
+                    resultColor = AppColors.lossRed;
+                  } else {
+                    resultLabel = 'DRAW';
+                    resultColor = Colors.amber;
+                  }
+                } else {
+                  resultLabel = 'FT';
+                  resultColor = AppColors.cyan;
+                }
 
                 return GlassCard(
                   margin: const EdgeInsets.only(bottom: 8),
@@ -1431,10 +1456,10 @@ class _ActivityTab extends ConsumerWidget {
                               children: [
                                 Text(
                                   '$gf – $ga',
-                                  style: GoogleFonts.rajdhani(
+                                  style: GoogleFonts.orbitron(
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
-                                    color: resultColor,
+                                    color: (isUserP1 || isUserP2) ? resultColor : Colors.white,
                                   ),
                                 ),
                                 const SizedBox(width: 8),

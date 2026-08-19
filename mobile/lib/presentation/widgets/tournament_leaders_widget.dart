@@ -25,47 +25,53 @@ class TournamentLeadersWidget extends ConsumerWidget {
 
         if (standings.isEmpty) return const SizedBox.shrink();
 
+        // Only show tournament leaders if at least one match has been played in this tournament
+        final playedStandings = standings.where((s) => ((s['played'] as num?)?.toInt() ?? 0) > 0).toList();
+        if (playedStandings.isEmpty) return const SizedBox.shrink();
+
         // 1. Top Goal Scorer
-        final topScorerList = [...standings]..sort((a, b) {
+        final topScorerList = [...playedStandings]..sort((a, b) {
             final gfA = (a['goals_for'] as num?)?.toInt() ?? 0;
             final gfB = (b['goals_for'] as num?)?.toInt() ?? 0;
             return gfB.compareTo(gfA);
           });
         final topScorer = topScorerList.first;
 
-        // 2. Accurate Passer
-        final topPasserList = [...standings]..sort((a, b) {
-            final pA = (a['passes_completed'] as num?)?.toInt() ?? (((a['points'] as num?)?.toInt() ?? 0) * 15 + 40);
-            final pB = (b['passes_completed'] as num?)?.toInt() ?? (((b['points'] as num?)?.toInt() ?? 0) * 15 + 40);
+        // 2. Table Leader / Top Points
+        final topPointsList = [...playedStandings]..sort((a, b) {
+            final pA = (a['points'] as num?)?.toInt() ?? 0;
+            final pB = (b['points'] as num?)?.toInt() ?? 0;
             return pB.compareTo(pA);
           });
-        final topPasser = topPasserList.first;
+        final topPoints = topPointsList.first;
 
         // 3. Golden Glove / Best Defense (Fewest goals conceded)
-        final playedStandings = standings.where((s) => ((s['played'] as num?)?.toInt() ?? 0) > 0).toList();
-        final bestDefList = playedStandings.isNotEmpty ? [...playedStandings] : [...standings];
-        bestDefList.sort((a, b) {
-          final gaA = (a['goals_against'] as num?)?.toInt() ?? 99;
-          final gaB = (b['goals_against'] as num?)?.toInt() ?? 99;
-          return gaA.compareTo(gaB);
-        });
+        final bestDefList = [...playedStandings]..sort((a, b) {
+            final gaA = (a['goals_against'] as num?)?.toInt() ?? 99;
+            final gaB = (b['goals_against'] as num?)?.toInt() ?? 99;
+            return gaA.compareTo(gaB);
+          });
         final bestDef = bestDefList.first;
 
         // 4. Most Dominant / Highest Win Rate
-        final winRateList = playedStandings.isNotEmpty ? [...playedStandings] : [...standings];
-        winRateList.sort((a, b) {
-          final pA = (a['played'] as num?)?.toInt() ?? 1;
-          final pB = (b['played'] as num?)?.toInt() ?? 1;
-          final wA = (a['won'] as num?)?.toInt() ?? 0;
-          final wB = (b['won'] as num?)?.toInt() ?? 0;
-          final rateA = pA > 0 ? wA / pA : 0.0;
-          final rateB = pB > 0 ? wB / pB : 0.0;
-          return rateB.compareTo(rateA);
-        });
+        final winRateList = [...playedStandings]..sort((a, b) {
+            final pA = (a['played'] as num?)?.toInt() ?? 1;
+            final pB = (b['played'] as num?)?.toInt() ?? 1;
+            final wA = (a['won'] as num?)?.toInt() ?? 0;
+            final wB = (b['won'] as num?)?.toInt() ?? 0;
+            final rateA = pA > 0 ? wA / pA : 0.0;
+            final rateB = pB > 0 ? wB / pB : 0.0;
+            return rateB.compareTo(rateA);
+          });
         final topDominant = winRateList.first;
 
         final topScorerPlayed = (topScorer['played'] as num?)?.toInt() ?? 1;
         final topScorerGf = (topScorer['goals_for'] as num?)?.toInt() ?? 0;
+
+        final topPointsWon = (topPoints['won'] as num?)?.toInt() ?? 0;
+        final topPointsDrawn = (topPoints['drawn'] as num?)?.toInt() ?? 0;
+        final topPointsLost = (topPoints['lost'] as num?)?.toInt() ?? 0;
+        final topPointsVal = (topPoints['points'] as num?)?.toInt() ?? 0;
 
         final bestDefPlayed = (bestDef['played'] as num?)?.toInt() ?? 1;
         final bestDefGa = (bestDef['goals_against'] as num?)?.toInt() ?? 0;
@@ -128,12 +134,12 @@ class TournamentLeadersWidget extends ConsumerWidget {
                   ),
                   const SizedBox(width: 12),
                   _buildLeaderCard(
-                    title: 'ACCURATE PASSER',
-                    icon: Icons.alt_route,
+                    title: 'TABLE LEADER',
+                    icon: Icons.emoji_events,
                     badgeColor: AppColors.cyan,
-                    playerName: topPasser['player_name']?.toString() ?? 'Player',
-                    primaryStat: '${(88.5 + (((topPasser['points'] as num?)?.toInt() ?? 0) % 8)).toStringAsFixed(1)}% ACC',
-                    subStat: '${((topPasser['passes_completed'] as num?)?.toInt() ?? (((topPasser['points'] as num?)?.toInt() ?? 0) * 15 + 40))} Passes Comp.',
+                    playerName: topPoints['player_name']?.toString() ?? 'Player',
+                    primaryStat: '$topPointsVal PTS',
+                    subStat: '${topPointsWon}W • ${topPointsDrawn}D • ${topPointsLost}L',
                   ),
                   const SizedBox(width: 12),
                   _buildLeaderCard(

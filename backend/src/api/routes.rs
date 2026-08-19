@@ -827,10 +827,15 @@ async fn get_tournament_bracket(
                 "group_name": m.group_name,
                 "player_1_rating": m.player_1_rating,
                 "player_2_rating": m.player_2_rating,
+                "player_1_avatar": m.player_1_avatar,
+                "player_2_avatar": m.player_2_avatar,
                 "matchday_id": m.matchday_id,
                 "matchday_number": m.matchday_number,
+                "matchday_scheduled_date": m.matchday_scheduled_date,
                 "scheduled_at": m.scheduled_at,
+                "original_scheduled_at": m.original_scheduled_at,
                 "is_rescheduled": m.is_rescheduled,
+                "reschedule_reason": m.reschedule_reason,
             })
         })
         .collect();
@@ -850,12 +855,24 @@ async fn get_tournament_bracket(
 #[derive(Serialize)]
 pub struct H2hRecordResponse {
     pub player_1_id: Uuid,
+    pub player_1_name: String,
+    pub player_1_avatar: Option<String>,
+    pub player_1_elo: i32,
+    pub player_1_stats: db::PlayerPerformanceStats,
     pub player_2_id: Uuid,
+    pub player_2_name: String,
+    pub player_2_avatar: Option<String>,
+    pub player_2_elo: i32,
+    pub player_2_stats: db::PlayerPerformanceStats,
+    pub elo_delta: i32,
     pub total_matches: i64,
     pub player_1_wins: i64,
     pub draws: i64,
     pub player_2_wins: i64,
+    pub player_1_goals: i64,
+    pub player_2_goals: i64,
     pub avg_goal_diff: f64,
+    pub recent_matches: Vec<db::H2hRecentMatch>,
 }
 
 /// Returns live H2H stats from the database between two players.
@@ -865,24 +882,28 @@ async fn get_h2h_record(
     Path((id, opponent_id)): Path<(Uuid, Uuid)>,
 ) -> Result<Json<H2hRecordResponse>, (StatusCode, Json<ApiErrorResponse>)> {
     match db::get_h2h_record_db(&state.pool, id, opponent_id).await {
-        Ok(row) => Ok(Json(H2hRecordResponse {
-            player_1_id:   id,
-            player_2_id:   opponent_id,
-            total_matches: row.total_matches,
-            player_1_wins: row.p1_wins,
-            draws:         row.draws,
-            player_2_wins: row.p2_wins,
-            avg_goal_diff: row.avg_goal_diff,
+        Ok(res) => Ok(Json(H2hRecordResponse {
+            player_1_id: res.player_1_id,
+            player_1_name: res.player_1_name,
+            player_1_avatar: res.player_1_avatar,
+            player_1_elo: res.player_1_elo,
+            player_1_stats: res.player_1_stats,
+            player_2_id: res.player_2_id,
+            player_2_name: res.player_2_name,
+            player_2_avatar: res.player_2_avatar,
+            player_2_elo: res.player_2_elo,
+            player_2_stats: res.player_2_stats,
+            elo_delta: res.elo_delta,
+            total_matches: res.total_matches,
+            player_1_wins: res.player_1_wins,
+            draws: res.draws,
+            player_2_wins: res.player_2_wins,
+            player_1_goals: res.player_1_goals,
+            player_2_goals: res.player_2_goals,
+            avg_goal_diff: res.avg_goal_diff,
+            recent_matches: res.recent_matches,
         })),
-        Err(_) => Ok(Json(H2hRecordResponse {
-            player_1_id:   id,
-            player_2_id:   opponent_id,
-            total_matches: 0,
-            player_1_wins: 0,
-            draws:         0,
-            player_2_wins: 0,
-            avg_goal_diff: 0.0,
-        })),
+        Err(e) => Err(internal_error(e)),
     }
 }
 
@@ -1563,12 +1584,24 @@ async fn get_player_scheduled_matches(
                 "id": m.id,
                 "tournament_id": m.tournament_id,
                 "tournament_name": m.tournament_name,
+                "format_type": m.format_type,
                 "player_1_id": m.player_1_id,
                 "player_1_name": m.player_1_name,
+                "player_1_avatar": m.player_1_avatar,
                 "player_2_id": m.player_2_id,
                 "player_2_name": m.player_2_name,
+                "player_2_avatar": m.player_2_avatar,
                 "round_number": m.round_number,
+                "group_name": m.group_name,
                 "status": m.status,
+                "scheduled_at": m.scheduled_at.map(|t| t.to_rfc3339()),
+                "original_scheduled_at": m.original_scheduled_at.map(|t| t.to_rfc3339()),
+                "is_rescheduled": m.is_rescheduled.unwrap_or(false),
+                "reschedule_reason": m.reschedule_reason,
+                "matchday_number": m.matchday_number,
+                "matchday_scheduled_date": m.matchday_scheduled_date.map(|d| d.to_string()),
+                "start_date": m.start_date.map(|d| d.to_string()),
+                "created_at": m.created_at.map(|t| t.to_rfc3339()),
             })
         })
         .collect();

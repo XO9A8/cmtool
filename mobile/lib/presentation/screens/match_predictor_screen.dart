@@ -111,8 +111,13 @@ class _MatchPredictorScreenState extends ConsumerState<MatchPredictorScreen> {
               child: Text('Prediction API error: ${ApiClient.formatErrorMessage(err)}', style: const TextStyle(color: Colors.redAccent)),
             ),
             data: (res) {
-              final double p1Win = ((res['p1_win_probability'] ?? 0.5) as num).toDouble() * 100;
-              final double p2Win = ((res['p2_win_probability'] ?? 0.5) as num).toDouble() * 100;
+              final double p1Raw = ((res['player_1_win_prob'] ?? res['player_1_win_probability'] ?? res['p1_win_probability'] ?? 0.39) as num).toDouble();
+              final double drawRaw = ((res['draw_prob'] ?? res['draw_probability'] ?? 0.22) as num).toDouble();
+              final double p2Raw = ((res['player_2_win_prob'] ?? res['player_2_win_probability'] ?? res['p2_win_probability'] ?? 0.39) as num).toDouble();
+
+              final double p1Win = (p1Raw * 100).clamp(1.0, 98.0);
+              final double draw = (drawRaw * 100).clamp(1.0, 98.0);
+              final double p2Win = (p2Raw * 100).clamp(1.0, 98.0);
 
               return GlassCard(
                 gradientColors: const [Color(0xFF191C2B), Color(0xFF0F111A)],
@@ -121,7 +126,7 @@ class _MatchPredictorScreenState extends ConsumerState<MatchPredictorScreen> {
                 child: Column(
                   children: [
                     Text(
-                      'AI PREDICTED WIN PROBABILITY',
+                      'AI PREDICTED MATCH OUTCOME',
                       style: GoogleFonts.rajdhani(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
@@ -138,38 +143,67 @@ class _MatchPredictorScreenState extends ConsumerState<MatchPredictorScreen> {
                             Text(
                               '${p1Win.toStringAsFixed(1)}%',
                               style: GoogleFonts.rajdhani(
-                                fontSize: 36,
+                                fontSize: 32,
                                 fontWeight: FontWeight.w800,
                                 color: AppColors.primary,
                               ),
                             ),
                             const SizedBox(height: 4),
-                            Text('Player 1', style: GoogleFonts.rajdhani(fontWeight: FontWeight.w600, color: Colors.white70)),
+                            Text('Player 1 Win', style: GoogleFonts.rajdhani(fontWeight: FontWeight.w600, color: Colors.white70, fontSize: 13)),
                           ],
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.white10,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text('VS', style: GoogleFonts.orbitron(fontWeight: FontWeight.bold, color: Colors.white54)),
+                        Column(
+                          children: [
+                            Text(
+                              '${draw.toStringAsFixed(1)}%',
+                              style: GoogleFonts.rajdhani(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.amber,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text('Draw', style: GoogleFonts.rajdhani(fontWeight: FontWeight.w600, color: Colors.white54, fontSize: 13)),
+                          ],
                         ),
                         Column(
                           children: [
                             Text(
                               '${p2Win.toStringAsFixed(1)}%',
                               style: GoogleFonts.rajdhani(
-                                fontSize: 36,
+                                fontSize: 32,
                                 fontWeight: FontWeight.w800,
                                 color: AppColors.cyan,
                               ),
                             ),
                             const SizedBox(height: 4),
-                            Text('Player 2', style: GoogleFonts.rajdhani(fontWeight: FontWeight.w600, color: Colors.white70)),
+                            Text('Player 2 Win', style: GoogleFonts.rajdhani(fontWeight: FontWeight.w600, color: Colors.white70, fontSize: 13)),
                           ],
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 18),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: SizedBox(
+                        height: 8,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: (p1Win * 10).toInt(),
+                              child: Container(color: AppColors.primary),
+                            ),
+                            Expanded(
+                              flex: (draw * 10).toInt(),
+                              child: Container(color: Colors.amber.withValues(alpha: 0.8)),
+                            ),
+                            Expanded(
+                              flex: (p2Win * 10).toInt(),
+                              child: Container(color: AppColors.cyan),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),

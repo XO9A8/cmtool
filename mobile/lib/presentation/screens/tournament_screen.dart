@@ -353,6 +353,10 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
           'participant_ids': _selectedPlayerIds.toList(),
         },
       );
+      final authUserId = ref.read(authStateProvider);
+      if (authUserId != null) {
+        ref.invalidate(playerScheduledMatchesProvider(authUserId));
+      }
       widget.onCreated();
       if (mounted) Navigator.of(context).pop();
     } catch (e) {

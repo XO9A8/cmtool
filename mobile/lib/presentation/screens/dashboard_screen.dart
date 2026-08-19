@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -277,6 +275,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       color: AppColors.primary,
       backgroundColor: AppColors.surface,
       onRefresh: () async {
+        final apiClient = ref.read(apiClientProvider);
+        await apiClient.clearAllCache();
         ref.invalidate(analyticsProvider(userId));
         ref.invalidate(matchHistoryProvider(userId));
         ref.invalidate(playerScheduledMatchesProvider(userId));
@@ -341,7 +341,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   const SizedBox(height: 24),
 
                   // ── 7. Club Activity Feed ───────────────────────────────
-                  _buildActivityFeed(hasClub, clubId)
+                  _buildActivityFeed(hasClub, clubId, userId)
                       .animate()
                       .fade(delay: 400.ms, duration: 400.ms)
                       .slideY(begin: 0.05, duration: 400.ms),
@@ -727,16 +727,200 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  // ── 4. Upcoming Matches Card ──────────────────────────────────────────────
+  // ── 4. Upcoming Matches Card (Next 3 Match Dates Schedule) ───────────────
+
+  DateTime _parseMatchDate(Map<String, dynamic> m) {
+    final roundNum = (m['round_number'] as num?)?.toInt() ?? 1;
+
+    // 1. Explicit match scheduled_at
+    final schedAt = m['scheduled_at']?.toString();
+    if (schedAt != null && schedAt.isNotEmpty) {
+      try {
+        return DateTime.parse(schedAt).toLocal();
+      } catch (_) {}
+    }
+
+    // 2. Matchday scheduled_date
+    final mdDate = m['matchday_scheduled_date']?.toString();
+    if (mdDate != null && mdDate.isNotEmpty) {
+      try {
+        final d = DateTime.parse(mdDate);
+        return DateTime(d.year, d.month, d.day, 23, 59);
+      } catch (_) {}
+    }
+
+    // 3. Tournament start_date + (round_number - 1) days
+    final startDate = m['start_date']?.toString();
+    if (startDate != null && startDate.isNotEmpty) {
+      try {
+        final d = DateTime.parse(startDate).add(Duration(days: roundNum > 1 ? roundNum - 1 : 0));
+        return DateTime(d.year, d.month, d.day, 23, 59);
+      } catch (_) {}
+    }
+
+    // 4. Tournament created_at + (round_number - 1) days
+    final createdAt = m['created_at']?.toString();
+    if (createdAt != null && createdAt.isNotEmpty) {
+      try {
+        final base = DateTime.parse(createdAt).toLocal();
+        final baseDay = DateTime(base.year, base.month, base.day);
+        final d = baseDay.add(Duration(days: roundNum > 1 ? roundNum - 1 : 0));
+        return DateTime(d.year, d.month, d.day, 23, 59);
+      } catch (_) {}
+    }
+
+    // 5. Fallback relative to today by round_number
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final d = today.add(Duration(days: roundNum > 1 ? roundNum - 1 : 0));
+    return DateTime(d.year, d.month, d.day, 23, 59);
+  }
+
+  String _dateKey(DateTime dt) {
+    return '${dt.year.toString().padLeft(4, '0')}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+  }
+
+  String _formatDateHeader(DateTime dt, [Map<String, dynamic>? sampleMatch]) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final target = DateTime(dt.year, dt.month, dt.day);
+    final diffDays = target.difference(today).inDays;
+
+    const monthNames = [
+      'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
+      'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'
+    ];
+    const dayNames = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+
+    final dayName = dayNames[dt.weekday - 1];
+    final monthName = monthNames[dt.month - 1];
+
+    final mdNum = sampleMatch?['matchday_number'] ?? sampleMatch?['round_number'];
+    final mdPrefix = mdNum != null ? 'MATCHDAY $mdNum • ' : '';
+
+    if (diffDays == 0) {
+      return '${mdPrefix}TODAY • $dayName, $monthName ${dt.day}';
+    } else if (diffDays == 1) {
+      return '${mdPrefix}TOMORROW • $dayName, $monthName ${dt.day}';
+    } else {
+      return '$mdPrefix$dayName, $monthName ${dt.day}';
+    }
+  }
+
+  String _formatMatchTime(Map<String, dynamic> m) {
+    final schedAt = m['scheduled_at']?.toString();
+    if (schedAt != null && schedAt.isNotEmpty) {
+      try {
+        final dt = DateTime.parse(schedAt).toLocal();
+        final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+        final minute = dt.minute.toString().padLeft(2, '0');
+        final amPm = dt.hour >= 12 ? 'PM' : 'AM';
+        return '$hour:$minute $amPm';
+      } catch (_) {}
+    }
+    return '11:59 PM';
+  }
+
+  String _formatRoundLabel(Map<String, dynamic> m) {
+    final groupName = m['group_name']?.toString();
+    final roundNum = (m['round_number'] as num?)?.toInt() ?? 1;
+    final formatType = m['format_type']?.toString();
+
+    if (groupName != null && groupName.isNotEmpty) {
+      return '$groupName • R$roundNum';
+    }
+    if (formatType == 'knockout' || (formatType == 'group_knockout' && roundNum >= 10)) {
+      if (roundNum >= 10) return 'KNOCKOUT R$roundNum';
+      return 'ROUND $roundNum';
+    }
+    final mdNum = m['matchday_number'];
+    if (mdNum != null) return 'MATCHDAY $mdNum';
+    return 'ROUND $roundNum';
+  }
 
   Widget _buildUpcomingMatchesCard(String userId) {
     final scheduledAsync = ref.watch(playerScheduledMatchesProvider(userId));
 
     return scheduledAsync.when(
-      loading: () => const _ShimmerCard(height: 120),
+      loading: () => const _ShimmerCard(height: 140),
       error: (err, _) => _errorCard('Could not load scheduled matches'),
       data: (data) {
-        final matches = data['matches'] as List<dynamic>? ?? [];
+        final rawMatches = data['matches'] as List<dynamic>? ?? [];
+
+        if (rawMatches.isEmpty) {
+          return GlassCard(
+            borderColor: AppColors.primary.withValues(alpha: 0.5),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.calendar_month,
+                        color: AppColors.primary, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      'UPCOMING MATCHES',
+                      style: GoogleFonts.rajdhani(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.event_available,
+                        color: AppColors.textMuted, size: 26),
+                    const SizedBox(width: 10),
+                    Text(
+                      'No upcoming matches scheduled',
+                      style: GoogleFonts.rajdhani(
+                        fontSize: 14,
+                        color: AppColors.textMuted,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        }
+
+        // Sort chronologically by effective scheduled date
+        final sortedMatches = [...rawMatches]..sort((a, b) {
+            final dtA = _parseMatchDate(a);
+            final dtB = _parseMatchDate(b);
+            return dtA.compareTo(dtB);
+          });
+
+        // Group matches by calendar date key
+        final Map<String, List<dynamic>> dateGroups = {};
+        final Map<String, DateTime> dateObjects = {};
+        for (final m in sortedMatches) {
+          final dt = _parseMatchDate(m);
+          final key = _dateKey(dt);
+          dateGroups.putIfAbsent(key, () => []).add(m);
+          if (!dateObjects.containsKey(key)) {
+            dateObjects[key] = dt;
+          }
+        }
+
+        // Take the next 3 distinct scheduled dates
+        final allDateKeys = dateGroups.keys.toList();
+        final next3DateKeys = allDateKeys.take(3).toList();
+
+        // Calculate total displayed matches and remaining count
+        int displayedMatchesCount = 0;
+        for (final key in next3DateKeys) {
+          displayedMatchesCount += (dateGroups[key]?.length ?? 0);
+        }
+        final remainingCount = sortedMatches.length - displayedMatchesCount;
 
         return GlassCard(
           borderColor: AppColors.primary.withValues(alpha: 0.5),
@@ -744,13 +928,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Header
               Row(
                 children: [
                   const Icon(Icons.calendar_month,
                       color: AppColors.primary, size: 18),
                   const SizedBox(width: 8),
                   Text(
-                    'UPCOMING MATCHES',
+                    'NEXT 3 MATCH DAYS SCHEDULE',
                     style: GoogleFonts.rajdhani(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
@@ -759,93 +944,270 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ),
                   ),
                   const Spacer(),
-                  if (matches.isNotEmpty)
-                    GlowBadge(
-                      label: '${matches.length} UPCOMING',
-                      color: AppColors.cyan,
-                    ),
+                  GlowBadge(
+                    label: '$displayedMatchesCount ${displayedMatchesCount == 1 ? 'MATCH' : 'MATCHES'} (${next3DateKeys.length} ${next3DateKeys.length == 1 ? 'DAY' : 'DAYS'})',
+                    color: AppColors.cyan,
+                  ),
                 ],
               ),
               const SizedBox(height: 14),
-              if (matches.isEmpty)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.event_available,
-                        color: AppColors.textMuted, size: 28),
-                    const SizedBox(width: 10),
-                    Text(
-                      'No upcoming matches',
-                      style: GoogleFonts.rajdhani(
-                        fontSize: 14,
-                        color: AppColors.textMuted,
-                        fontWeight: FontWeight.bold,
+
+              // Iterate through the next 3 scheduled dates
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: next3DateKeys.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 14),
+                itemBuilder: (_, dateIdx) {
+                  final dateKey = next3DateKeys[dateIdx];
+                  final dayMatches = dateGroups[dateKey] ?? [];
+                  final dateDt = dateObjects[dateKey] ?? DateTime.now();
+                  final sampleMatch = dayMatches.isNotEmpty ? (dayMatches.first as Map<String, dynamic>) : null;
+                  final dateLabel = _formatDateHeader(dateDt, sampleMatch);
+
+                  return Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.03),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.07),
                       ),
                     ),
-                  ],
-                )
-              else
-                ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: math.min(matches.length, 4),
-                  separatorBuilder: (_, __) =>
-                      const Divider(color: Colors.white10, height: 16),
-                  itemBuilder: (_, idx) {
-                    final m = matches[idx];
-                    final tName =
-                        m['tournament_name']?.toString() ?? 'Tournament';
-                    final round = m['round_number'] ?? 1;
-                    final p1 = m['player_1_name']?.toString() ?? 'TBD';
-                    final p2 = m['player_2_name']?.toString() ?? 'TBD';
-
-                    return Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                tName.toUpperCase(),
-                                style: GoogleFonts.rajdhani(
-                                  fontSize: 11,
-                                  color: AppColors.cyan,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 1,
-                                ),
+                        // Date Header Strip
+                        Row(
+                          children: [
+                            Container(
+                              width: 7,
+                              height: 7,
+                              decoration: const BoxDecoration(
+                                color: AppColors.cyan,
+                                shape: BoxShape.circle,
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '$p1  vs  $p2',
-                                style: GoogleFonts.rajdhani(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceLight,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            'ROUND $round',
-                            style: GoogleFonts.rajdhani(
-                              fontSize: 11,
-                              color: AppColors.textMuted,
-                              fontWeight: FontWeight.bold,
                             ),
-                          ),
+                            const SizedBox(width: 6),
+                            Text(
+                              dateLabel,
+                              style: GoogleFonts.rajdhani(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.cyan,
+                                letterSpacing: 1.1,
+                              ),
+                            ),
+                            const Spacer(),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.cyan.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '${dayMatches.length} ${dayMatches.length == 1 ? 'MATCH' : 'MATCHES'}',
+                                style: GoogleFonts.rajdhani(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.cyan,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Matches for this specific day
+                        ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: dayMatches.length,
+                          separatorBuilder: (_, __) =>
+                              const Divider(color: Colors.white10, height: 14),
+                          itemBuilder: (_, mIdx) {
+                            final m = dayMatches[mIdx];
+                            final tName = m['tournament_name']?.toString() ??
+                                'Tournament';
+                            final roundLabel = _formatRoundLabel(m);
+                            final timeLabel = _formatMatchTime(m);
+                            final isRescheduled = m['is_rescheduled'] == true;
+
+                            final p1Id = m['player_1_id']?.toString();
+                            final p2Id = m['player_2_id']?.toString();
+                            final p1Name =
+                                m['player_1_name']?.toString() ?? 'TBD';
+                            final p2Name =
+                                m['player_2_name']?.toString() ?? 'TBD';
+                            final isUserP1 = p1Id == userId;
+                            final isUserP2 = p2Id == userId;
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Tournament + Round + Time metadata row
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        tName.toUpperCase(),
+                                        style: GoogleFonts.rajdhani(
+                                          fontSize: 11,
+                                          color: AppColors.primary,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 0.8,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    if (isRescheduled) ...[
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 5, vertical: 1.5),
+                                        margin: const EdgeInsets.only(right: 6),
+                                        decoration: BoxDecoration(
+                                          color: Colors.amber.withValues(alpha: 0.15),
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(
+                                              color: Colors.amber.withValues(alpha: 0.4)),
+                                        ),
+                                        child: Text(
+                                          'RESCHEDULED',
+                                          style: GoogleFonts.rajdhani(
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.amber,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.surfaceLight,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        roundLabel,
+                                        style: GoogleFonts.rajdhani(
+                                          fontSize: 10,
+                                          color: Colors.white70,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      timeLabel,
+                                      style: GoogleFonts.rajdhani(
+                                        fontSize: 10,
+                                        color: AppColors.textMuted,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 5),
+
+                                // Players vs Row
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        p1Name,
+                                        style: GoogleFonts.rajdhani(
+                                          fontSize: 14,
+                                          fontWeight: isUserP1
+                                              ? FontWeight.w900
+                                              : FontWeight.bold,
+                                          color: isUserP1
+                                              ? AppColors.primary
+                                              : Colors.white,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8),
+                                      child: Text(
+                                        'VS',
+                                        style: GoogleFonts.orbitron(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w900,
+                                          color: AppColors.cyan.withValues(alpha: 0.7),
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Text(
+                                        p2Name,
+                                        textAlign: TextAlign.end,
+                                        style: GoogleFonts.rajdhani(
+                                          fontSize: 14,
+                                          fontWeight: isUserP2
+                                              ? FontWeight.w900
+                                              : FontWeight.bold,
+                                          color: isUserP2
+                                              ? AppColors.primary
+                                              : Colors.white,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            );
+                          },
                         ),
                       ],
-                    );
-                  },
+                    ),
+                  );
+                },
+              ),
+
+              // Button if there are matches beyond the first 3 days
+              if (remainingCount > 0) ...[
+                const SizedBox(height: 12),
+                InkWell(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const TournamentScreen()),
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 8, horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.cyan.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                          color: AppColors.cyan.withValues(alpha: 0.2)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '+$remainingCount MORE MATCHES ON UPCOMING DATES',
+                          style: GoogleFonts.rajdhani(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.cyan,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Icon(Icons.arrow_forward_rounded,
+                            color: AppColors.cyan, size: 14),
+                      ],
+                    ),
+                  ),
                 ),
+              ],
             ],
           ),
         );
@@ -1224,7 +1586,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   // ── 7. Club Activity Feed ─────────────────────────────────────────────────
 
-  Widget _buildActivityFeed(bool hasClub, String clubId) {
+  Widget _buildActivityFeed(bool hasClub, String clubId, String userId) {
     if (!hasClub) {
       return _noClubCard(
           'CLUB ACTIVITY', 'Join a club to see activity.');
@@ -1273,15 +1635,39 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ? time.substring(0, 10)
                     : time;
 
-                final isWin = gf > ga;
-                final isLoss = gf < ga;
-                final col = isWin
-                    ? AppColors.winGreen
-                    : isLoss
-                        ? AppColors.lossRed
-                        : Colors.grey;
-                final resultLabel =
-                    isWin ? 'WIN' : (isLoss ? 'LOSS' : 'DRAW');
+                final isP1Win = gf > ga;
+                final isP2Win = ga > gf;
+                final isUserP1 = act['player_id']?.toString() == userId;
+                final isUserP2 = act['opponent_id']?.toString() == userId;
+
+                String resultLabel;
+                Color col;
+                if (isUserP1) {
+                  if (isP1Win) {
+                    resultLabel = 'WON';
+                    col = AppColors.winGreen;
+                  } else if (isP2Win) {
+                    resultLabel = 'LOST';
+                    col = AppColors.lossRed;
+                  } else {
+                    resultLabel = 'DRAW';
+                    col = Colors.amber;
+                  }
+                } else if (isUserP2) {
+                  if (isP2Win) {
+                    resultLabel = 'WON';
+                    col = AppColors.winGreen;
+                  } else if (isP1Win) {
+                    resultLabel = 'LOST';
+                    col = AppColors.lossRed;
+                  } else {
+                    resultLabel = 'DRAW';
+                    col = Colors.amber;
+                  }
+                } else {
+                  resultLabel = 'FT';
+                  col = AppColors.cyan;
+                }
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 8),
@@ -1313,7 +1699,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                matchType,
+                                matchType.toUpperCase(),
                                 style: GoogleFonts.rajdhani(
                                   fontSize: 11,
                                   color: AppColors.textMuted,

@@ -537,14 +537,46 @@ pub async fn get_club_leaderboard_db(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Head-to-Head database query result row.
-#[allow(dead_code)]
-#[derive(FromRow)]
-pub struct H2hDbResult {
+#[derive(Serialize, Clone, Debug, Default)]
+pub struct PlayerPerformanceStats {
+    pub possession: f64,
+    pub passing: f64,
+    pub shooting: f64,
+    pub defending: f64,
+    pub form: f64,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct H2hRecentMatch {
+    pub match_id: Uuid,
+    pub player_1_score: i32,
+    pub player_2_score: i32,
+    pub winner_id: Option<Uuid>,
+    pub match_type: String,
+    pub created_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct H2hFullResult {
+    pub player_1_id: Uuid,
+    pub player_1_name: String,
+    pub player_1_avatar: Option<String>,
+    pub player_1_elo: i32,
+    pub player_1_stats: PlayerPerformanceStats,
+    pub player_2_id: Uuid,
+    pub player_2_name: String,
+    pub player_2_avatar: Option<String>,
+    pub player_2_elo: i32,
+    pub player_2_stats: PlayerPerformanceStats,
+    pub elo_delta: i32,
     pub total_matches: i64,
-    pub p1_wins: i64,
+    pub player_1_wins: i64,
     pub draws: i64,
-    pub p2_wins: i64,
+    pub player_2_wins: i64,
+    pub player_1_goals: i64,
+    pub player_2_goals: i64,
     pub avg_goal_diff: f64,
+    pub recent_matches: Vec<H2hRecentMatch>,
 }
 
 /// Queries historical Head-to-Head match records between two players.
@@ -552,20 +584,90 @@ pub async fn get_h2h_record_db(
     pool: &PgPool,
     p1_id: Uuid,
     p2_id: Uuid,
-) -> Result<H2hDbResult, sqlx::Error> {
-    let row = sqlx::query_as::<_, H2hDbResult>(
+) -> Result<H2hFullResult, sqlx::Error> {
+    // 1. Get Player 1 Info
+    let p1_row = sqlx::query!(
+        r#"
+        SELECT COALESCE(NULLIF(u.full_name, ''), u.username, 'Player 1') AS name,
+               pp.avatar_graphic,
+               COALESCE(cm.skill_rating, 1000)::INT4 AS elo,
+               COALESCE(cm.form_rating, 50.0)::FLOAT8 AS form
+        FROM Users u
+        LEFT JOIN Player_Profiles pp ON u.id = pp.user_id
+        LEFT JOIN (
+            SELECT DISTINCT ON (player_id) player_id, skill_rating, form_rating
+            FROM Club_Memberships
+            ORDER BY player_id, joined_at DESC NULLS LAST
+        ) cm ON cm.player_id = u.id
+        WHERE u.id = $1
+        "#,
+        p1_id
+    )
+    .fetch_optional(pool)
+    .await?;
+
+    let p1_name = p1_row.as_ref().and_then(|r| r.name.clone()).unwrap_or_else(|| "Player 1".to_string());
+    let p1_avatar = p1_row.as_ref().and_then(|r| r.avatar_graphic.clone());
+    let p1_elo = p1_row.as_ref().and_then(|r| r.elo).unwrap_or(1000);
+    let p1_form = p1_row.as_ref().and_then(|r| r.form).unwrap_or(50.0);
+
+    // 2. Get Player 2 Info
+    let p2_row = sqlx::query!(
+        r#"
+        SELECT COALESCE(NULLIF(u.full_name, ''), u.username, 'Player 2') AS name,
+               pp.avatar_graphic,
+               COALESCE(cm.skill_rating, 1000)::INT4 AS elo,
+               COALESCE(cm.form_rating, 50.0)::FLOAT8 AS form
+        FROM Users u
+        LEFT JOIN Player_Profiles pp ON u.id = pp.user_id
+        LEFT JOIN (
+            SELECT DISTINCT ON (player_id) player_id, skill_rating, form_rating
+            FROM Club_Memberships
+            ORDER BY player_id, joined_at DESC NULLS LAST
+        ) cm ON cm.player_id = u.id
+        WHERE u.id = $1
+        "#,
+        p2_id
+    )
+    .fetch_optional(pool)
+    .await?;
+
+    let p2_name = p2_row.as_ref().and_then(|r| r.name.clone()).unwrap_or_else(|| "Player 2".to_string());
+    let p2_avatar = p2_row.as_ref().and_then(|r| r.avatar_graphic.clone());
+    let p2_elo = p2_row.as_ref().and_then(|r| r.elo).unwrap_or(1000);
+    let p2_form = p2_row.as_ref().and_then(|r| r.form).unwrap_or(50.0);
+
+    let elo_delta = p1_elo - p2_elo;
+
+    // 3. Aggregate Match Records stats
+    #[derive(FromRow)]
+    struct StatsRow {
+        total_matches: i64,
+        p1_wins: i64,
+        draws: i64,
+        p2_wins: i64,
+        p1_goals: i64,
+        p2_goals: i64,
+        avg_goal_diff: f64,
+    }
+
+    let stats = sqlx::query_as::<_, StatsRow>(
         r#"
         SELECT
-            COUNT(*) as total_matches,
+            COUNT(*)::INT8 as total_matches,
             COUNT(*) FILTER (WHERE (player_id = $1 AND goals_for > goals_against)
-                               OR  (opponent_id = $1 AND goals_against > goals_for)) as p1_wins,
-            COUNT(*) FILTER (WHERE goals_for = goals_against) as draws,
+                               OR  (opponent_id = $1 AND goals_against > goals_for))::INT8 as p1_wins,
+            COUNT(*) FILTER (WHERE goals_for = goals_against)::INT8 as draws,
             COUNT(*) FILTER (WHERE (player_id = $2 AND goals_for > goals_against)
-                               OR  (opponent_id = $2 AND goals_against > goals_for)) as p2_wins,
-            COALESCE(AVG(ABS(goals_for - goals_against)), 0.0)                       as avg_goal_diff
+                               OR  (opponent_id = $2 AND goals_against > goals_for))::INT8 as p2_wins,
+            COALESCE(SUM(CASE WHEN player_id = $1 THEN goals_for ELSE goals_against END), 0)::INT8 as p1_goals,
+            COALESCE(SUM(CASE WHEN player_id = $2 THEN goals_for ELSE goals_against END), 0)::INT8 as p2_goals,
+            COALESCE(AVG(ABS(goals_for - goals_against)), 0.0)::FLOAT8 as avg_goal_diff
         FROM Match_Records
-        WHERE (player_id = $1 AND opponent_id = $2)
-           OR (player_id = $2 AND opponent_id = $1)
+        WHERE ((player_id = $1 AND opponent_id = $2)
+           OR  (player_id = $2 AND opponent_id = $1))
+          AND deleted_at IS NULL
+          AND (verification_status = 'approved' OR verification_status IS NULL)
         "#,
     )
     .bind(p1_id)
@@ -573,7 +675,152 @@ pub async fn get_h2h_record_db(
     .fetch_one(pool)
     .await?;
 
-    Ok(row)
+    // 4. Query recent matches between these two players
+    #[derive(FromRow)]
+    struct RecentRow {
+        id: Uuid,
+        player_id: Uuid,
+        opponent_id: Uuid,
+        goals_for: i32,
+        goals_against: i32,
+        match_type: String,
+        created_at: Option<chrono::DateTime<chrono::Utc>>,
+    }
+
+    let recent_rows = sqlx::query_as::<_, RecentRow>(
+        r#"
+        SELECT
+            id,
+            player_id,
+            opponent_id,
+            goals_for::INT4 as goals_for,
+            goals_against::INT4 as goals_against,
+            match_type,
+            created_at
+        FROM Match_Records
+        WHERE ((player_id = $1 AND opponent_id = $2)
+           OR  (player_id = $2 AND opponent_id = $1))
+          AND deleted_at IS NULL
+          AND (verification_status = 'approved' OR verification_status IS NULL)
+        ORDER BY created_at DESC
+        LIMIT 10
+        "#,
+    )
+    .bind(p1_id)
+    .bind(p2_id)
+    .fetch_all(pool)
+    .await?;
+
+    let recent_matches: Vec<H2hRecentMatch> = recent_rows
+        .into_iter()
+        .map(|r| {
+            let (p1_score, p2_score) = if r.player_id == p1_id {
+                (r.goals_for, r.goals_against)
+            } else {
+                (r.goals_against, r.goals_for)
+            };
+
+            let winner_id = if p1_score > p2_score {
+                Some(p1_id)
+            } else if p2_score > p1_score {
+                Some(p2_id)
+            } else {
+                None
+            };
+
+            H2hRecentMatch {
+                match_id: r.id,
+                player_1_score: p1_score,
+                player_2_score: p2_score,
+                winner_id,
+                match_type: r.match_type,
+                created_at: r.created_at,
+            }
+        })
+        .collect();
+
+    // 5. Query overall match performance stats for Player 1 & Player 2
+    #[derive(FromRow)]
+    struct PerfRow {
+        possession: Option<f64>,
+        passing: Option<f64>,
+        shooting: Option<f64>,
+        defending: Option<f64>,
+    }
+
+    let p1_perf = sqlx::query_as::<_, PerfRow>(
+        r#"
+        SELECT
+            AVG(CASE WHEN player_id = $1 THEN possession::FLOAT8 ELSE (100.0 - possession::FLOAT8) END) as possession,
+            AVG(CASE WHEN passes_attempted > 0 THEN (passes_completed::FLOAT8 * 100.0 / passes_attempted::FLOAT8) ELSE NULL END) as passing,
+            AVG(CASE WHEN shots_total > 0 THEN (shots_on_target::FLOAT8 * 100.0 / shots_total::FLOAT8) ELSE NULL END) as shooting,
+            AVG(CASE WHEN player_id = $1 THEN (GREATEST(0.0, 10.0 - goals_against::FLOAT8) * 6.0 + LEAST(10.0, interceptions::FLOAT8) * 4.0) ELSE NULL END) as defending
+        FROM Match_Records
+        WHERE (player_id = $1 OR opponent_id = $1)
+          AND deleted_at IS NULL
+          AND (verification_status = 'approved' OR verification_status IS NULL)
+        "#,
+    )
+    .bind(p1_id)
+    .fetch_one(pool)
+    .await
+    .unwrap_or(PerfRow { possession: None, passing: None, shooting: None, defending: None });
+
+    let p2_perf = sqlx::query_as::<_, PerfRow>(
+        r#"
+        SELECT
+            AVG(CASE WHEN player_id = $1 THEN possession::FLOAT8 ELSE (100.0 - possession::FLOAT8) END) as possession,
+            AVG(CASE WHEN passes_attempted > 0 THEN (passes_completed::FLOAT8 * 100.0 / passes_attempted::FLOAT8) ELSE NULL END) as passing,
+            AVG(CASE WHEN shots_total > 0 THEN (shots_on_target::FLOAT8 * 100.0 / shots_total::FLOAT8) ELSE NULL END) as shooting,
+            AVG(CASE WHEN player_id = $1 THEN (GREATEST(0.0, 10.0 - goals_against::FLOAT8) * 6.0 + LEAST(10.0, interceptions::FLOAT8) * 4.0) ELSE NULL END) as defending
+        FROM Match_Records
+        WHERE (player_id = $1 OR opponent_id = $1)
+          AND deleted_at IS NULL
+          AND (verification_status = 'approved' OR verification_status IS NULL)
+        "#,
+    )
+    .bind(p2_id)
+    .fetch_one(pool)
+    .await
+    .unwrap_or(PerfRow { possession: None, passing: None, shooting: None, defending: None });
+
+    let player_1_stats = PlayerPerformanceStats {
+        possession: p1_perf.possession.unwrap_or(50.0).clamp(10.0, 100.0),
+        passing: p1_perf.passing.unwrap_or(75.0).clamp(10.0, 100.0),
+        shooting: p1_perf.shooting.unwrap_or(50.0).clamp(10.0, 100.0),
+        defending: p1_perf.defending.unwrap_or(60.0).clamp(10.0, 100.0),
+        form: p1_form.clamp(10.0, 100.0),
+    };
+
+    let player_2_stats = PlayerPerformanceStats {
+        possession: p2_perf.possession.unwrap_or(50.0).clamp(10.0, 100.0),
+        passing: p2_perf.passing.unwrap_or(75.0).clamp(10.0, 100.0),
+        shooting: p2_perf.shooting.unwrap_or(50.0).clamp(10.0, 100.0),
+        defending: p2_perf.defending.unwrap_or(60.0).clamp(10.0, 100.0),
+        form: p2_form.clamp(10.0, 100.0),
+    };
+
+    Ok(H2hFullResult {
+        player_1_id: p1_id,
+        player_1_name: p1_name,
+        player_1_avatar: p1_avatar,
+        player_1_elo: p1_elo,
+        player_1_stats,
+        player_2_id: p2_id,
+        player_2_name: p2_name,
+        player_2_avatar: p2_avatar,
+        player_2_elo: p2_elo,
+        player_2_stats,
+        elo_delta,
+        total_matches: stats.total_matches,
+        player_1_wins: stats.p1_wins,
+        draws: stats.draws,
+        player_2_wins: stats.p2_wins,
+        player_1_goals: stats.p1_goals,
+        player_2_goals: stats.p2_goals,
+        avg_goal_diff: stats.avg_goal_diff,
+        recent_matches,
+    })
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2112,12 +2359,24 @@ pub struct ScheduledMatchRow {
     pub id: Uuid,
     pub tournament_id: Uuid,
     pub tournament_name: String,
+    pub format_type: Option<String>,
     pub player_1_id: Option<Uuid>,
     pub player_1_name: Option<String>,
+    pub player_1_avatar: Option<String>,
     pub player_2_id: Option<Uuid>,
     pub player_2_name: Option<String>,
+    pub player_2_avatar: Option<String>,
     pub round_number: i32,
+    pub group_name: Option<String>,
     pub status: String,
+    pub scheduled_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub original_scheduled_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub is_rescheduled: Option<bool>,
+    pub reschedule_reason: Option<String>,
+    pub matchday_number: Option<i32>,
+    pub matchday_scheduled_date: Option<chrono::NaiveDate>,
+    pub start_date: Option<chrono::NaiveDate>,
+    pub created_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 pub async fn get_player_scheduled_matches(
@@ -2130,19 +2389,39 @@ pub async fn get_player_scheduled_matches(
             m.id,
             m.tournament_id,
             t.name AS tournament_name,
+            t.format_type,
             m.player_1_id,
             COALESCE(NULLIF(u1.full_name, ''), u1.username) AS player_1_name,
+            pp1.avatar_graphic AS player_1_avatar,
             m.player_2_id,
             COALESCE(NULLIF(u2.full_name, ''), u2.username) AS player_2_name,
+            pp2.avatar_graphic AS player_2_avatar,
             m.round_number::INT4 AS round_number,
-            m.status
+            m.group_name,
+            m.status,
+            m.scheduled_at,
+            m.original_scheduled_at,
+            COALESCE(m.is_rescheduled, false) AS is_rescheduled,
+            m.reschedule_reason,
+            COALESCE(md.matchday_number::INT4, m.round_number::INT4) AS matchday_number,
+            md.scheduled_date AS matchday_scheduled_date,
+            t.start_date,
+            t.created_at
         FROM T_Matches m
         INNER JOIN Tournaments t ON m.tournament_id = t.id
         LEFT JOIN Users u1 ON m.player_1_id = u1.id
         LEFT JOIN Users u2 ON m.player_2_id = u2.id
+        LEFT JOIN Player_Profiles pp1 ON u1.id = pp1.user_id
+        LEFT JOIN Player_Profiles pp2 ON u2.id = pp2.user_id
+        LEFT JOIN Matchdays md ON (m.matchday_id = md.id OR (m.tournament_id = md.tournament_id AND m.round_number = md.matchday_number))
         WHERE (m.player_1_id = $1 OR m.player_2_id = $1)
-          AND m.status = 'scheduled'
-        ORDER BY m.round_number ASC, m.created_at ASC
+          AND m.status IN ('scheduled', 'rescheduled')
+          AND t.deleted_at IS NULL
+          AND t.status NOT IN ('deleted', 'completed', 'archived', 'cancelled')
+        ORDER BY 
+            COALESCE(m.scheduled_at, (md.scheduled_date::TIMESTAMPTZ + INTERVAL '23 hours 59 minutes'), (t.start_date::TIMESTAMPTZ + (m.round_number - 1) * INTERVAL '1 day' + INTERVAL '23 hours 59 minutes'), (t.created_at::DATE::TIMESTAMPTZ + (m.round_number - 1) * INTERVAL '1 day' + INTERVAL '23 hours 59 minutes')) ASC,
+            m.round_number ASC,
+            m.created_at ASC
         "#,
     )
     .bind(player_id)
@@ -2202,10 +2481,21 @@ pub async fn delete_tournament(
     pool: &PgPool,
     tournament_id: Uuid,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query("UPDATE Tournaments SET deleted_at = NOW() WHERE id = $1")
+    sqlx::query("UPDATE Tournaments SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1")
         .bind(tournament_id)
         .execute(pool)
         .await?;
+
+    sqlx::query("DELETE FROM T_Matches WHERE tournament_id = $1")
+        .bind(tournament_id)
+        .execute(pool)
+        .await?;
+
+    sqlx::query("DELETE FROM Matchdays WHERE tournament_id = $1")
+        .bind(tournament_id)
+        .execute(pool)
+        .await?;
+
     Ok(())
 }
 

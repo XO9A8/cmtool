@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -99,37 +100,27 @@ class TournamentDetailScreen extends ConsumerStatefulWidget {
     required this.tournamentName,
     required this.formatType,
     required this.status,
-    this.isAdmin = true, // Default to true if not passed for now, though better to explicitly pass
-
+    this.isAdmin =
+        true, // Default to true if not passed for now, though better to explicitly pass
   });
 
   @override
-  ConsumerState<TournamentDetailScreen> createState() => _TournamentDetailScreenState();
+  ConsumerState<TournamentDetailScreen> createState() =>
+      _TournamentDetailScreenState();
 }
 
-class _TournamentDetailScreenState extends ConsumerState<TournamentDetailScreen> {
+class _TournamentDetailScreenState
+    extends ConsumerState<TournamentDetailScreen> {
   int _tabIndex = 0;
   // For knockout fixtures view: 0 = list, 1 = tree
   int _fixtureView = 0;
   // Track mutable status locally so admin actions update the UI
   late String _currentStatus;
-  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     _currentStatus = widget.status;
-    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
-      if (_currentStatus == 'active') {
-        _refresh();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _refreshTimer?.cancel();
-    super.dispose();
   }
 
   bool get _isKnockout => widget.formatType == 'knockout';
@@ -137,9 +128,11 @@ class _TournamentDetailScreenState extends ConsumerState<TournamentDetailScreen>
   Future<void> _refresh() async {
     final apiClient = ref.read(apiClientProvider);
     await apiClient.clearAllCache();
-    
+
     ref.invalidate(tournamentBracketProvider(widget.tournamentId));
     ref.invalidate(leagueStandingsProvider(widget.tournamentId));
+    ref.invalidate(matchdaysProvider(widget.tournamentId));
+    ref.invalidate(tournamentProgressProvider(widget.tournamentId));
     ref.invalidate(clubTournamentsProvider);
   }
 
@@ -163,13 +156,17 @@ class _TournamentDetailScreenState extends ConsumerState<TournamentDetailScreen>
               labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
               destinations: const [
                 NavigationDestination(
-                  icon: Icon(Icons.calendar_month_outlined, color: AppColors.textMuted),
-                  selectedIcon: Icon(Icons.calendar_month, color: AppColors.primary),
+                  icon: Icon(Icons.calendar_month_outlined,
+                      color: AppColors.textMuted),
+                  selectedIcon:
+                      Icon(Icons.calendar_month, color: AppColors.primary),
                   label: 'FIXTURES',
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.leaderboard_outlined, color: AppColors.textMuted),
-                  selectedIcon: Icon(Icons.leaderboard, color: AppColors.primary),
+                  icon: Icon(Icons.leaderboard_outlined,
+                      color: AppColors.textMuted),
+                  selectedIcon:
+                      Icon(Icons.leaderboard, color: AppColors.primary),
                   label: 'STANDINGS',
                 ),
                 NavigationDestination(
@@ -382,16 +379,26 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
 
   @override
   Widget build(BuildContext context) {
-    final bracketAsync = ref.watch(tournamentBracketProvider(widget.tournamentId));
+    final bracketAsync =
+        ref.watch(tournamentBracketProvider(widget.tournamentId));
     final matchdaysAsync = ref.watch(matchdaysProvider(widget.tournamentId));
-    final isKnockout = widget.formatType == 'knockout' || widget.formatType == 'group_knockout';
+    final isKnockout = widget.formatType == 'knockout' ||
+        widget.formatType == 'group_knockout';
 
-    if (bracketAsync.isLoading || matchdaysAsync.isLoading) return _buildLoading();
-    if (bracketAsync.hasError) return _buildError(bracketAsync.error.toString());
-    if (matchdaysAsync.hasError) return _buildError(matchdaysAsync.error.toString());
+    if ((bracketAsync.isLoading && !bracketAsync.hasValue) ||
+        (matchdaysAsync.isLoading && !matchdaysAsync.hasValue)) {
+      return _buildLoading();
+    }
+    if (bracketAsync.hasError && !bracketAsync.hasValue) {
+      return _buildError(bracketAsync.error.toString());
+    }
+    if (matchdaysAsync.hasError && !matchdaysAsync.hasValue) {
+      return _buildError(matchdaysAsync.error.toString());
+    }
 
     final fixtures = (bracketAsync.value?['fixtures'] as List<dynamic>? ?? []);
-    final matchdays = (matchdaysAsync.value?['matchdays'] as List<dynamic>? ?? []);
+    final matchdays =
+        (matchdaysAsync.value?['matchdays'] as List<dynamic>? ?? []);
 
     if (fixtures.isEmpty) {
       return SingleChildScrollView(
@@ -404,16 +411,34 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
     // Auto-select first matchday if not set
     if (_selectedMatchdayId == null && matchdays.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() => _selectedMatchdayId = matchdays.first['id'].toString());
+        if (mounted) {
+          setState(
+              () => _selectedMatchdayId = matchdays.first['id'].toString());
+        }
       });
     }
 
-    final filteredFixtures = fixtures.where((f) {
-      if (_selectedMatchdayId != null) {
+    // Separate rescheduled vs regular fixtures
+    final rescheduledFixtures = fixtures.where((f) {
+      final isResched = f['is_rescheduled'] == true;
+      final status = (f['status'] ?? '').toString().toLowerCase();
+      return isResched || status == 'rescheduled';
+    }).toList();
+
+    final regularFixtures = fixtures.where((f) {
+      final isResched = f['is_rescheduled'] == true;
+      final status = (f['status'] ?? '').toString().toLowerCase();
+      return !isResched && status != 'rescheduled';
+    }).toList();
+
+    final filteredRegularFixtures = regularFixtures.where((f) {
+      if (_selectedMatchdayId != null && _selectedMatchdayId != 'all') {
         return f['matchday_id']?.toString() == _selectedMatchdayId;
       }
       return true;
     }).toList();
+
+    final isTreeView = isKnockout && widget.fixtureView == 1;
 
     return CustomScrollView(
       primary: false,
@@ -426,36 +451,162 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
                 _buildViewToggle(),
                 const SizedBox(height: 16),
               ],
-              _buildMatchdaySelector(matchdays),
-              const SizedBox(height: 16),
-              if (filteredFixtures.isEmpty)
+              if (matchdays.isNotEmpty) ...[
+                _buildMatchdaySelector(matchdays),
+                const SizedBox(height: 20),
+              ],
+              if (rescheduledFixtures.isNotEmpty && !isTreeView) ...[
+                _buildRescheduledSectionHeader(rescheduledFixtures.length),
+                const SizedBox(height: 12),
+                ...rescheduledFixtures.asMap().entries.map((entry) {
+                  final idx = entry.key;
+                  final rf = entry.value;
+                  return _MatchFixtureTile(
+                    fixture: rf,
+                    tournamentId: widget.tournamentId,
+                    delay: idx * 60,
+                    totalRounds: 0,
+                    formatType: widget.formatType,
+                    isAdmin: widget.isAdmin,
+                    isRescheduledSection: true,
+                  )
+                      .animate()
+                      .fade(duration: 300.ms)
+                      .slideY(begin: 0.05, duration: 300.ms);
+                }),
+                const SizedBox(height: 20),
+              ],
+              if (!isTreeView) ...[
+                _buildRegularFixturesHeader(_selectedMatchdayId, matchdays,
+                    filteredRegularFixtures.length),
+                const SizedBox(height: 12),
+              ],
+              if (filteredRegularFixtures.isEmpty && !isTreeView)
                 _buildEmptyState()
-              else if (isKnockout && widget.fixtureView == 1)
-                _buildBracketTreeView(context, widget.formatType == 'group_knockout' 
-                    ? filteredFixtures.where((f) => ((f['round_number'] as num?)?.toInt() ?? 1) >= 10).toList() 
-                    : filteredFixtures),
+              else if (isTreeView)
+                _buildBracketTreeView(
+                    context,
+                    widget.formatType == 'group_knockout'
+                        ? fixtures
+                            .where((f) =>
+                                ((f['round_number'] as num?)?.toInt() ?? 1) >=
+                                10)
+                            .toList()
+                        : fixtures),
             ]),
           ),
         ),
-        if (filteredFixtures.isNotEmpty && !(isKnockout && widget.fixtureView == 1))
+        if (filteredRegularFixtures.isNotEmpty && !isTreeView)
           SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 16).copyWith(bottom: 16),
-            sliver: _buildFixtureListSliver(context, filteredFixtures, 0),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16).copyWith(bottom: 16),
+            sliver:
+                _buildFixtureListSliver(context, filteredRegularFixtures, 0),
           ),
       ],
     );
   }
 
+  Widget _buildRescheduledSectionHeader(int count) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: Colors.amber.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+          ),
+          child: const Icon(Icons.update, color: Colors.amber, size: 16),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          'RESCHEDULED MATCHES',
+          style: GoogleFonts.orbitron(
+            color: Colors.amber,
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.2,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          decoration: BoxDecoration(
+            color: Colors.amber.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+          ),
+          child: Text(
+            '$count',
+            style: GoogleFonts.orbitron(
+              color: Colors.amber,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
+  Widget _buildRegularFixturesHeader(
+      String? selectedMdId, List<dynamic> matchdays, int count) {
+    String title = 'MATCHES';
+    if (selectedMdId != null && selectedMdId != 'all') {
+      final md = matchdays.firstWhere((m) => m['id'].toString() == selectedMdId,
+          orElse: () => null);
+      if (md != null) {
+        title = 'MATCHDAY ${md['matchday_number']} FIXTURES';
+      }
+    } else if (selectedMdId == 'all') {
+      title = 'ALL FIXTURES';
+    }
+
+    return Row(
+      children: [
+        const Icon(Icons.sports_soccer, color: AppColors.cyan, size: 16),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: GoogleFonts.orbitron(
+            color: Colors.white,
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.2,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceLight,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.white10),
+          ),
+          child: Text(
+            '$count',
+            style: GoogleFonts.orbitron(
+              color: AppColors.textMuted,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _buildMatchdaySelector(List<dynamic> matchdays) {
     if (matchdays.isEmpty) return const SizedBox.shrink();
 
     final selectedMd = matchdays.firstWhere(
       (m) => m['id'].toString() == _selectedMatchdayId,
-      orElse: () => matchdays.first,
+      orElse: () => null,
     );
-    final dateStr = selectedMd['scheduled_date']?.toString();
+
+    final isAllSelected = _selectedMatchdayId == 'all';
+    final dateStr = selectedMd?['scheduled_date']?.toString();
     String dateLabel = 'Date TBD';
     if (dateStr != null && dateStr.isNotEmpty) {
       try {
@@ -463,112 +614,173 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
         dateLabel = '${d.day}/${d.month}/${d.year}';
       } catch (_) {}
     }
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SizedBox(
-          height: 40,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: matchdays.length,
-            itemBuilder: (context, index) {
-              final md = matchdays[index];
-              final isSelected = md['id'].toString() == _selectedMatchdayId;
-              
-              return GestureDetector(
-                onTap: () => setState(() => _selectedMatchdayId = md['id'].toString()),
-                child: Container(
-                  margin: const EdgeInsets.only(right: 8),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: isSelected ? AppColors.primary.withValues(alpha: 0.2) : AppColors.surfaceLight.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: isSelected ? AppColors.primary : Colors.white.withValues(alpha: 0.1)),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    'Matchday ${md['matchday_number']}',
-                    style: GoogleFonts.orbitron(
-                      color: isSelected ? AppColors.primary : Colors.white70,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-              );
-            },
+        // Dropdown Selector Container
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+                color: AppColors.primary.withValues(alpha: 0.35), width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.08),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-        ),
-        const SizedBox(height: 12),
-        GlassCard(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              Row(
-                children: [
-                  const Icon(Icons.calendar_today, color: AppColors.primary, size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      dateLabel,
-                      style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              const Icon(Icons.filter_list_rounded,
+                  color: AppColors.primary, size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: matchdays.any((m) =>
+                                m['id'].toString() == _selectedMatchdayId) ||
+                            isAllSelected
+                        ? _selectedMatchdayId
+                        : matchdays.first['id'].toString(),
+                    dropdownColor: AppColors.surface,
+                    icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                        color: AppColors.primary, size: 24),
+                    isExpanded: true,
+                    style: GoogleFonts.orbitron(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
                     ),
-                  ),
-                  if (widget.isAdmin)
-                    GestureDetector(
-                      onTap: () => _showRescheduleDialog(selectedMd),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.cyan.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppColors.cyan.withValues(alpha: 0.3)),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.edit_calendar, color: AppColors.cyan, size: 14),
-                            const SizedBox(width: 4),
-                            Text(
-                              'RESCHEDULE',
-                              style: GoogleFonts.rajdhani(
-                                color: AppColors.cyan,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
+                    items: [
+                      ...matchdays.map((md) {
+                        final mdId = md['id'].toString();
+                        final mdNum = md['matchday_number'];
+                        final dStr = md['scheduled_date']?.toString();
+                        String dShort = '';
+                        if (dStr != null && dStr.isNotEmpty) {
+                          try {
+                            final d = DateTime.parse(dStr);
+                            dShort = ' • ${d.day}/${d.month}/${d.year}';
+                          } catch (_) {}
+                        }
+                        return DropdownMenuItem<String>(
+                          value: mdId,
+                          child: Text(
+                            'MATCHDAY $mdNum$dShort',
+                            style: GoogleFonts.orbitron(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
                             ),
-                          ],
+                          ),
+                        );
+                      }),
+                      DropdownMenuItem<String>(
+                        value: 'all',
+                        child: Text(
+                          'ALL MATCHDAYS',
+                          style: GoogleFonts.orbitron(
+                            color: AppColors.cyan,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              const Divider(color: Colors.white10, height: 1),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildExportButton(
-                      'EXPORT FIXTURES',
-                      Icons.picture_as_pdf,
-                      () => _exportMatchday(selectedMd, false),
-                    ),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() => _selectedMatchdayId = val);
+                      }
+                    },
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildExportButton(
-                      'EXPORT RESULTS',
-                      Icons.picture_as_pdf,
-                      () => _exportMatchday(selectedMd, true),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ],
           ),
         ),
+        if (selectedMd != null) ...[
+          const SizedBox(height: 12),
+          GlassCard(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.calendar_today,
+                        color: AppColors.primary, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Scheduled: $dateLabel',
+                        style: GoogleFonts.rajdhani(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    if (widget.isAdmin)
+                      GestureDetector(
+                        onTap: () => _showRescheduleDialog(selectedMd),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.cyan.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                                color: AppColors.cyan.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.edit_calendar,
+                                  color: AppColors.cyan, size: 14),
+                              const SizedBox(width: 4),
+                              Text(
+                                'RESCHEDULE',
+                                style: GoogleFonts.rajdhani(
+                                  color: AppColors.cyan,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Divider(color: Colors.white10, height: 1),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildExportButton(
+                        'EXPORT FIXTURES',
+                        Icons.picture_as_pdf,
+                        () => _exportMatchday(selectedMd, false),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildExportButton(
+                        'EXPORT RESULTS',
+                        Icons.picture_as_pdf,
+                        () => _exportMatchday(selectedMd, true),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -606,12 +818,12 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
   Future<void> _exportMatchday(dynamic matchday, bool includeResults) async {
     try {
       final client = ref.read(apiClientProvider);
-      await client.exportMatchdayPdf(widget.tournamentId, matchday['id'].toString(), includeResults);
-      // Wait, there is no file saver here currently. We can just show a success message for now, or use path_provider and open_file to view it.
-      // Since it's a mobile app, let's just show a snackbar saying it was generated.
+      await client.exportMatchdayPdf(
+          widget.tournamentId, matchday['id'].toString(), includeResults);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('PDF Exported Successfully (Check app directory)')),
+          const SnackBar(
+              content: Text('PDF Exported Successfully (Check app directory)')),
         );
       }
     } catch (e) {
@@ -631,7 +843,7 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
         currentDate = DateTime.parse(dateStr);
       } catch (_) {}
     }
-    
+
     await showDialog(
       context: context,
       builder: (_) => RescheduleDialog(
@@ -643,19 +855,21 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
     );
   }
 
-
-
   Widget _buildEmptyState() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 16),
         child: Column(
           children: [
-            Icon(Icons.search_off, color: AppColors.textMuted.withValues(alpha: 0.5), size: 48),
+            Icon(Icons.search_off,
+                color: AppColors.textMuted.withValues(alpha: 0.5), size: 48),
             const SizedBox(height: 12),
             Text(
               'No matches found',
-              style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              style: GoogleFonts.rajdhani(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold),
             ),
           ],
         ),
@@ -674,8 +888,10 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
           side: BorderSide(color: AppColors.primary.withValues(alpha: 0.3)),
         ),
         segments: const [
-          ButtonSegment(value: 0, icon: Icon(Icons.view_list), label: Text('LIST')),
-          ButtonSegment(value: 1, icon: Icon(Icons.account_tree), label: Text('TREE')),
+          ButtonSegment(
+              value: 0, icon: Icon(Icons.view_list), label: Text('LIST')),
+          ButtonSegment(
+              value: 1, icon: Icon(Icons.account_tree), label: Text('TREE')),
         ],
         selected: {widget.fixtureView},
         onSelectionChanged: (s) => widget.onToggleView(s.first),
@@ -683,9 +899,8 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
     );
   }
 
-
-
-  Widget _buildFixtureListSliver(BuildContext context, List<dynamic> fixtures, int totalRounds) {
+  Widget _buildFixtureListSliver(
+      BuildContext context, List<dynamic> fixtures, int totalRounds) {
     final sorted = [...fixtures]..sort((a, b) {
         final rA = (a['round_number'] as num?)?.toInt() ?? 0;
         final rB = (b['round_number'] as num?)?.toInt() ?? 0;
@@ -702,13 +917,20 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
             totalRounds: totalRounds,
             formatType: widget.formatType,
             isAdmin: widget.isAdmin,
-          ).animate().fade(duration: 300.ms, delay: Duration(milliseconds: (index % 10) * 60)).slideY(begin: 0.06, duration: 300.ms, delay: Duration(milliseconds: (index % 10) * 60));
+          )
+              .animate()
+              .fade(
+                  duration: 300.ms,
+                  delay: Duration(milliseconds: (index % 10) * 60))
+              .slideY(
+                  begin: 0.06,
+                  duration: 300.ms,
+                  delay: Duration(milliseconds: (index % 10) * 60));
         },
         childCount: sorted.length,
       ),
     );
   }
-
 
   Widget _buildBracketTreeView(BuildContext context, List<dynamic> fixtures) {
     if (fixtures.isEmpty) {
@@ -756,7 +978,8 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
         child: CustomPaint(
           painter: _BracketLinesPainter(
             numRounds: numRounds,
-            matchesPerRound: sortedRounds.map((r) => roundsMap[r]?.length ?? 0).toList(),
+            matchesPerRound:
+                sortedRounds.map((r) => roundsMap[r]?.length ?? 0).toList(),
             nodeWidth: nodeWidth,
             nodeHeight: nodeHeight,
             hSpace: hSpace,
@@ -782,7 +1005,8 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
             top: y,
             width: nodeWidth,
             height: nodeHeight,
-            child: _BracketVersusPill(fixture: match, tournamentId: widget.tournamentId),
+            child: _BracketVersusPill(
+                fixture: match, tournamentId: widget.tournamentId),
           ),
         );
       }
@@ -821,16 +1045,20 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
         padding: const EdgeInsets.symmetric(vertical: 48),
         child: Column(
           children: [
-            Icon(Icons.sports_soccer, color: AppColors.textMuted.withValues(alpha: 0.3), size: 60),
+            Icon(Icons.sports_soccer,
+                color: AppColors.textMuted.withValues(alpha: 0.3), size: 60),
             const SizedBox(height: 16),
             Text(
               'No fixtures generated yet',
-              style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 16),
+              style: GoogleFonts.rajdhani(
+                  color: AppColors.textMuted, fontSize: 16),
             ),
             const SizedBox(height: 4),
             Text(
               'Start the tournament to generate fixtures',
-              style: GoogleFonts.rajdhani(color: AppColors.textMuted.withValues(alpha: 0.6), fontSize: 13),
+              style: GoogleFonts.rajdhani(
+                  color: AppColors.textMuted.withValues(alpha: 0.6),
+                  fontSize: 13),
             ),
           ],
         ),
@@ -886,6 +1114,7 @@ class _MatchFixtureTile extends ConsumerWidget {
   final int totalRounds;
   final String formatType;
   final bool isAdmin;
+  final bool isRescheduledSection;
 
   const _MatchFixtureTile({
     required this.fixture,
@@ -894,10 +1123,12 @@ class _MatchFixtureTile extends ConsumerWidget {
     required this.totalRounds,
     required this.formatType,
     required this.isAdmin,
+    this.isRescheduledSection = false,
   });
 
   String _getRoundLabel(int r, int totalRounds) {
-    if (formatType == 'knockout' || (formatType == 'group_knockout' && r >= 10)) {
+    if (formatType == 'knockout' ||
+        (formatType == 'group_knockout' && r >= 10)) {
       if (r == totalRounds && totalRounds > 0) return 'FINAL';
       if (r == totalRounds - 1 && totalRounds > 1) return 'SEMI-FINAL';
       if (r == totalRounds - 2 && totalRounds > 2) return 'QUARTER-FINAL';
@@ -906,48 +1137,40 @@ class _MatchFixtureTile extends ConsumerWidget {
     return 'MATCH DAY $r';
   }
 
-  Future<void> _showMatchRescheduleDialog(BuildContext context, WidgetRef ref, String matchId) async {
-    final date = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(2024),
-      lastDate: DateTime(2030),
-    );
-    if (date == null) return;
-
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.now(),
-    );
-    if (time == null) return;
-
-    final dt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
-    
-    // Show loading
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator(color: AppColors.cyan)),
-    );
-
+  String _formatDateTime(dynamic dtVal) {
+    if (dtVal == null) return 'TBD';
     try {
-      final client = ref.read(apiClientProvider);
-      await client.rescheduleMatch(tournamentId, matchId, dt, null);
-      if (context.mounted) {
-        Navigator.pop(context); // pop loading
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Match rescheduled successfully', style: TextStyle(color: Colors.white)), backgroundColor: AppColors.cyan),
-        );
-        ref.invalidate(tournamentBracketProvider(tournamentId));
-      }
-    } catch (e) {
-      if (context.mounted) {
-        Navigator.pop(context); // pop loading
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to reschedule match: $e', style: const TextStyle(color: Colors.white)), backgroundColor: AppColors.lossRed),
-        );
-      }
+      final dt = DateTime.parse(dtVal.toString()).toLocal();
+      final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+      final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+      final minuteStr = dt.minute.toString().padLeft(2, '0');
+      final dayStr = dt.day.toString().padLeft(2, '0');
+      final monthStr = dt.month.toString().padLeft(2, '0');
+      return '$dayStr/$monthStr/${dt.year} $h:$minuteStr $ampm';
+    } catch (_) {
+      return dtVal.toString();
     }
+  }
+
+  void _showMatchRescheduleDialog(
+      BuildContext context, WidgetRef ref, String matchId) async {
+    DateTime? currentDt;
+    final schedStr = fixture['scheduled_at']?.toString();
+    if (schedStr != null && schedStr.isNotEmpty) {
+      try {
+        currentDt = DateTime.parse(schedStr).toLocal();
+      } catch (_) {}
+    }
+
+    await showDialog(
+      context: context,
+      builder: (_) => RescheduleDialog(
+        tournamentId: tournamentId,
+        matchId: matchId,
+        currentDate: currentDt,
+        isMatchday: false,
+      ),
+    );
   }
 
   @override
@@ -956,9 +1179,13 @@ class _MatchFixtureTile extends ConsumerWidget {
     final p1Id = fixture['player_1_id']?.toString() ?? '';
     final p2Id = fixture['player_2_id']?.toString() ?? '';
     final p1Name = fixture['player_1_name']?.toString() ??
-        (p1Id.length > 8 ? p1Id.substring(0, 8) : (p1Id.isNotEmpty ? p1Id : 'TBD'));
+        (p1Id.length > 8
+            ? p1Id.substring(0, 8)
+            : (p1Id.isNotEmpty ? p1Id : 'TBD'));
     final p2Name = fixture['player_2_name']?.toString() ??
-        (p2Id.length > 8 ? p2Id.substring(0, 8) : (p2Id.isNotEmpty ? p2Id : 'TBD'));
+        (p2Id.length > 8
+            ? p2Id.substring(0, 8)
+            : (p2Id.isNotEmpty ? p2Id : 'TBD'));
     final p1Avatar = fixture['player_1_avatar']?.toString();
     final p2Avatar = fixture['player_2_avatar']?.toString();
     final round = (fixture['round_number'] as num?)?.toInt() ?? 1;
@@ -974,22 +1201,33 @@ class _MatchFixtureTile extends ConsumerWidget {
 
     final groupName = fixture['group_name']?.toString();
     final roundLabel = _getRoundLabel(round, totalRounds);
-    final isGroupMatch = formatType == 'round_robin' || (formatType == 'group_knockout' && round < 10);
-    
-    // Check if the user asked to add date and deadline:
-    // e.g. " • 11:59 PM"
-    // Since backend might not have deadline, we just hardcode the requested string if it's a group match, or always?
-    // User: "and whats the lable round 1 instead say match day also include date and deadline of 11:59 pm"
-    const dateStr = ' • 11:59 PM'; // Hardcoded deadline for now as requested
-    
-    final headerText = groupName != null && groupName.isNotEmpty && isGroupMatch
-        ? '$groupName • $roundLabel$dateStr'
-        : '$roundLabel$dateStr';
+    final isGroupMatch = formatType == 'round_robin' ||
+        (formatType == 'group_knockout' && round < 10);
+
+    final origMdNum = fixture['matchday_number'];
+    final origLabel = origMdNum != null
+        ? 'ORIGINAL: MATCHDAY $origMdNum'
+        : 'ORIGINAL: ROUND $round';
+
+    final headerText = isRescheduledSection
+        ? (groupName != null && groupName.isNotEmpty
+            ? '$groupName • $origLabel'
+            : origLabel)
+        : (groupName != null && groupName.isNotEmpty && isGroupMatch
+            ? '$groupName • $roundLabel • 11:59 PM'
+            : '$roundLabel • 11:59 PM');
+
+    final schedAt = fixture['scheduled_at'];
+    final origSchedAt =
+        fixture['original_scheduled_at'] ?? fixture['matchday_scheduled_date'];
+    final reason = fixture['reschedule_reason']?.toString();
 
     return GlassCard(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(0),
-      borderColor: AppColors.primary.withValues(alpha: 0.2),
+      borderColor: isRescheduledSection
+          ? Colors.amber.withValues(alpha: 0.35)
+          : AppColors.primary.withValues(alpha: 0.2),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1002,7 +1240,11 @@ class _MatchFixtureTile extends ConsumerWidget {
                   child: Text(
                     headerText,
                     style: GoogleFonts.rajdhani(
-                      color: groupName != null && groupName.isNotEmpty ? AppColors.cyan : AppColors.textMuted,
+                      color: isRescheduledSection
+                          ? Colors.amber
+                          : (groupName != null && groupName.isNotEmpty
+                              ? AppColors.cyan
+                              : AppColors.textMuted),
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 1.4,
@@ -1010,23 +1252,15 @@ class _MatchFixtureTile extends ConsumerWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                if (isCompleted) ...[
-                  const SizedBox(width: 8),
-                  const GlowBadge(label: 'COMPLETED', color: AppColors.winGreen),
+                if (isRescheduledSection) ...[
+                  const GlowBadge(label: 'RESCHEDULED', color: Colors.amber),
+                  const SizedBox(width: 6),
                 ],
-                const SizedBox(width: 4),
-                // Predict button
-                _IconActionButton(
-                  icon: Icons.psychology,
-                  label: 'PREDICT',
-                  color: AppColors.purple,
-                  onTap: () {
-                    final p1Rating = (fixture['player_1_rating'] as num?)?.toInt() ?? 1000;
-                    final p2Rating = (fixture['player_2_rating'] as num?)?.toInt() ?? 1000;
-                    _showPredictionSheet(context, p1Name, p2Name, p1Rating, p2Rating);
-                  },
-                ),
-                const SizedBox(width: 6),
+                if (isCompleted) ...[
+                  const GlowBadge(
+                      label: 'COMPLETED', color: AppColors.winGreen),
+                  const SizedBox(width: 6),
+                ],
                 // If fixture is completed or has match record, show DISPUTE button; else show REPORT (OCR Upload) & FORFEIT
                 if (isCompleted || (fixture['match_record_id'] != null)) ...[
                   _IconActionButton(
@@ -1034,8 +1268,10 @@ class _MatchFixtureTile extends ConsumerWidget {
                     label: 'DISPUTE',
                     color: AppColors.lossRed,
                     onTap: () {
-                      final recId = fixture['match_record_id']?.toString() ?? matchId;
-                      _showDisputeDialog(context, ref, recId, '$p1Name vs $p2Name');
+                      final recId =
+                          fixture['match_record_id']?.toString() ?? matchId;
+                      _showDisputeDialog(
+                          context, ref, recId, '$p1Name vs $p2Name');
                     },
                   ),
                 ] else ...[
@@ -1060,7 +1296,8 @@ class _MatchFixtureTile extends ConsumerWidget {
                       icon: Icons.edit_calendar,
                       label: 'RESCHEDULE',
                       color: AppColors.cyan,
-                      onTap: () => _showMatchRescheduleDialog(context, ref, matchId),
+                      onTap: () =>
+                          _showMatchRescheduleDialog(context, ref, matchId),
                     ),
                     const SizedBox(width: 6),
                   ],
@@ -1085,51 +1322,339 @@ class _MatchFixtureTile extends ConsumerWidget {
             ),
           ),
 
+          // Rescheduled metadata banner
+          if (isRescheduledSection) ...[
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.amber.withValues(alpha: 0.2)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.schedule, color: Colors.amber, size: 14),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: RichText(
+                          text: TextSpan(
+                            style: GoogleFonts.rajdhani(
+                                color: Colors.white, fontSize: 12),
+                            children: [
+                              const TextSpan(
+                                text: 'Rescheduled To: ',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.amber),
+                              ),
+                              TextSpan(
+                                text: _formatDateTime(schedAt),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white),
+                              ),
+                              if (origSchedAt != null) ...[
+                                TextSpan(
+                                  text:
+                                      '  (Was: ${_formatDateTime(origSchedAt)})',
+                                  style: const TextStyle(
+                                      color: AppColors.textMuted),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (reason != null && reason.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.notes,
+                            color: AppColors.cyan, size: 14),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Reason: $reason',
+                            style: GoogleFonts.rajdhani(
+                              color: Colors.white70,
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+
           Container(height: 1, color: Colors.white.withValues(alpha: 0.05)),
 
           // Players body
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: isCompleted
-                ? _buildResultRow(p1Name, p2Name, p1IsWinner, p2IsWinner, winnerId == null, p1Score: p1Score, p2Score: p2Score, p1Avatar: p1Avatar, p2Avatar: p2Avatar)
+                ? _buildResultRow(
+                    p1Name, p2Name, p1IsWinner, p2IsWinner, winnerId == null,
+                    p1Score: p1Score,
+                    p2Score: p2Score,
+                    p1Avatar: p1Avatar,
+                    p2Avatar: p2Avatar)
                 : _buildVsRow(p1Name, p2Name, p1Avatar, p2Avatar),
+          ),
+
+          // Integrated AI Prediction Bar inside the card
+          if (!isCompleted && p1Id.isNotEmpty && p2Id.isNotEmpty) ...[
+            _buildInlinePredictionBar(
+              (fixture['player_1_rating'] ??
+                          fixture['player_1_skill_rating'] as num?)
+                      ?.toInt() ??
+                  1000,
+              (fixture['player_2_rating'] ??
+                          fixture['player_2_skill_rating'] as num?)
+                      ?.toInt() ??
+                  1000,
+              (fixture['player_1_h2h_wins'] as num?)?.toInt() ?? 0,
+              (fixture['player_2_h2h_wins'] as num?)?.toInt() ?? 0,
+              p1Name,
+              p2Name,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Map<String, double> _calculatePrediction(int r1, int r2, int h1, int h2) {
+    final e1 = 1.0 / (1.0 + pow(10.0, (r2 - r1) / 400.0));
+    final totalH2h = (h1 + h2).toDouble();
+    final h2hBonus = totalH2h >= 3.0 ? ((h1 - h2) / totalH2h) * 0.08 : 0.0;
+    final adjE1 = (e1 + h2hBonus).clamp(0.04, 0.96);
+
+    final eloGap = (r1 - r2).abs().toDouble();
+    final drawProb = (0.24 * exp(-eloGap / 500.0)).clamp(0.06, 0.24);
+    final remaining = 1.0 - drawProb;
+
+    final p1Win = ((adjE1 * remaining) * 100).round() / 100;
+    final p2Win = (((1.0 - adjE1) * remaining) * 100).round() / 100;
+    final draw = ((1.0 - (p1Win + p2Win)) * 100).round() / 100;
+
+    return {'p1': p1Win * 100, 'draw': draw * 100, 'p2': p2Win * 100};
+  }
+
+  Widget _buildInlinePredictionBar(
+      int r1, int r2, int h1, int h2, String p1Name, String p2Name) {
+    final pred = _calculatePrediction(r1, r2, h1, h2);
+    final p1Pct = pred['p1'] ?? 39.0;
+    final drawPct = pred['draw'] ?? 22.0;
+    final p2Pct = pred['p2'] ?? 39.0;
+
+    final p1Short = p1Name.split(' ').first;
+    final p2Short = p2Name.split(' ').first;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.025),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Player 1 prediction label
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.6),
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    '$p1Short: ${p1Pct.toStringAsFixed(0)}%',
+                    style: GoogleFonts.rajdhani(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+
+              // Draw prediction label
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1.5),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  'DRAW ${drawPct.toStringAsFixed(0)}%',
+                  style: GoogleFonts.rajdhani(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.amber,
+                  ),
+                ),
+              ),
+
+              // Player 2 prediction label
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '${p2Pct.toStringAsFixed(0)}% :$p2Short',
+                    style: GoogleFonts.rajdhani(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.cyan,
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      color: AppColors.cyan,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.cyan.withValues(alpha: 0.6),
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 7),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: SizedBox(
+              height: 4.5,
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: (p1Pct * 10).toInt().clamp(1, 1000),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.5),
+                            blurRadius: 2,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 1),
+                  Expanded(
+                    flex: (drawPct * 10).toInt().clamp(1, 1000),
+                    child: Container(
+                      color: Colors.amber.withValues(alpha: 0.75),
+                    ),
+                  ),
+                  const SizedBox(width: 1),
+                  Expanded(
+                    flex: (p2Pct * 10).toInt().clamp(1, 1000),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.cyan,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.cyan.withValues(alpha: 0.5),
+                            blurRadius: 2,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildVsRow(String p1Name, String p2Name, String? p1Avatar, String? p2Avatar) {
+  Widget _buildVsRow(
+      String p1Name, String p2Name, String? p1Avatar, String? p2Avatar) {
     return Row(
       children: [
-        Expanded(child: _PlayerColumn(name: p1Name, highlight: false, avatarGraphic: p1Avatar)),
+        Expanded(
+            child: _PlayerColumn(
+                name: p1Name,
+                highlight: true,
+                color: AppColors.primary,
+                avatarGraphic: p1Avatar)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.15),
+              color: Colors.white.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
+              border:
+                  Border.all(color: Colors.white12),
             ),
             child: Text(
               'VS',
               style: GoogleFonts.orbitron(
-                color: AppColors.primary,
-                fontSize: 14,
+                color: Colors.white70,
+                fontSize: 13,
                 fontWeight: FontWeight.bold,
               ),
             ),
           ),
         ),
-        Expanded(child: _PlayerColumn(name: p2Name, highlight: false, rightAlign: true, avatarGraphic: p2Avatar)),
+        Expanded(
+            child: _PlayerColumn(
+                name: p2Name,
+                highlight: true,
+                color: AppColors.cyan,
+                rightAlign: true,
+                avatarGraphic: p2Avatar)),
       ],
     );
   }
 
-  Widget _buildResultRow(String p1Name, String p2Name, bool p1Won, bool p2Won, bool isDraw, {num? p1Score, num? p2Score, String? p1Avatar, String? p2Avatar}) {
-    Color p1Color = isDraw ? Colors.amber : (p1Won ? AppColors.winGreen : AppColors.lossRed);
-    Color p2Color = isDraw ? Colors.amber : (p2Won ? AppColors.winGreen : AppColors.lossRed);
+  Widget _buildResultRow(
+      String p1Name, String p2Name, bool p1Won, bool p2Won, bool isDraw,
+      {num? p1Score, num? p2Score, String? p1Avatar, String? p2Avatar}) {
+    Color p1Color = isDraw
+        ? Colors.amber
+        : (p1Won ? AppColors.winGreen : AppColors.lossRed);
+    Color p2Color = isDraw
+        ? Colors.amber
+        : (p2Won ? AppColors.winGreen : AppColors.lossRed);
 
     final scoreDisplay = (p1Score != null && p2Score != null)
         ? '${p1Score.toInt()} – ${p2Score.toInt()}'
@@ -1137,7 +1662,12 @@ class _MatchFixtureTile extends ConsumerWidget {
 
     return Row(
       children: [
-        Expanded(child: _PlayerColumn(name: p1Name, highlight: p1Won, color: p1Color, avatarGraphic: p1Avatar)),
+        Expanded(
+            child: _PlayerColumn(
+                name: p1Name,
+                highlight: p1Won,
+                color: p1Color,
+                avatarGraphic: p1Avatar)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Column(
@@ -1153,26 +1683,27 @@ class _MatchFixtureTile extends ConsumerWidget {
               const SizedBox(height: 2),
               Text(
                 'FT',
-                style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 10, letterSpacing: 1.5),
+                style: GoogleFonts.rajdhani(
+                    color: AppColors.textMuted,
+                    fontSize: 10,
+                    letterSpacing: 1.5),
               ),
             ],
           ),
         ),
-        Expanded(child: _PlayerColumn(name: p2Name, highlight: p2Won, color: p2Color, rightAlign: true, avatarGraphic: p2Avatar)),
+        Expanded(
+            child: _PlayerColumn(
+                name: p2Name,
+                highlight: p2Won,
+                color: p2Color,
+                rightAlign: true,
+                avatarGraphic: p2Avatar)),
       ],
     );
   }
 
-  void _showPredictionSheet(BuildContext context, String p1Name, String p2Name, int p1Rating, int p2Rating) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) => _PredictionSheet(p1Name: p1Name, p2Name: p2Name, p1Rating: p1Rating, p2Rating: p2Rating),
-    );
-  }
-
-  void _showDisputeDialog(BuildContext context, WidgetRef ref, String matchRecordId, String matchTitle) {
+  void _showDisputeDialog(BuildContext context, WidgetRef ref,
+      String matchRecordId, String matchTitle) {
     final reasonCtrl = TextEditingController();
 
     showDialog(
@@ -1183,12 +1714,15 @@ class _MatchFixtureTile extends ConsumerWidget {
           borderRadius: BorderRadius.circular(16),
           side: const BorderSide(color: AppColors.lossRed),
         ),
-        title: Text('RAISE DISPUTE', style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: Text('RAISE DISPUTE',
+            style: GoogleFonts.rajdhani(
+                color: Colors.white, fontWeight: FontWeight.bold)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Raise a formal dispute for match: $matchTitle.', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+            Text('Raise a formal dispute for match: $matchTitle.',
+                style: const TextStyle(color: Colors.white70, fontSize: 13)),
             const SizedBox(height: 16),
             TextField(
               controller: reasonCtrl,
@@ -1197,7 +1731,8 @@ class _MatchFixtureTile extends ConsumerWidget {
                 labelStyle: const TextStyle(color: Colors.white54),
                 filled: true,
                 fillColor: Colors.white.withValues(alpha: 0.05),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
               ),
               maxLines: 3,
               style: const TextStyle(color: Colors.white),
@@ -1207,7 +1742,8 @@ class _MatchFixtureTile extends ConsumerWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('CANCEL', style: TextStyle(color: Colors.white54)),
+            child:
+                const Text('CANCEL', style: TextStyle(color: Colors.white54)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.lossRed),
@@ -1225,7 +1761,8 @@ class _MatchFixtureTile extends ConsumerWidget {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Dispute raised for $matchTitle. Logged for admin review.'),
+                      content: Text(
+                          'Dispute raised for $matchTitle. Logged for admin review.'),
                       backgroundColor: AppColors.lossRed,
                     ),
                   );
@@ -1241,7 +1778,9 @@ class _MatchFixtureTile extends ConsumerWidget {
                 }
               }
             },
-            child: Text('SUBMIT DISPUTE', style: GoogleFonts.rajdhani(color: Colors.black, fontWeight: FontWeight.bold)),
+            child: Text('SUBMIT DISPUTE',
+                style: GoogleFonts.rajdhani(
+                    color: Colors.black, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -1266,25 +1805,45 @@ class _PlayerColumn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final displayColor = color ?? Colors.white;
+    final playerThemeColor = color ?? (rightAlign ? AppColors.cyan : AppColors.primary);
 
     return Column(
-      crossAxisAlignment: rightAlign ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      crossAxisAlignment:
+          rightAlign ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       children: [
-        CircleAvatar(
-          radius: 18,
-          backgroundColor: getAvatarById(avatarGraphic).gradient.first.withValues(alpha: 0.2),
-          child: Icon(
-            getAvatarById(avatarGraphic).icon,
-            size: 20,
-            color: getAvatarById(avatarGraphic).gradient.first,
+        Container(
+          padding: const EdgeInsets.all(2),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: playerThemeColor.withValues(alpha: 0.6),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: playerThemeColor.withValues(alpha: 0.15),
+                blurRadius: 6,
+              ),
+            ],
+          ),
+          child: CircleAvatar(
+            radius: 18,
+            backgroundColor: getAvatarById(avatarGraphic)
+                .gradient
+                .first
+                .withValues(alpha: 0.2),
+            child: Icon(
+              getAvatarById(avatarGraphic).icon,
+              size: 20,
+              color: getAvatarById(avatarGraphic).gradient.first,
+            ),
           ),
         ),
         const SizedBox(height: 6),
         Text(
           name,
           style: GoogleFonts.rajdhani(
-            color: highlight ? displayColor : Colors.white,
+            color: Colors.white,
             fontWeight: highlight ? FontWeight.bold : FontWeight.w500,
             fontSize: 14,
           ),
@@ -1358,9 +1917,13 @@ class _BracketVersusPill extends ConsumerWidget {
     final p1Id = fixture['player_1_id']?.toString() ?? '';
     final p2Id = fixture['player_2_id']?.toString() ?? '';
     final p1Name = fixture['player_1_name']?.toString() ??
-        (p1Id.length > 8 ? p1Id.substring(0, 8) : (p1Id.isNotEmpty ? p1Id : 'TBD'));
+        (p1Id.length > 8
+            ? p1Id.substring(0, 8)
+            : (p1Id.isNotEmpty ? p1Id : 'TBD'));
     final p2Name = fixture['player_2_name']?.toString() ??
-        (p2Id.length > 8 ? p2Id.substring(0, 8) : (p2Id.isNotEmpty ? p2Id : 'TBD'));
+        (p2Id.length > 8
+            ? p2Id.substring(0, 8)
+            : (p2Id.isNotEmpty ? p2Id : 'TBD'));
     final status = (fixture['status'] ?? 'scheduled').toString().toLowerCase();
     final winnerId = fixture['winner_player_id']?.toString();
     final isComplete = status == 'completed';
@@ -1398,7 +1961,9 @@ class _BracketVersusPill extends ConsumerWidget {
           ),
           boxShadow: [
             if (isComplete)
-              BoxShadow(color: AppColors.winGreen.withValues(alpha: 0.2), blurRadius: 8),
+              BoxShadow(
+                  color: AppColors.winGreen.withValues(alpha: 0.2),
+                  blurRadius: 8),
           ],
         ),
         child: Column(
@@ -1493,7 +2058,8 @@ class _StandingsTab extends StatelessWidget {
               borderColor: AppColors.cyan.withValues(alpha: 0.25),
               child: Column(
                 children: [
-                  const Icon(Icons.account_tree, color: AppColors.cyan, size: 40),
+                  const Icon(Icons.account_tree,
+                      color: AppColors.cyan, size: 40),
                   const SizedBox(height: 16),
                   Text(
                     'DIRECT KNOCKOUT BRACKET',
@@ -1575,7 +2141,10 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
           side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
         ),
         title: Text('START TOURNAMENT?',
-            style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+            style: GoogleFonts.rajdhani(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 18)),
         content: Text(
           'This will generate all fixtures and set the tournament to LIVE. This cannot be undone.',
           style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 15),
@@ -1583,7 +2152,8 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text('CANCEL', style: GoogleFonts.rajdhani(color: AppColors.textMuted)),
+            child: Text('CANCEL',
+                style: GoogleFonts.rajdhani(color: AppColors.textMuted)),
           ),
           EsportsButton(
             label: 'START',
@@ -1607,7 +2177,8 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Failed: ${ApiClient.formatErrorMessage(e)}', style: GoogleFonts.rajdhani()),
+          content: Text('Failed: ${ApiClient.formatErrorMessage(e)}',
+              style: GoogleFonts.rajdhani()),
           backgroundColor: AppColors.lossRed,
         ));
       }
@@ -1626,7 +2197,10 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
           side: BorderSide(color: AppColors.textMuted.withValues(alpha: 0.3)),
         ),
         title: Text('COMPLETE TOURNAMENT?',
-            style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+            style: GoogleFonts.rajdhani(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 18)),
         content: Text(
           'Mark this tournament as completed and archive it. All fixtures will be locked.',
           style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 15),
@@ -1634,7 +2208,8 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text('CANCEL', style: GoogleFonts.rajdhani(color: AppColors.textMuted)),
+            child: Text('CANCEL',
+                style: GoogleFonts.rajdhani(color: AppColors.textMuted)),
           ),
           EsportsButton(
             label: 'COMPLETE',
@@ -1659,7 +2234,8 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Failed: ${ApiClient.formatErrorMessage(e)}', style: GoogleFonts.rajdhani()),
+          content: Text('Failed: ${ApiClient.formatErrorMessage(e)}',
+              style: GoogleFonts.rajdhani()),
           backgroundColor: AppColors.lossRed,
         ));
       }
@@ -1678,7 +2254,10 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
           side: BorderSide(color: AppColors.lossRed.withValues(alpha: 0.4)),
         ),
         title: Text('DELETE TOURNAMENT?',
-            style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+            style: GoogleFonts.rajdhani(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 18)),
         content: Text(
           'This will permanently delete the tournament and all its fixtures. This action cannot be undone. Only the club owner can perform this action.',
           style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 15),
@@ -1686,7 +2265,8 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text('CANCEL', style: GoogleFonts.rajdhani(color: AppColors.textMuted)),
+            child: Text('CANCEL',
+                style: GoogleFonts.rajdhani(color: AppColors.textMuted)),
           ),
           EsportsButton(
             label: 'DELETE',
@@ -1704,18 +2284,26 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
     try {
       final client = ref.read(apiClientProvider);
       await client.deleteTournament(widget.tournamentId);
+      await client.clearAllCache();
       if (mounted) {
         ref.invalidate(clubTournamentsProvider);
+        ref.invalidate(tournamentBracketProvider(widget.tournamentId));
+        final authUserId = ref.read(authStateProvider);
+        if (authUserId != null) {
+          ref.invalidate(playerScheduledMatchesProvider(authUserId));
+        }
         Navigator.of(context).pop(); // Go back to club screen
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Tournament deleted successfully.', style: GoogleFonts.rajdhani()),
+          content: Text('Tournament deleted successfully.',
+              style: GoogleFonts.rajdhani()),
           backgroundColor: AppColors.winGreen,
         ));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Failed: ${ApiClient.formatErrorMessage(e)}', style: GoogleFonts.rajdhani()),
+          content: Text('Failed: ${ApiClient.formatErrorMessage(e)}',
+              style: GoogleFonts.rajdhani()),
           backgroundColor: AppColors.lossRed,
         ));
       }
@@ -1726,10 +2314,15 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
 
   @override
   Widget build(BuildContext context) {
-    final bracketAsync = ref.watch(tournamentBracketProvider(widget.tournamentId));
-    final fixtures = (bracketAsync.asData?.value['fixtures'] as List<dynamic>? ?? []);
+    final bracketAsync =
+        ref.watch(tournamentBracketProvider(widget.tournamentId));
+    final fixtures =
+        (bracketAsync.asData?.value['fixtures'] as List<dynamic>? ?? []);
     final totalMatches = fixtures.length;
-    final completedMatches = fixtures.where((f) => (f['status'] ?? '').toString().toLowerCase() == 'completed').length;
+    final completedMatches = fixtures
+        .where(
+            (f) => (f['status'] ?? '').toString().toLowerCase() == 'completed')
+        .length;
     final remainingMatches = totalMatches - completedMatches;
     final progress = totalMatches > 0 ? (completedMatches / totalMatches) : 0.0;
 
@@ -1744,10 +2337,14 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
       final p2Id = f['player_2_id']?.toString();
       final p2Name = f['player_2_name']?.toString() ?? 'Player';
 
-      if (p1Id != null && p1Id.isNotEmpty && p1Id != '00000000-0000-0000-0000-000000000000') {
+      if (p1Id != null &&
+          p1Id.isNotEmpty &&
+          p1Id != '00000000-0000-0000-0000-000000000000') {
         participantMap[p1Id] = p1Name;
       }
-      if (p2Id != null && p2Id.isNotEmpty && p2Id != '00000000-0000-0000-0000-000000000000') {
+      if (p2Id != null &&
+          p2Id.isNotEmpty &&
+          p2Id != '00000000-0000-0000-0000-000000000000') {
         participantMap[p2Id] = p2Name;
       }
     }
@@ -1755,9 +2352,13 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
     final isDraft = widget.status == 'draft' || widget.status == 'scheduled';
     final isActive = widget.status == 'active';
     final isKnockout = widget.formatType == 'knockout';
-    final participantCount = participantMap.isNotEmpty ? participantMap.length : null;
+    final participantCount =
+        participantMap.isNotEmpty ? participantMap.length : null;
 
-    final isDoubleRoundRobin = !isKnockout && participantCount != null && participantCount > 1 && maxRounds >= (participantCount - 1) * 2;
+    final isDoubleRoundRobin = !isKnockout &&
+        participantCount != null &&
+        participantCount > 1 &&
+        maxRounds >= (participantCount - 1) * 2;
 
     return SingleChildScrollView(
       primary: false,
@@ -1791,7 +2392,9 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
                           Text(
                             widget.formatType == 'group_knockout'
                                 ? 'Group Stage + Knockout Tournament'
-                                : (isKnockout ? 'Direct Knockout Tournament' : 'League Round-Robin Tournament'),
+                                : (isKnockout
+                                    ? 'Direct Knockout Tournament'
+                                    : 'League Round-Robin Tournament'),
                             style: GoogleFonts.rajdhani(
                               color: AppColors.textMuted,
                               fontSize: 13,
@@ -1815,7 +2418,9 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
                       child: _infoMetricTile(
                         icon: Icons.group_outlined,
                         label: 'PARTICIPANTS',
-                        value: participantCount != null ? '$participantCount' : 'TBD',
+                        value: participantCount != null
+                            ? '$participantCount'
+                            : 'TBD',
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -1839,14 +2444,19 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
                       child: _infoMetricTile(
                         icon: Icons.pie_chart_outline,
                         label: 'PROGRESS',
-                        value: totalMatches > 0 ? '${(progress * 100).round()}%' : '0%',
+                        value: totalMatches > 0
+                            ? '${(progress * 100).round()}%'
+                            : '0%',
                       ),
                     ),
                   ],
                 ),
               ],
             ),
-          ).animate().fade(duration: 300.ms).slideY(begin: 0.06, duration: 300.ms),
+          )
+              .animate()
+              .fade(duration: 300.ms)
+              .slideY(begin: 0.06, duration: 300.ms),
 
           const SizedBox(height: 16),
 
@@ -1893,21 +2503,27 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
                   Row(
                     children: [
                       Expanded(
-                        child: _subStatBox('COMPLETED', '$completedMatches', AppColors.winGreen),
+                        child: _subStatBox('COMPLETED', '$completedMatches',
+                            AppColors.winGreen),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: _subStatBox('REMAINING', '$remainingMatches', AppColors.cyan),
+                        child: _subStatBox(
+                            'REMAINING', '$remainingMatches', AppColors.cyan),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: _subStatBox('TOTAL', '$totalMatches', Colors.white70),
+                        child: _subStatBox(
+                            'TOTAL', '$totalMatches', Colors.white70),
                       ),
                     ],
                   ),
                 ],
               ),
-            ).animate().fade(duration: 300.ms, delay: 60.ms).slideY(begin: 0.06, duration: 300.ms, delay: 60.ms),
+            )
+                .animate()
+                .fade(duration: 300.ms, delay: 60.ms)
+                .slideY(begin: 0.06, duration: 300.ms, delay: 60.ms),
             const SizedBox(height: 16),
           ],
 
@@ -1932,23 +2548,32 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
                   'Encounters Per Pairing',
                   isKnockout
                       ? 'Single Elimination'
-                      : (isDoubleRoundRobin ? 'Double Round-Robin (Home & Away)' : 'Single Round-Robin (1 Match)'),
+                      : (isDoubleRoundRobin
+                          ? 'Double Round-Robin (Home & Away)'
+                          : 'Single Round-Robin (1 Match)'),
                 ),
                 const SizedBox(height: 10),
                 _ruleRow(
                   Icons.scoreboard_outlined,
                   'Points System',
-                  isKnockout ? 'Winner Advances' : 'Win: 3 Pts | Draw: 1 Pt | Loss: 0 Pts',
+                  isKnockout
+                      ? 'Winner Advances'
+                      : 'Win: 3 Pts | Draw: 1 Pt | Loss: 0 Pts',
                 ),
                 const SizedBox(height: 10),
                 _ruleRow(
                   Icons.equalizer,
                   'Standings Ranking',
-                  isKnockout ? 'Bracket Progression' : 'Points → Goal Diff → Goals For → Wins',
+                  isKnockout
+                      ? 'Bracket Progression'
+                      : 'Points → Goal Diff → Goals For → Wins',
                 ),
               ],
             ),
-          ).animate().fade(duration: 300.ms, delay: 100.ms).slideY(begin: 0.06, duration: 300.ms, delay: 100.ms),
+          )
+              .animate()
+              .fade(duration: 300.ms, delay: 100.ms)
+              .slideY(begin: 0.06, duration: 300.ms, delay: 100.ms),
 
           const SizedBox(height: 16),
 
@@ -1967,12 +2592,15 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: (isDraft ? AppColors.winGreen : AppColors.primary).withValues(alpha: 0.15),
+                          color:
+                              (isDraft ? AppColors.winGreen : AppColors.primary)
+                                  .withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Icon(
                           Icons.admin_panel_settings,
-                          color: isDraft ? AppColors.winGreen : AppColors.primary,
+                          color:
+                              isDraft ? AppColors.winGreen : AppColors.primary,
                           size: 20,
                         ),
                       ),
@@ -2003,12 +2631,14 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  Divider(color: Colors.white.withValues(alpha: 0.08), height: 1),
+                  Divider(
+                      color: Colors.white.withValues(alpha: 0.08), height: 1),
                   const SizedBox(height: 16),
                   if (isDraft) ...[
                     Text(
                       'Generating fixtures will lock participating players and set the status to LIVE.',
-                      style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 13),
+                      style: GoogleFonts.rajdhani(
+                          color: AppColors.textMuted, fontSize: 13),
                     ),
                     const SizedBox(height: 14),
                     EsportsButton(
@@ -2023,7 +2653,8 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
                   if (isActive) ...[
                     Text(
                       'Marking complete will finalize final standings and lock all match results.',
-                      style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 13),
+                      style: GoogleFonts.rajdhani(
+                          color: AppColors.textMuted, fontSize: 13),
                     ),
                     const SizedBox(height: 14),
                     EsportsButton(
@@ -2036,16 +2667,21 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
                     ),
                   ],
                   const SizedBox(height: 16),
-                  Divider(color: Colors.white.withValues(alpha: 0.08), height: 1),
+                  Divider(
+                      color: Colors.white.withValues(alpha: 0.08), height: 1),
                   const SizedBox(height: 16),
                   Text(
                     'DANGER ZONE',
-                    style: GoogleFonts.rajdhani(color: AppColors.lossRed, fontSize: 13, fontWeight: FontWeight.bold),
+                    style: GoogleFonts.rajdhani(
+                        color: AppColors.lossRed,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Permanently remove this tournament (Club Owners only).',
-                    style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 13),
+                    style: GoogleFonts.rajdhani(
+                        color: AppColors.textMuted, fontSize: 13),
                   ),
                   const SizedBox(height: 14),
                   EsportsButton(
@@ -2058,14 +2694,18 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
                   ),
                 ],
               ),
-            ).animate().fade(duration: 300.ms, delay: 140.ms).slideY(begin: 0.06, duration: 300.ms, delay: 140.ms),
+            )
+                .animate()
+                .fade(duration: 300.ms, delay: 140.ms)
+                .slideY(begin: 0.06, duration: 300.ms, delay: 140.ms),
           ],
         ],
       ),
     );
   }
 
-  Widget _infoMetricTile({required IconData icon, required String label, required String value}) {
+  Widget _infoMetricTile(
+      {required IconData icon, required String label, required String value}) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
       decoration: BoxDecoration(
@@ -2160,165 +2800,6 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
               ),
             ],
           ),
-        ),
-      ],
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// AI Prediction Bottom Sheet
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _PredictionSheet extends ConsumerWidget {
-  final String p1Name;
-  final String p2Name;
-  final int p1Rating;
-  final int p2Rating;
-
-  const _PredictionSheet({required this.p1Name, required this.p2Name, required this.p1Rating, required this.p2Rating});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final params = PredictParams(p1Rating: p1Rating, p2Rating: p2Rating);
-    final predAsync = ref.watch(matchPredictionProvider(params));
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: const Border(top: BorderSide(color: AppColors.purple, width: 2)),
-      ),
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Handle
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 20),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.psychology, color: AppColors.purple, size: 22),
-              const SizedBox(width: 8),
-              Text(
-                'AI MATCH PREDICTION',
-                style: GoogleFonts.rajdhani(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.5,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-
-          predAsync.when(
-            loading: () => const Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 32),
-                child: CircularProgressIndicator(color: AppColors.purple),
-              ),
-            ),
-            error: (e, _) => Text(
-              'Prediction Engine Offline: $e',
-              style: GoogleFonts.rajdhani(color: AppColors.lossRed, fontSize: 14),
-            ),
-            data: (data) {
-              final p1Win = (data['player_1_win_probability'] as num?)?.toDouble() ?? 0.0;
-              final draw = (data['draw_probability'] as num?)?.toDouble() ?? 0.0;
-              final p2Win = (data['player_2_win_probability'] as num?)?.toDouble() ?? 0.0;
-
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: _ProbabilityColumn(name: p1Name, label: 'WIN', prob: p1Win, color: AppColors.winGreen)),
-                  Expanded(child: _ProbabilityColumn(name: 'DRAW', label: '–', prob: draw, color: Colors.amber)),
-                  Expanded(child: _ProbabilityColumn(name: p2Name, label: 'WIN', prob: p2Win, color: AppColors.lossRed)),
-                ],
-              );
-            },
-          ),
-
-          const SizedBox(height: 24),
-        ],
-      ),
-    ).animate().slideY(begin: 0.15, duration: 350.ms, curve: Curves.easeOut).fade(duration: 300.ms);
-  }
-}
-
-class _ProbabilityColumn extends StatelessWidget {
-  final String name;
-  final String label;
-  final double prob;
-  final Color color;
-
-  const _ProbabilityColumn({
-    required this.name,
-    required this.label,
-    required this.prob,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          '${(prob * 100).toStringAsFixed(1)}%',
-          style: GoogleFonts.orbitron(
-            color: color,
-            fontSize: 26,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 8),
-        // Bar
-        Container(
-          height: 4,
-          margin: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(2),
-            color: AppColors.surfaceLight,
-          ),
-          child: FractionallySizedBox(
-            widthFactor: prob.clamp(0.0, 1.0),
-            alignment: Alignment.centerLeft,
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(2),
-                color: color,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: GoogleFonts.rajdhani(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 13,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        Text(
-          label,
-          style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 10, letterSpacing: 1),
         ),
       ],
     );

@@ -102,7 +102,7 @@ class _NavigationRootScreenState extends State<NavigationRootScreen> {
     DashboardScreen(),
     TournamentScreen(),
     ClubsScreen(),
-    AnalyticsHubScreen(),
+    H2hScreen(),
   ];
 
   @override
@@ -265,9 +265,9 @@ class _NavigationRootScreenState extends State<NavigationRootScreen> {
               label: 'Clubs',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.insights_outlined),
-              activeIcon: Icon(Icons.insights),
-              label: 'Analytics & H2H',
+              icon: Icon(Icons.compare_arrows_outlined),
+              activeIcon: Icon(Icons.compare_arrows),
+              label: 'H2H',
             ),
           ],
         ),
@@ -276,52 +276,3 @@ class _NavigationRootScreenState extends State<NavigationRootScreen> {
   }
 }
 
-class AnalyticsHubScreen extends StatefulWidget {
-  const AnalyticsHubScreen({super.key});
-
-  @override
-  State<AnalyticsHubScreen> createState() => _AnalyticsHubScreenState();
-}
-
-class _AnalyticsHubScreenState extends State<AnalyticsHubScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabCtrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabCtrl = TabController(length: 2, vsync: this);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          color: AppColors.surface,
-          child: TabBar(
-            controller: _tabCtrl,
-            indicatorColor: AppColors.primary,
-            indicatorWeight: 3,
-            labelColor: AppColors.primary,
-            unselectedLabelColor: AppColors.textMuted,
-            labelStyle: GoogleFonts.rajdhani(fontWeight: FontWeight.bold, fontSize: 13),
-            tabs: const [
-              Tab(icon: Icon(Icons.compare_arrows, size: 18), text: 'H2H RIVALRY'),
-              Tab(icon: Icon(Icons.person, size: 18), text: 'PROFILE & BADGES'),
-            ],
-          ),
-        ),
-        Expanded(
-          child: TabBarView(
-            controller: _tabCtrl,
-            children: const [
-              H2hScreen(),
-              PlayerProfileScreen(),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}

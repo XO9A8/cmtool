@@ -325,7 +325,7 @@ class ApiClient {
 
   /// Fetches scheduled matches for a player.
   Future<Map<String, dynamic>> getPlayerScheduledMatches(String playerId) async {
-    final response = await _getWithCache('/api/v1/players/$playerId/scheduled-matches');
+    final response = await _dio.get('/api/v1/players/$playerId/scheduled-matches');
     return response.data as Map<String, dynamic>;
   }
 

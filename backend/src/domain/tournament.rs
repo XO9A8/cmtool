@@ -322,6 +322,12 @@ pub struct MatchPrediction {
     pub expected_score_p1: f64,
     /// Raw expected score for Player 2.
     pub expected_score_p2: f64,
+    #[serde(default)]
+    pub player_1_win_probability: f64,
+    #[serde(default)]
+    pub draw_probability: f64,
+    #[serde(default)]
+    pub player_2_win_probability: f64,
 }
 
 /// Calculates predicted match probabilities combining expected Elo scores and historical H2H records.
@@ -334,29 +340,37 @@ pub fn predict_match_outcome(
     let r1 = p1_rating as f64;
     let r2 = p2_rating as f64;
 
+    // Standard Elo expected outcome: e1 = 1 / (1 + 10^((r2 - r1)/400))
     let e1 = 1.0 / (1.0 + 10.0_f64.powf((r2 - r1) / 400.0));
     let e2 = 1.0 - e1;
 
     let total_h2h = (h2h_p1_wins + h2h_p2_wins) as f64;
     let h2h_bonus = if total_h2h >= 3.0 {
-        ((h2h_p1_wins as f64 - h2h_p2_wins as f64) / total_h2h) * 0.05
+        ((h2h_p1_wins as f64 - h2h_p2_wins as f64) / total_h2h) * 0.08
     } else {
         0.0
     };
 
-    let adj_e1 = (e1 + h2h_bonus).clamp(0.05, 0.95);
-    let draw_prob = 0.22; // Base draw probability in eFootball matches
+    let adj_e1 = (e1 + h2h_bonus).clamp(0.04, 0.96);
+
+    // Dynamic draw probability: higher when ratings are even, lower when there is a large gap
+    let elo_gap = (r1 - r2).abs();
+    let draw_prob = (0.24 * (-elo_gap / 500.0).exp()).clamp(0.06, 0.24);
 
     let remaining_prob = 1.0 - draw_prob;
     let player_1_win_prob = (adj_e1 * remaining_prob * 100.0).round() / 100.0;
-    let player_2_win_prob = ((1.0 - adj_e1) * remaining_prob * 100.0).round() / 100.0;
+    let player_2_win_prob = (((1.0 - adj_e1) * remaining_prob) * 100.0).round() / 100.0;
+    let draw_prob_rounded = ((1.0 - (player_1_win_prob + player_2_win_prob)) * 100.0).round() / 100.0;
 
     MatchPrediction {
         player_1_win_prob,
-        draw_prob: (draw_prob * 100.0).round() / 100.0,
+        draw_prob: draw_prob_rounded,
         player_2_win_prob,
-        expected_score_p1: e1,
-        expected_score_p2: e2,
+        expected_score_p1: (e1 * 1000.0).round() / 1000.0,
+        expected_score_p2: (e2 * 1000.0).round() / 1000.0,
+        player_1_win_probability: player_1_win_prob,
+        draw_probability: draw_prob_rounded,
+        player_2_win_probability: player_2_win_prob,
     }
 }
 

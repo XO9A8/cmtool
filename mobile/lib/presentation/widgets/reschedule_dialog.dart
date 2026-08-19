@@ -131,6 +131,10 @@ class _RescheduleDialogState extends ConsumerState<RescheduleDialog> {
         ref.invalidate(matchdayMatchesProvider((tournamentId: widget.tournamentId, matchdayId: widget.matchdayId!)));
       }
       ref.invalidate(tournamentProgressProvider(widget.tournamentId));
+      final authUserId = ref.read(authStateProvider);
+      if (authUserId != null) {
+        ref.invalidate(playerScheduledMatchesProvider(authUserId));
+      }
       
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
