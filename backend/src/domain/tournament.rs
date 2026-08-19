@@ -60,18 +60,26 @@ pub fn distribute_matchday_dates(
         (Some(start), Some(end)) if num_matchdays > 1 => {
             let total_days = (end - start).num_days();
             if total_days <= 0 {
-                return vec![Some(start); num_matchdays];
+                // If end date is before start date, fallback to 1 week per matchday
+                (0..num_matchdays)
+                    .map(|i| start.checked_add_signed(chrono::Duration::days(i as i64 * 7)))
+                    .collect()
+            } else {
+                let interval = (total_days as f64) / ((num_matchdays - 1) as f64);
+                (0..num_matchdays)
+                    .map(|i| {
+                        let offset = (i as f64 * interval).round() as i64;
+                        start.checked_add_signed(chrono::Duration::days(offset))
+                    })
+                    .collect()
             }
-            
-            let interval = (total_days as f64) / ((num_matchdays - 1) as f64);
+        }
+        (Some(start), _) => {
+            // Fallback: 1 matchday per week if no end_date is provided
             (0..num_matchdays)
-                .map(|i| {
-                    let offset = (i as f64 * interval).round() as i64;
-                    start.checked_add_signed(chrono::Duration::days(offset))
-                })
+                .map(|i| start.checked_add_signed(chrono::Duration::days(i as i64 * 7)))
                 .collect()
         }
-        (Some(start), _) => vec![Some(start); num_matchdays],
         _ => vec![None; num_matchdays],
     }
 }

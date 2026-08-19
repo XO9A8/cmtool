@@ -701,6 +701,7 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
             delay: index * 60,
             totalRounds: totalRounds,
             formatType: widget.formatType,
+            isAdmin: widget.isAdmin,
           ).animate().fade(duration: 300.ms, delay: Duration(milliseconds: (index % 10) * 60)).slideY(begin: 0.06, duration: 300.ms, delay: Duration(milliseconds: (index % 10) * 60));
         },
         childCount: sorted.length,
@@ -884,6 +885,7 @@ class _MatchFixtureTile extends ConsumerWidget {
   final int delay;
   final int totalRounds;
   final String formatType;
+  final bool isAdmin;
 
   const _MatchFixtureTile({
     required this.fixture,
@@ -891,6 +893,7 @@ class _MatchFixtureTile extends ConsumerWidget {
     required this.delay,
     required this.totalRounds,
     required this.formatType,
+    required this.isAdmin,
   });
 
   String _getRoundLabel(int r, int totalRounds) {
@@ -901,6 +904,50 @@ class _MatchFixtureTile extends ConsumerWidget {
       return 'ROUND $r MATCH';
     }
     return 'MATCH DAY $r';
+  }
+
+  Future<void> _showMatchRescheduleDialog(BuildContext context, WidgetRef ref, String matchId) async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2024),
+      lastDate: DateTime(2030),
+    );
+    if (date == null) return;
+
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+    );
+    if (time == null) return;
+
+    final dt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator(color: AppColors.cyan)),
+    );
+
+    try {
+      final client = ref.read(apiClientProvider);
+      await client.rescheduleMatch(tournamentId, matchId, dt, null);
+      if (context.mounted) {
+        Navigator.pop(context); // pop loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Match rescheduled successfully', style: TextStyle(color: Colors.white)), backgroundColor: AppColors.cyan),
+        );
+        ref.invalidate(tournamentBracketProvider(tournamentId));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.pop(context); // pop loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to reschedule match: $e', style: const TextStyle(color: Colors.white)), backgroundColor: AppColors.lossRed),
+        );
+      }
+    }
   }
 
   @override
@@ -1008,6 +1055,15 @@ class _MatchFixtureTile extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(width: 6),
+                  if (isAdmin) ...[
+                    _IconActionButton(
+                      icon: Icons.edit_calendar,
+                      label: 'RESCHEDULE',
+                      color: AppColors.cyan,
+                      onTap: () => _showMatchRescheduleDialog(context, ref, matchId),
+                    ),
+                    const SizedBox(width: 6),
+                  ],
                   _IconActionButton(
                     icon: Icons.gavel,
                     label: 'FORFEIT',
