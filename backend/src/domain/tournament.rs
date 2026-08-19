@@ -281,6 +281,17 @@ pub fn generate_group_knockout_phase_two_fixtures(
         }
     }
 
+    // Explicitly sort standings within each group by points DESC, goal_diff DESC, goals_for DESC
+    for g_standings in groups.values_mut() {
+        g_standings.sort_by(|a, b| {
+            b.points.cmp(&a.points)
+                .then_with(|| b.goal_diff.cmp(&a.goal_diff))
+                .then_with(|| b.goals_for.cmp(&a.goals_for))
+                .then_with(|| b.won.cmp(&a.won))
+                .then_with(|| b.drawn.cmp(&a.drawn))
+        });
+    }
+
     // 2. Sort groups by name to have a deterministic order
     let mut group_names: Vec<String> = groups.keys().cloned().collect();
     group_names.sort();
@@ -558,8 +569,13 @@ pub async fn process_tournament_advancement(
 
                     if let Some((_, Some(end_date))) = tournament_info {
                         let start_date = chrono::Utc::now().naive_utc().date();
+                        let effective_end_date = if end_date <= start_date {
+                            start_date.checked_add_signed(chrono::Duration::days((bracket.total_rounds as i64) * 7)).unwrap_or(start_date)
+                        } else {
+                            end_date
+                        };
                         let phase_two_rounds = bracket.total_rounds as usize;
-                        let phase_two_dates = distribute_matchday_dates(Some(start_date), Some(end_date), phase_two_rounds);
+                        let phase_two_dates = distribute_matchday_dates(Some(start_date), Some(effective_end_date), phase_two_rounds);
                         for (r, d) in ((round_offset + 1)..=max_bracket_round).zip(phase_two_dates) {
                             matchdays_data.push((r as i32, d));
                         }
@@ -681,12 +697,12 @@ mod tests {
         let dates = distribute_matchday_dates(None, None, 3);
         assert_eq!(dates, vec![None, None, None]);
     }
-}
 
-#[tokio::test]
-async fn test_issue_total_rounds() {
-    let r1_matches = 2;
-    let total_rounds = (r1_matches as f64).log2().ceil() as i32 + 1;
-    println!("test_issue_total_rounds: r1_matches={}, total_rounds={}", r1_matches, total_rounds);
-    assert_eq!(total_rounds, 2);
+    #[tokio::test]
+    async fn test_issue_total_rounds() {
+        let r1_matches = 2;
+        let total_rounds = (r1_matches as f64).log2().ceil() as i32 + 1;
+        println!("test_issue_total_rounds: r1_matches={}, total_rounds={}", r1_matches, total_rounds);
+        assert_eq!(total_rounds, 2);
+    }
 }

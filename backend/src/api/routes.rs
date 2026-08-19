@@ -1899,6 +1899,7 @@ async fn start_tournament(
         
         let matchdays_data: Vec<(i32, Option<chrono::NaiveDate>, Uuid)> = matchdays_data.into_iter().zip(matchday_ids.clone()).map(|((num, d), id)| (num, d, id)).collect();
 
+        let mut inserted_matches = Vec::new();
         for f in fixtures.iter() {
             let p1_id = f.player_1.as_ref().map(|p| p.id);
             let p2_id = f.player_2.as_ref().map(|p| p.id);
@@ -1921,9 +1922,13 @@ async fn start_tournament(
             )
             .await
             .map_err(|e| internal_error(e))?;
-            
+
+            inserted_matches.push((inserted_match_id, f));
+        }
+
+        // Advance byes only AFTER all round 1 matches are in the database
+        for (inserted_match_id, f) in inserted_matches {
             if let Some(winner_id) = f.winner_id {
-                // Bug 3 Fix: Complete bye matches and advance the winner immediately
                 sqlx::query("UPDATE T_Matches SET status = 'completed', player_1_score = 0, player_2_score = 0 WHERE id = $1")
                     .bind(inserted_match_id)
                     .execute(&state.pool)
@@ -2600,7 +2605,11 @@ async fn reschedule_match(
         SELECT id FROM T_Matches 
         WHERE tournament_id = $1 AND id != $2 
         AND scheduled_at::DATE = $3 
-        AND (player_1_id IN ($4, $5) OR player_2_id IN ($4, $5))
+        AND (
+            ($4::UUID IS NOT NULL AND (player_1_id = $4 OR player_2_id = $4))
+            OR
+            ($5::UUID IS NOT NULL AND (player_1_id = $5 OR player_2_id = $5))
+        )
         LIMIT 1
         "#
     )

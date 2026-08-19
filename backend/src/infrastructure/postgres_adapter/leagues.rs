@@ -442,9 +442,9 @@ pub async fn update_league_standing_guarded(
     sqlx::query(
         r#"
         INSERT INTO League_Standings (
-            tournament_id, player_id, played, won, drawn, lost, goals_for, goals_against, goal_diff, points, processed_match_ids, updated_at
+            tournament_id, player_id, played, won, drawn, lost, goals_for, goals_against, goal_diff, points, processed_match_ids, group_name, updated_at
         )
-        VALUES ($6, $7, 1, $1, $2, $3, $4, $5, $4 - $5, $1 * 3 + $2, ARRAY[$8]::UUID[], NOW())
+        VALUES ($6, $7, 1, $1, $2, $3, $4, $5, $4 - $5, $1 * 3 + $2, ARRAY[$8]::UUID[], (SELECT group_name FROM T_Matches WHERE id = $8), NOW())
         ON CONFLICT (tournament_id, player_id) DO UPDATE
         SET played        = League_Standings.played + 1,
             won           = League_Standings.won + $1,
@@ -490,17 +490,16 @@ pub async fn advance_knockout_winner(
     current_match_number: i32,
     winner_id: Uuid,
 ) -> Result<(), sqlx::Error> {
-    // Check if the current round is the final round (only 1 match in the round)
-    let matches_in_round: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM T_Matches WHERE tournament_id = $1 AND round_number = $2 AND group_name IS NULL"
+    // Find the total rounds from Matchdays to safely determine if current round is the final
+    let max_round: i32 = sqlx::query_scalar(
+        "SELECT COALESCE(MAX(matchday_number), 1)::INT4 FROM Matchdays WHERE tournament_id = $1"
     )
     .bind(tournament_id)
-    .bind(current_round)
     .fetch_one(pool)
     .await
-    .unwrap_or(0);
+    .unwrap_or(1);
 
-    if matches_in_round > 1 {
+    if current_round < max_round {
         let next_round = current_round + 1;
         let next_slot  = (current_match_number + 1) / 2;
 
@@ -546,7 +545,7 @@ pub async fn advance_knockout_winner(
                 "SELECT id FROM Matchdays WHERE tournament_id = $1 AND matchday_number = $2 LIMIT 1"
             )
             .bind(tournament_id)
-            .bind(next_round as i16)
+            .bind(next_round)
             .fetch_optional(pool)
             .await
             .unwrap_or(None);
@@ -592,7 +591,7 @@ pub async fn advance_knockout_winner(
     .await
     .unwrap_or(1);
 
-    if pending_count == 0 {
+    if current_round >= max_round && pending_count == 0 {
         // Tournament is complete! Mark it as completed.
         let _ = sqlx::query("UPDATE Tournaments SET status = 'completed', updated_at = NOW() WHERE id = $1")
             .bind(tournament_id)

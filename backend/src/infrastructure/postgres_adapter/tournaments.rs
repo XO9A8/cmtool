@@ -265,7 +265,7 @@ pub async fn insert_tournament_matches_batch(
              .push_bind(tournament_id)
              .push_bind(m.0)
              .push_bind(m.1)
-             .push_bind(m.2 as i16) // round_number is smallint
+             .push_bind(m.2)
              .push_bind(m.3)
              .push_bind("scheduled")
              .push_bind(m.4.clone())
@@ -342,9 +342,11 @@ pub async fn get_advancement_context(pool: &PgPool, match_id: Uuid) -> Result<Op
             mr.goals_against AS "goals_against?: i32"
         FROM T_Matches m
         LEFT JOIN Match_Records mr ON mr.t_match_id = m.id
+            AND mr.deleted_at IS NULL
+            AND mr.verification_status = 'approved'
         LEFT JOIN Tournaments t   ON t.id  = m.tournament_id
         WHERE m.id = $1 OR mr.id = $1
-        ORDER BY mr.created_at ASC
+        ORDER BY mr.created_at DESC NULLS LAST
         LIMIT 1
         "#,
         match_id
