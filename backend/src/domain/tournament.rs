@@ -3,6 +3,7 @@
 //! Provides Elo-seeded Knockout Bracket generation, Circle Method Round-Robin league fixture scheduling,
 //! and match outcome probability prediction.
 
+use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -44,6 +45,37 @@ pub struct KnockoutBracket {
     /// Round 1 fixture nodes.
     pub fixtures: Vec<FixtureNode>,
 }
+
+/// Distributes matchday dates evenly across the tournament period.
+pub fn distribute_matchday_dates(
+    start_date: Option<NaiveDate>,
+    end_date: Option<NaiveDate>,
+    num_matchdays: usize,
+) -> Vec<Option<NaiveDate>> {
+    if num_matchdays == 0 {
+        return vec![];
+    }
+    
+    match (start_date, end_date) {
+        (Some(start), Some(end)) if num_matchdays > 1 => {
+            let total_days = (end - start).num_days();
+            if total_days <= 0 {
+                return vec![Some(start); num_matchdays];
+            }
+            
+            let interval = (total_days as f64) / ((num_matchdays - 1) as f64);
+            (0..num_matchdays)
+                .map(|i| {
+                    let offset = (i as f64 * interval).round() as i64;
+                    start.checked_add_signed(chrono::Duration::days(offset))
+                })
+                .collect()
+        }
+        (Some(start), _) => vec![Some(start); num_matchdays],
+        _ => vec![None; num_matchdays],
+    }
+}
+
 
 /// Automated Knockout Bracket Generator using Elo Seeding.
 /// Higher seeds play lower seeds in Round 1 (1 vs N, 2 vs N-1, etc.)
@@ -546,6 +578,38 @@ mod tests {
         let group_b: Vec<_> = assignments.iter().filter(|(_, g)| g == "GROUP B").collect();
         assert_eq!(group_a.len(), 3);
         assert_eq!(group_b.len(), 3);
+    }
+
+    #[test]
+    fn test_distribute_matchday_dates() {
+        use chrono::NaiveDate;
+        
+        let start = NaiveDate::from_ymd_opt(2023, 1, 1);
+        let end = NaiveDate::from_ymd_opt(2023, 1, 10);
+        
+        // 1. Zero matchdays
+        let dates = distribute_matchday_dates(start, end, 0);
+        assert!(dates.is_empty());
+        
+        // 2. Single matchday
+        let dates = distribute_matchday_dates(start, end, 1);
+        assert_eq!(dates, vec![start]);
+        
+        // 3. Two matchdays
+        let dates = distribute_matchday_dates(start, end, 2);
+        assert_eq!(dates, vec![start, end]);
+        
+        // 4. Three matchdays
+        let dates = distribute_matchday_dates(start, end, 3);
+        assert_eq!(dates, vec![
+            NaiveDate::from_ymd_opt(2023, 1, 1),
+            NaiveDate::from_ymd_opt(2023, 1, 6),
+            NaiveDate::from_ymd_opt(2023, 1, 10),
+        ]);
+        
+        // 5. Without dates
+        let dates = distribute_matchday_dates(None, None, 3);
+        assert_eq!(dates, vec![None, None, None]);
     }
 }
 

@@ -536,3 +536,21 @@ final pendingMatchesProvider = FutureProvider<List<dynamic>>((ref) async {
   return client.getPendingMatches();
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Tournament Matchdays & Progress Providers
+// ─────────────────────────────────────────────────────────────────────────────
+
+final matchdaysProvider = FutureProvider.family<Map<String, dynamic>, String>((ref, tournamentId) async {
+  final client = ref.watch(apiClientProvider);
+  return client.getMatchdays(tournamentId);
+});
+
+final matchdayMatchesProvider = FutureProvider.family<Map<String, dynamic>, ({String tournamentId, String matchdayId})>((ref, arg) async {
+  final client = ref.watch(apiClientProvider);
+  return client.getMatchdayMatches(arg.tournamentId, arg.matchdayId);
+});
+
+final tournamentProgressProvider = FutureProvider.family<Map<String, dynamic>, String>((ref, tournamentId) async {
+  final client = ref.watch(apiClientProvider);
+  return client.getTournamentProgress(tournamentId);
+});

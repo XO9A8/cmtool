@@ -366,12 +366,16 @@ class ApiClient {
     required String name,
     required String formatType,
     Map<String, dynamic>? rulesConfig,
+    DateTime? startDate,
+    DateTime? endDate,
   }) async {
     final response = await _dio.post('/api/v1/tournaments', data: {
       'club_id': clubId,
       'name': name,
       'format_type': formatType,
       if (rulesConfig != null) 'rules_config': rulesConfig,
+      if (startDate != null) 'start_date': startDate.toIso8601String().split('T').first,
+      if (endDate != null) 'end_date': endDate.toIso8601String().split('T').first,
     });
     return response.data as Map<String, dynamic>;
   }
@@ -380,6 +384,16 @@ class ApiClient {
   Future<Map<String, dynamic>> getTournamentBracket(String tournamentId, ) async {
     final response = await _getWithCache('/api/v1/tournaments/$tournamentId/bracket');
     return response.data as Map<String, dynamic>;
+  }
+
+  /// Exports matchday PDF
+  Future<List<int>> exportMatchdayPdf(String tournamentId, String matchdayId, bool includeResults) async {
+    final response = await _dio.get(
+      '/api/v1/tournaments/$tournamentId/matchdays/$matchdayId/export/pdf',
+      queryParameters: {'include_results': includeResults},
+      options: Options(responseType: ResponseType.bytes),
+    );
+    return response.data as List<int>;
   }
 
   /// Starts a tournament with given players - generates fixtures and sets status to active.
@@ -475,6 +489,62 @@ class ApiClient {
     final response = await _dio.post('/api/v1/seasons/snapshot', data: {
       'season_id': seasonId,
     });
+    return response.data as Map<String, dynamic>;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Matchdays & Scheduling
+  // ─────────────────────────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> getMatchdays(String tournamentId) async {
+    final response = await _getWithCache('/api/v1/tournaments/$tournamentId/matchdays');
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getMatchdayMatches(String tournamentId, String matchdayId) async {
+    final response = await _getWithCache('/api/v1/tournaments/$tournamentId/matchdays/$matchdayId/matches');
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> updateMatchdaySchedule(String tournamentId, String matchdayId, DateTime? date) async {
+    final response = await _dio.put(
+      '/api/v1/tournaments/$tournamentId/matchdays/$matchdayId/schedule',
+      data: {
+        'scheduled_date': date?.toIso8601String().split('T').first,
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> rescheduleMatch(String tournamentId, String matchId, DateTime scheduledAt, String? reason) async {
+    final response = await _dio.put(
+      '/api/v1/tournaments/$tournamentId/matches/$matchId/reschedule',
+      data: {
+        'scheduled_at': scheduledAt.toUtc().toIso8601String(),
+        if (reason != null) 'reason': reason,
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<List<int>> downloadMatchdayFixtures(String tournamentId, String matchdayId) async {
+    final response = await _dio.get<List<int>>(
+      '/api/v1/tournaments/$tournamentId/matchdays/$matchdayId/export/fixtures',
+      options: Options(responseType: ResponseType.bytes),
+    );
+    return response.data ?? [];
+  }
+
+  Future<List<int>> downloadMatchdayResults(String tournamentId, String matchdayId) async {
+    final response = await _dio.get<List<int>>(
+      '/api/v1/tournaments/$tournamentId/matchdays/$matchdayId/export/results',
+      options: Options(responseType: ResponseType.bytes),
+    );
+    return response.data ?? [];
+  }
+
+  Future<Map<String, dynamic>> getTournamentProgress(String tournamentId) async {
+    final response = await _getWithCache('/api/v1/tournaments/$tournamentId/progress');
     return response.data as Map<String, dynamic>;
   }
 }

@@ -70,6 +70,13 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/api/v1/tournaments/:id/standings", get(get_league_standings))
         .route("/api/v1/tournaments/:id/start", post(start_tournament))
         .route("/api/v1/tournaments/:id/status", post(update_tournament_status))
+        .route("/api/v1/tournaments/:id/matchdays", get(get_matchdays))
+        .route("/api/v1/tournaments/:id/matchdays/:md_id/matches", get(get_matchday_matches))
+        .route("/api/v1/tournaments/:id/matchdays/:md_id/schedule", axum::routing::put(update_matchday_schedule))
+        .route("/api/v1/tournaments/:id/matches/:match_id/reschedule", axum::routing::put(reschedule_match))
+        .route("/api/v1/tournaments/:id/matchdays/:md_id/export/fixtures", get(export_matchday_fixtures))
+        .route("/api/v1/tournaments/:id/matchdays/:md_id/export/results", get(export_matchday_results))
+        .route("/api/v1/tournaments/:id/progress", get(get_tournament_progress))
         .route("/api/v1/players/:id/profile", get(get_player_profile).put(update_player_profile))
         .route("/api/v1/players/:id/matches", get(get_player_matches))
         .route("/api/v1/players/:id/scheduled-matches", get(get_player_scheduled_matches))
@@ -1603,6 +1610,8 @@ pub struct CreateTournamentDbRequest {
     pub club_id: Uuid,
     pub name: String,
     pub format_type: String,
+    pub start_date: Option<String>,
+    pub end_date: Option<String>,
     #[serde(default)]
     pub rules_config: serde_json::Value,
 }
@@ -1634,12 +1643,17 @@ async fn create_tournament(
         payload.rules_config
     };
 
+    let start_date = payload.start_date.and_then(|d| chrono::NaiveDate::parse_from_str(&d, "%Y-%m-%d").ok());
+    let end_date = payload.end_date.and_then(|d| chrono::NaiveDate::parse_from_str(&d, "%Y-%m-%d").ok());
+
     let tournament_id = db::create_tournament(
         &state.pool,
         payload.club_id,
         &payload.name,
         &payload.format_type,
         &rules,
+        start_date,
+        end_date,
     )
     .await
     .map_err(|e| internal_error(e))?;
@@ -1699,16 +1713,23 @@ async fn start_tournament(
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ApiErrorResponse>)> {
     let mut players = payload.players;
 
-    let tourney = sqlx::query!(
-        "SELECT club_id, format_type, rules_config, status FROM Tournaments WHERE id = $1 AND deleted_at IS NULL",
-        tournament_id
+    let tourney = sqlx::query(
+        "SELECT club_id, format_type, rules_config, status, start_date, end_date FROM Tournaments WHERE id = $1 AND deleted_at IS NULL"
     )
+    .bind(tournament_id)
     .fetch_optional(&state.pool)
     .await
     .map_err(|e| internal_error(e))?;
 
-    let (club_id, format_type, rules_config, status) = match tourney {
-        Some(t) => (t.club_id, t.format_type, t.rules_config, t.status),
+    let (club_id, format_type, rules_config, status, start_date, end_date) = match tourney {
+        Some(t) => (
+            t.try_get::<Uuid, _>("club_id").unwrap(),
+            t.try_get::<String, _>("format_type").unwrap(),
+            t.try_get::<serde_json::Value, _>("rules_config").unwrap(),
+            t.try_get::<String, _>("status").unwrap(),
+            t.try_get::<Option<chrono::NaiveDate>, _>("start_date").unwrap_or(None),
+            t.try_get::<Option<chrono::NaiveDate>, _>("end_date").unwrap_or(None)
+        ),
         None => return Err(bad_request("TOURNAMENT_NOT_FOUND", "Tournament not found")),
     };
 
@@ -1783,9 +1804,17 @@ async fn start_tournament(
     if format_type == "knockout" {
         let fixtures = generate_knockout_bracket(tournament_id, players).fixtures;
         fixtures_count = fixtures.len();
+        
+        let max_round = fixtures.iter().map(|f| f.round_number).max().unwrap_or(0);
+        let matchday_dates = crate::domain::tournament::distribute_matchday_dates(start_date, end_date, max_round as usize);
+        let matchdays_data: Vec<(i32, Option<chrono::NaiveDate>)> = (1..=max_round as i32).zip(matchday_dates).collect();
+        let matchday_ids = db::create_matchdays_batch(&state.pool, tournament_id, &matchdays_data).await.map_err(|e| internal_error(e))?;
+
         for f in fixtures.iter() {
             let p1_id = f.player_1.as_ref().map(|p| p.id);
             let p2_id = f.player_2.as_ref().map(|p| p.id);
+            let md_id = matchday_ids.get((f.round_number - 1) as usize).copied();
+            
             let inserted_match_id = db::insert_tournament_match(
                 &state.pool,
                 tournament_id,
@@ -1794,6 +1823,7 @@ async fn start_tournament(
                 f.round_number as i32,
                 f.match_number as i32,
                 None,
+                md_id,
             )
             .await
             .map_err(|e| internal_error(e))?;
@@ -1824,10 +1854,17 @@ async fn start_tournament(
         let (group_fixtures, player_groups) = generate_group_knockout_fixtures(tournament_id, players, groups_count, legs);
         fixtures_count = group_fixtures.len();
 
+        let max_round = group_fixtures.iter().map(|gf| gf.fixture.round_number).max().unwrap_or(0);
+        let matchday_dates = crate::domain::tournament::distribute_matchday_dates(start_date, end_date, max_round as usize);
+        let matchdays_data: Vec<(i32, Option<chrono::NaiveDate>)> = (1..=max_round as i32).zip(matchday_dates).collect();
+        let matchday_ids = db::create_matchdays_batch(&state.pool, tournament_id, &matchdays_data).await.map_err(|e| internal_error(e))?;
+
         for gf in group_fixtures.iter() {
             let f = &gf.fixture;
             let p1_id = f.player_1.as_ref().map(|p| p.id);
             let p2_id = f.player_2.as_ref().map(|p| p.id);
+            let md_id = matchday_ids.get((f.round_number - 1) as usize).copied();
+            
             db::insert_tournament_match(
                 &state.pool,
                 tournament_id,
@@ -1836,6 +1873,7 @@ async fn start_tournament(
                 f.round_number as i32,
                 f.match_number as i32,
                 Some(&gf.group_name),
+                md_id,
             )
             .await
             .map_err(|e| internal_error(e))?;
@@ -1846,9 +1884,17 @@ async fn start_tournament(
     } else if format_type == "round_robin" || format_type == "league" {
         let fixtures = generate_round_robin_fixtures(tournament_id, players, legs);
         fixtures_count = fixtures.len();
+        
+        let max_round = fixtures.iter().map(|f| f.round_number).max().unwrap_or(0);
+        let matchday_dates = crate::domain::tournament::distribute_matchday_dates(start_date, end_date, max_round as usize);
+        let matchdays_data: Vec<(i32, Option<chrono::NaiveDate>)> = (1..=max_round as i32).zip(matchday_dates).collect();
+        let matchday_ids = db::create_matchdays_batch(&state.pool, tournament_id, &matchdays_data).await.map_err(|e| internal_error(e))?;
+
         for f in fixtures.iter() {
             let p1_id = f.player_1.as_ref().map(|p| p.id);
             let p2_id = f.player_2.as_ref().map(|p| p.id);
+            let md_id = matchday_ids.get((f.round_number - 1) as usize).copied();
+            
             db::insert_tournament_match(
                 &state.pool,
                 tournament_id,
@@ -1857,6 +1903,7 @@ async fn start_tournament(
                 f.round_number as i32,
                 f.match_number as i32,
                 None,
+                md_id,
             )
             .await
             .map_err(|e| internal_error(e))?;
@@ -2292,4 +2339,131 @@ async fn get_club_resolved_activity(
         .await
         .map_err(|e| internal_error(e))?;
     Ok(Json(rows))
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Matchdays & Scheduling
+// ─────────────────────────────────────────────────────────────────────────────
+
+async fn get_matchdays(
+    State(state): State<Arc<AppState>>,
+    _auth: AuthenticatedUser,
+    Path(tournament_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ApiErrorResponse>)> {
+    let matchdays = db::get_matchdays(&state.pool, tournament_id)
+        .await
+        .map_err(|e| internal_error(e))?;
+    Ok(Json(serde_json::json!({ "matchdays": matchdays })))
+}
+
+async fn get_matchday_matches(
+    State(state): State<Arc<AppState>>,
+    _auth: AuthenticatedUser,
+    Path((tournament_id, matchday_id)): Path<(Uuid, Uuid)>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ApiErrorResponse>)> {
+    let all_matches = db::get_tournament_bracket(&state.pool, tournament_id).await.map_err(|e| internal_error(e))?;
+    let matchday_matches: Vec<_> = all_matches.into_iter().filter(|m| m.matchday_id == Some(matchday_id)).collect();
+    Ok(Json(serde_json::json!({ "fixtures": matchday_matches })))
+}
+
+#[derive(Deserialize)]
+pub struct UpdateMatchdayScheduleRequest {
+    pub scheduled_date: Option<String>,
+}
+
+async fn update_matchday_schedule(
+    State(state): State<Arc<AppState>>,
+    auth: AuthenticatedUser,
+    Path((tournament_id, matchday_id)): Path<(Uuid, Uuid)>,
+    Json(payload): Json<UpdateMatchdayScheduleRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ApiErrorResponse>)> {
+    let club_id = db::get_tournament_club_id(&state.pool, tournament_id).await.map_err(|e| internal_error(e))?.ok_or_else(|| bad_request("NOT_FOUND", "Tournament not found"))?;
+    let is_official = db::is_club_official(&state.pool, club_id, auth.user_id).await.map_err(|e| internal_error(e))?;
+    if !is_official { return Err(forbidden("FORBIDDEN", "Only officials can reschedule matchdays.")); }
+
+    let new_date = payload.scheduled_date.as_ref().and_then(|d| chrono::NaiveDate::parse_from_str(&d, "%Y-%m-%d").ok());
+    db::update_matchday_date(&state.pool, matchday_id, new_date).await.map_err(|e| internal_error(e))?;
+    
+    db::insert_schedule_audit(&state.pool, "matchday", matchday_id, "date_changed", None, payload.scheduled_date.as_deref(), None, auth.user_id)
+        .await.map_err(|e| internal_error(e))?;
+
+    Ok(Json(serde_json::json!({ "success": true })))
+}
+
+#[derive(Deserialize)]
+pub struct RescheduleMatchRequest {
+    pub scheduled_at: String,
+    pub reason: Option<String>,
+}
+
+async fn reschedule_match(
+    State(state): State<Arc<AppState>>,
+    auth: AuthenticatedUser,
+    Path((tournament_id, match_id)): Path<(Uuid, Uuid)>,
+    Json(payload): Json<RescheduleMatchRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ApiErrorResponse>)> {
+    let club_id = db::get_tournament_club_id(&state.pool, tournament_id).await.map_err(|e| internal_error(e))?.ok_or_else(|| bad_request("NOT_FOUND", "Tournament not found"))?;
+    let is_official = db::is_club_official(&state.pool, club_id, auth.user_id).await.map_err(|e| internal_error(e))?;
+    if !is_official { return Err(forbidden("FORBIDDEN", "Only officials can reschedule matches.")); }
+
+    let dt = chrono::DateTime::parse_from_rfc3339(&payload.scheduled_at)
+        .map_err(|_| bad_request("INVALID_DATE", "Invalid scheduled_at format"))?
+        .with_timezone(&chrono::Utc);
+        
+    db::reschedule_match(&state.pool, match_id, dt, payload.reason.as_deref()).await.map_err(|e| internal_error(e))?;
+    
+    db::insert_schedule_audit(&state.pool, "match", match_id, "rescheduled", None, Some(&payload.scheduled_at), payload.reason.as_deref(), auth.user_id)
+        .await.map_err(|e| internal_error(e))?;
+
+    Ok(Json(serde_json::json!({ "success": true })))
+}
+
+async fn get_tournament_progress(
+    State(state): State<Arc<AppState>>,
+    _auth: AuthenticatedUser,
+    Path(tournament_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ApiErrorResponse>)> {
+    let progress = db::get_tournament_progress(&state.pool, tournament_id)
+        .await
+        .map_err(|e| internal_error(e))?;
+    Ok(Json(serde_json::json!(progress)))
+}
+
+async fn export_matchday_fixtures(
+    State(state): State<Arc<AppState>>,
+    _auth: AuthenticatedUser,
+    Path((tournament_id, matchday_id)): Path<(Uuid, Uuid)>,
+) -> Result<impl axum::response::IntoResponse, (StatusCode, Json<ApiErrorResponse>)> {
+    let all_matches = db::get_tournament_bracket(&state.pool, tournament_id).await.map_err(|e| internal_error(e))?;
+    let matchday_matches: Vec<_> = all_matches.into_iter().filter(|m| m.matchday_id == Some(matchday_id)).collect();
+    
+    let md_number = matchday_matches.first().and_then(|m| m.matchday_number).unwrap_or(0);
+    
+    // Fetch tournament name
+    let tourney = sqlx::query!("SELECT name FROM Tournaments WHERE id = $1", tournament_id).fetch_one(&state.pool).await.map_err(|e| internal_error(e))?;
+    
+    let pdf_bytes = crate::domain::pdf_export::generate_matchday_pdf(&tourney.name, md_number, &matchday_matches, false);
+    
+    use axum::http::header;
+    let headers = [(header::CONTENT_TYPE, "application/pdf"), (header::CONTENT_DISPOSITION, "attachment; filename=\"fixtures.pdf\"")];
+    Ok((headers, pdf_bytes))
+}
+
+async fn export_matchday_results(
+    State(state): State<Arc<AppState>>,
+    _auth: AuthenticatedUser,
+    Path((tournament_id, matchday_id)): Path<(Uuid, Uuid)>,
+) -> Result<impl axum::response::IntoResponse, (StatusCode, Json<ApiErrorResponse>)> {
+    let all_matches = db::get_tournament_bracket(&state.pool, tournament_id).await.map_err(|e| internal_error(e))?;
+    let matchday_matches: Vec<_> = all_matches.into_iter().filter(|m| m.matchday_id == Some(matchday_id)).collect();
+    
+    let md_number = matchday_matches.first().and_then(|m| m.matchday_number).unwrap_or(0);
+    
+    let tourney = sqlx::query!("SELECT name FROM Tournaments WHERE id = $1", tournament_id).fetch_one(&state.pool).await.map_err(|e| internal_error(e))?;
+    
+    let pdf_bytes = crate::domain::pdf_export::generate_matchday_pdf(&tourney.name, md_number, &matchday_matches, true);
+    
+    use axum::http::header;
+    let headers = [(header::CONTENT_TYPE, "application/pdf"), (header::CONTENT_DISPOSITION, "attachment; filename=\"results.pdf\"")];
+    Ok((headers, pdf_bytes))
 }

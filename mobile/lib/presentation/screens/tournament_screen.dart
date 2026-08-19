@@ -290,6 +290,8 @@ class _CreateTournamentSheet extends ConsumerStatefulWidget {
 
 class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> {
   final _nameCtrl = TextEditingController();
+  DateTime? _startDate;
+  DateTime? _endDate;
   String _formatType = 'round_robin';
   int _legs = 1; // 1 = single round-robin, 2 = double round-robin
   int _groupsCount = 2; // 2, 4, or 8 groups
@@ -338,6 +340,8 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
         clubId: widget.clubId,
         name: name,
         formatType: _formatType,
+        startDate: _startDate,
+        endDate: _endDate,
         rulesConfig: {
           'legs': _legs,
           'groups_count': _groupsCount,
@@ -452,6 +456,28 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
                       borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
                     ),
                   ),
+                ),
+                const SizedBox(height: 18),
+
+                // Date Pickers
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildDatePicker(
+                        label: 'Start Date',
+                        date: _startDate,
+                        onChanged: (d) => setState(() => _startDate = d),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildDatePicker(
+                        label: 'End Date',
+                        date: _endDate,
+                        onChanged: (d) => setState(() => _endDate = d),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 18),
 
@@ -907,6 +933,58 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDatePicker({required String label, required DateTime? date, required ValueChanged<DateTime?> onChanged}) {
+    return GestureDetector(
+      onTap: () async {
+        final picked = await showDatePicker(
+          context: context,
+          initialDate: date ?? DateTime.now(),
+          firstDate: DateTime.now().subtract(const Duration(days: 365)),
+          lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+          builder: (context, child) => Theme(
+            data: ThemeData.dark().copyWith(
+              colorScheme: const ColorScheme.dark(
+                primary: AppColors.primary,
+                onPrimary: Colors.black,
+                surface: AppColors.surface,
+                onSurface: Colors.white,
+              ),
+            ),
+            child: child!,
+          ),
+        );
+        if (picked != null) {
+          onChanged(picked);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceLight.withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 12)),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Icon(Icons.calendar_today, color: AppColors.primary, size: 14),
+                const SizedBox(width: 8),
+                Text(
+                  date != null ? '${date.day}/${date.month}/${date.year}' : 'Not set',
+                  style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

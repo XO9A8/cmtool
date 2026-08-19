@@ -968,6 +968,13 @@ pub struct TMatchRow {
     pub player_2_rating: Option<i32>,
     pub player_1_avatar: Option<String>,
     pub player_2_avatar: Option<String>,
+    pub matchday_id: Option<Uuid>,
+    pub scheduled_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub original_scheduled_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub is_rescheduled: bool,
+    pub reschedule_reason: Option<String>,
+    pub matchday_number: Option<i32>,
+    pub matchday_scheduled_date: Option<chrono::NaiveDate>,
 }
 
 /// Fetches all T_Matches for a tournament, ordered by round number.
@@ -1002,7 +1009,14 @@ pub async fn get_tournament_bracket(
             cm1.skill_rating AS player_1_rating,
             cm2.skill_rating AS player_2_rating,
             pp1.avatar_graphic AS player_1_avatar,
-            pp2.avatar_graphic AS player_2_avatar
+            pp2.avatar_graphic AS player_2_avatar,
+            m.matchday_id,
+            m.scheduled_at,
+            m.original_scheduled_at,
+            m.is_rescheduled,
+            m.reschedule_reason,
+            md.matchday_number::INT4 AS matchday_number,
+            md.scheduled_date AS matchday_scheduled_date
         FROM T_Matches m
         LEFT JOIN Users u1 ON m.player_1_id = u1.id
         LEFT JOIN Users u2 ON m.player_2_id = u2.id
@@ -1014,6 +1028,7 @@ pub async fn get_tournament_bracket(
         LEFT JOIN Tournaments t ON m.tournament_id = t.id
         LEFT JOIN Club_Memberships cm1 ON cm1.player_id = m.player_1_id AND cm1.club_id = t.club_id
         LEFT JOIN Club_Memberships cm2 ON cm2.player_id = m.player_2_id AND cm2.club_id = t.club_id
+        LEFT JOIN Matchdays md ON m.matchday_id = md.id
         WHERE m.tournament_id = $1
         ORDER BY m.round_number ASC, m.created_at ASC
         "#,
@@ -1327,12 +1342,14 @@ pub async fn create_tournament(
     name: &str,
     format_type: &str,
     rules_config: &serde_json::Value,
+    start_date: Option<chrono::NaiveDate>,
+    end_date: Option<chrono::NaiveDate>,
 ) -> Result<Uuid, sqlx::Error> {
     let id = Uuid::new_v4();
     sqlx::query(
         r#"
-        INSERT INTO Tournaments (id, club_id, name, format_type, status, rules_config)
-        VALUES ($1, $2, $3, $4, 'draft', $5)
+        INSERT INTO Tournaments (id, club_id, name, format_type, status, rules_config, start_date, end_date)
+        VALUES ($1, $2, $3, $4, 'draft', $5, $6, $7)
         "#,
     )
     .bind(id)
@@ -1340,6 +1357,8 @@ pub async fn create_tournament(
     .bind(name)
     .bind(format_type)
     .bind(rules_config)
+    .bind(start_date)
+    .bind(end_date)
     .execute(pool)
     .await?;
 
@@ -1417,12 +1436,13 @@ pub async fn insert_tournament_match(
     round_number: i32,
     match_number: i32,
     group_name: Option<&str>,
+    matchday_id: Option<Uuid>,
 ) -> Result<Uuid, sqlx::Error> {
     let id = Uuid::new_v4();
     sqlx::query(
         r#"
-        INSERT INTO T_Matches (id, tournament_id, player_1_id, player_2_id, round_number, match_number, status, group_name)
-        VALUES ($1, $2, $3, $4, $5, $6, 'scheduled', $7)
+        INSERT INTO T_Matches (id, tournament_id, player_1_id, player_2_id, round_number, match_number, status, group_name, matchday_id)
+        VALUES ($1, $2, $3, $4, $5, $6, 'scheduled', $7, $8)
         "#,
     )
     .bind(id)
@@ -1432,6 +1452,7 @@ pub async fn insert_tournament_match(
     .bind(round_number)
     .bind(match_number)
     .bind(group_name)
+    .bind(matchday_id)
     .execute(pool)
     .await?;
 
@@ -1453,9 +1474,221 @@ pub async fn save_tournament_fixtures(
             fixture.round_number as i32,
             fixture.match_number as i32,
             None,
+            None,
         ).await?;
     }
     Ok(())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Matchdays & Scheduling
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[derive(FromRow, Serialize)]
+pub struct MatchdayRow {
+    pub id: Uuid,
+    pub tournament_id: Uuid,
+    pub matchday_number: i32,
+    pub scheduled_date: Option<chrono::NaiveDate>,
+    pub status: String,
+    pub match_count: i64,
+    pub completed_count: i64,
+    pub pending_count: i64,
+    pub rescheduled_count: i64,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+pub async fn create_matchdays_batch(
+    pool: &PgPool,
+    tournament_id: Uuid,
+    matchdays: &[(i32, Option<chrono::NaiveDate>)],
+) -> Result<Vec<Uuid>, sqlx::Error> {
+    let mut ids = Vec::new();
+    for (number, date) in matchdays {
+        let id = Uuid::new_v4();
+        sqlx::query(
+            "INSERT INTO Matchdays (id, tournament_id, matchday_number, scheduled_date, status) VALUES ($1, $2, $3, $4, 'upcoming')"
+        )
+        .bind(id)
+        .bind(tournament_id)
+        .bind(number)
+        .bind(date)
+        .execute(pool)
+        .await?;
+        ids.push(id);
+    }
+    Ok(ids)
+}
+
+pub async fn get_matchdays(
+    pool: &PgPool,
+    tournament_id: Uuid,
+) -> Result<Vec<MatchdayRow>, sqlx::Error> {
+    let rows = sqlx::query_as::<_, MatchdayRow>(
+        r#"
+        SELECT 
+            md.id, md.tournament_id, md.matchday_number::INT4 AS matchday_number, md.scheduled_date, md.status,
+            md.created_at, md.updated_at,
+            COUNT(m.id)::INT8 AS match_count,
+            COUNT(m.id) FILTER (WHERE m.status = 'completed')::INT8 AS completed_count,
+            COUNT(m.id) FILTER (WHERE m.status IN ('scheduled', 'disputed'))::INT8 AS pending_count,
+            COUNT(m.id) FILTER (WHERE m.is_rescheduled = true)::INT8 AS rescheduled_count
+        FROM Matchdays md
+        LEFT JOIN T_Matches m ON m.matchday_id = md.id
+        WHERE md.tournament_id = $1
+        GROUP BY md.id
+        ORDER BY md.matchday_number ASC
+        "#
+    )
+    .bind(tournament_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
+pub async fn update_matchday_date(
+    pool: &PgPool,
+    matchday_id: Uuid,
+    new_date: Option<chrono::NaiveDate>,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE Matchdays SET scheduled_date = $1, updated_at = NOW() WHERE id = $2")
+        .bind(new_date)
+        .bind(matchday_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn reschedule_match(
+    pool: &PgPool,
+    match_id: Uuid,
+    new_scheduled_at: chrono::DateTime<chrono::Utc>,
+    reason: Option<&str>,
+) -> Result<(), sqlx::Error> {
+    // We only set original_scheduled_at if it's currently NULL (i.e., first reschedule)
+    sqlx::query(
+        r#"
+        UPDATE T_Matches 
+        SET 
+            original_scheduled_at = COALESCE(original_scheduled_at, scheduled_at),
+            scheduled_at = $1,
+            is_rescheduled = true,
+            reschedule_reason = $2,
+            status = CASE WHEN status = 'scheduled' THEN 'rescheduled' ELSE status END,
+            updated_at = NOW()
+        WHERE id = $3
+        "#
+    )
+    .bind(new_scheduled_at)
+    .bind(reason)
+    .bind(match_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub async fn update_matchday_status(
+    pool: &PgPool,
+    matchday_id: Uuid,
+) -> Result<String, sqlx::Error> {
+    let stats = sqlx::query(
+        "SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE status = 'completed') as completed FROM T_Matches WHERE matchday_id = $1"
+    )
+    .bind(matchday_id)
+    .fetch_one(pool)
+    .await?;
+
+    let total: i64 = stats.try_get("total").unwrap_or(0);
+    let completed: i64 = stats.try_get("completed").unwrap_or(0);
+
+    let new_status = if total == 0 {
+        "upcoming"
+    } else if completed == total {
+        "completed"
+    } else if completed > 0 {
+        "in_progress"
+    } else {
+        "upcoming"
+    };
+
+    sqlx::query("UPDATE Matchdays SET status = $1, updated_at = NOW() WHERE id = $2")
+        .bind(new_status)
+        .bind(matchday_id)
+        .execute(pool)
+        .await?;
+    
+    Ok(new_status.to_string())
+}
+
+pub async fn insert_schedule_audit(
+    pool: &PgPool,
+    entity_type: &str,
+    entity_id: Uuid,
+    action: &str,
+    old_value: Option<&str>,
+    new_value: Option<&str>,
+    reason: Option<&str>,
+    changed_by: Uuid,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        r#"
+        INSERT INTO schedule_audit_log (entity_type, entity_id, action, old_value, new_value, reason, changed_by)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        "#
+    )
+    .bind(entity_type)
+    .bind(entity_id)
+    .bind(action)
+    .bind(old_value)
+    .bind(new_value)
+    .bind(reason)
+    .bind(changed_by)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+#[derive(Serialize)]
+pub struct TournamentProgressRow {
+    pub total_matchdays: i64,
+    pub completed_matchdays: i64,
+    pub total_matches: i64,
+    pub completed_matches: i64,
+    pub pending_matches: i64,
+    pub rescheduled_matches: i64,
+}
+
+pub async fn get_tournament_progress(
+    pool: &PgPool,
+    tournament_id: Uuid,
+) -> Result<TournamentProgressRow, sqlx::Error> {
+    let md_stats = sqlx::query(
+        "SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE status = 'completed') as completed FROM Matchdays WHERE tournament_id = $1"
+    )
+    .bind(tournament_id)
+    .fetch_one(pool)
+    .await?;
+
+    let match_stats = sqlx::query(
+        "SELECT COUNT(*) as total, 
+                COUNT(*) FILTER (WHERE status = 'completed') as completed,
+                COUNT(*) FILTER (WHERE status IN ('scheduled', 'rescheduled', 'disputed')) as pending,
+                COUNT(*) FILTER (WHERE is_rescheduled = true) as rescheduled
+         FROM T_Matches WHERE tournament_id = $1"
+    )
+    .bind(tournament_id)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(TournamentProgressRow {
+        total_matchdays: md_stats.try_get("total").unwrap_or(0),
+        completed_matchdays: md_stats.try_get("completed").unwrap_or(0),
+        total_matches: match_stats.try_get("total").unwrap_or(0),
+        completed_matches: match_stats.try_get("completed").unwrap_or(0),
+        pending_matches: match_stats.try_get("pending").unwrap_or(0),
+        rescheduled_matches: match_stats.try_get("rescheduled").unwrap_or(0),
+    })
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
