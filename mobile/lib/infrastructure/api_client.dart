@@ -431,6 +431,12 @@ class ApiClient {
     return response.data as Map<String, dynamic>;
   }
 
+  /// Fetches detailed player statistics and leaderboards for a tournament.
+  Future<Map<String, dynamic>> getTournamentPlayerStats(String tournamentId, {bool forceRefresh = false}) async {
+    final response = await _getWithCache('/api/v1/tournaments/$tournamentId/player-stats', forceRefresh: forceRefresh);
+    return response.data as Map<String, dynamic>;
+  }
+
   /// Deletes a tournament (club owners only).
   Future<Map<String, dynamic>> deleteTournament(String tournamentId) async {
     final response = await _dio.delete('/api/v1/tournaments/$tournamentId');

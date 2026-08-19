@@ -509,6 +509,12 @@ final leagueStandingsProvider = FutureProvider.family<Map<String, dynamic>, Stri
   return client.getLeagueStandings(tournamentId);
 });
 
+/// Fetches aggregated player statistics & leaderboards for a tournament.
+final tournamentPlayerStatsProvider = FutureProvider.family<Map<String, dynamic>, String>((ref, tournamentId) async {
+  final client = ref.watch(apiClientProvider);
+  return client.getTournamentPlayerStats(tournamentId);
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Club Activity Feed Provider
 // ─────────────────────────────────────────────────────────────────────────────

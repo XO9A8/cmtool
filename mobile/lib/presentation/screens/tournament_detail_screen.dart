@@ -14,6 +14,7 @@ import '../widgets/forfeit_claim_modal.dart';
 import '../widgets/ocr_upload_modal.dart';
 import 'player_profile_screen.dart';
 import '../widgets/tournament_leaders_widget.dart';
+import '../widgets/tournament_player_standings_widget.dart';
 import '../widgets/reschedule_dialog.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -131,6 +132,7 @@ class _TournamentDetailScreenState
 
     ref.invalidate(tournamentBracketProvider(widget.tournamentId));
     ref.invalidate(leagueStandingsProvider(widget.tournamentId));
+    ref.invalidate(tournamentPlayerStatsProvider(widget.tournamentId));
     ref.invalidate(matchdaysProvider(widget.tournamentId));
     ref.invalidate(tournamentProgressProvider(widget.tournamentId));
     ref.invalidate(clubTournamentsProvider);
@@ -2017,7 +2019,7 @@ class _BracketVersusPill extends ConsumerWidget {
 // Tab 2: Standings
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _StandingsTab extends StatelessWidget {
+class _StandingsTab extends StatefulWidget {
   final String tournamentId;
   final String formatType;
   final VoidCallback onGoToFixtures;
@@ -2029,78 +2031,168 @@ class _StandingsTab extends StatelessWidget {
   });
 
   @override
+  State<_StandingsTab> createState() => _StandingsTabState();
+}
+
+class _StandingsTabState extends State<_StandingsTab> {
+  int _viewMode = 0; // 0: Table Standings, 1: Top 5 Leaders & Stats
+
+  @override
   Widget build(BuildContext context) {
-    final isDirectKnockout = formatType == 'knockout';
-    final isGroupKnockout = formatType == 'group_knockout';
-
-    if (isGroupKnockout) {
-      return SingleChildScrollView(
-        primary: false,
-        padding: const EdgeInsets.all(16),
-        child: GroupStandingsWidget(
-          tournamentId: tournamentId,
-        )
-            .animate()
-            .fade(duration: 350.ms)
-            .slideY(begin: 0.06, duration: 350.ms),
-      );
-    }
-
-    if (isDirectKnockout) {
-      return SingleChildScrollView(
-        primary: false,
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            TournamentLeadersWidget(tournamentId: tournamentId),
-            const SizedBox(height: 16),
-            GlassCard(
-              borderColor: AppColors.cyan.withValues(alpha: 0.25),
-              child: Column(
-                children: [
-                  const Icon(Icons.account_tree,
-                      color: AppColors.cyan, size: 40),
-                  const SizedBox(height: 16),
-                  Text(
-                    'DIRECT KNOCKOUT BRACKET',
-                    style: GoogleFonts.orbitron(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Direct knockout tournaments use bracket progression rather than standings tables. View the bracket in the Fixtures tab.',
-                    style: GoogleFonts.rajdhani(
-                      color: AppColors.textMuted,
-                      fontSize: 14,
-                      height: 1.4,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 20),
-                  EsportsButton(
-                    label: 'GO TO FIXTURES & BRACKET',
-                    icon: Icons.calendar_month,
-                    gradient: const [AppColors.cyan, AppColors.purple],
-                    onPressed: onGoToFixtures,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ).animate().fade(duration: 300.ms).slideY(begin: 0.06, duration: 300.ms);
-    }
+    final isDirectKnockout = widget.formatType == 'knockout';
+    final isGroupKnockout = widget.formatType == 'group_knockout';
 
     return SingleChildScrollView(
       primary: false,
       padding: const EdgeInsets.all(16),
-      child: LeagueTableWidget(tournamentId: tournamentId)
-          .animate()
-          .fade(duration: 350.ms)
-          .slideY(begin: 0.06, duration: 350.ms),
+      child: Column(
+        children: [
+          // Segmented Sub-Tab Switcher
+          Container(
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.surfaceLight),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: () => setState(() => _viewMode = 0),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: _viewMode == 0
+                            ? AppColors.primary.withValues(alpha: 0.25)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(10),
+                        border: _viewMode == 0
+                            ? Border.all(color: AppColors.primary.withValues(alpha: 0.5))
+                            : null,
+                      ),
+                      alignment: Alignment.center,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.table_chart_outlined,
+                            size: 16,
+                            color: _viewMode == 0 ? AppColors.primary : AppColors.textMuted,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'TABLE STANDINGS',
+                            style: GoogleFonts.orbitron(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: _viewMode == 0 ? Colors.white : AppColors.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: InkWell(
+                    onTap: () => setState(() => _viewMode = 1),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: _viewMode == 1
+                            ? AppColors.primary.withValues(alpha: 0.25)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(10),
+                        border: _viewMode == 1
+                            ? Border.all(color: AppColors.primary.withValues(alpha: 0.5))
+                            : null,
+                      ),
+                      alignment: Alignment.center,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.military_tech,
+                            size: 16,
+                            color: _viewMode == 1 ? AppColors.primary : AppColors.textMuted,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'TOP 5 LEADERS',
+                            style: GoogleFonts.orbitron(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: _viewMode == 1 ? Colors.white : AppColors.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Content body
+          if (_viewMode == 1)
+            TournamentPlayerStandingsWidget(tournamentId: widget.tournamentId)
+          else if (isGroupKnockout)
+            GroupStandingsWidget(tournamentId: widget.tournamentId)
+                .animate()
+                .fade(duration: 350.ms)
+                .slideY(begin: 0.06, duration: 350.ms)
+          else if (isDirectKnockout)
+            Column(
+              children: [
+                TournamentLeadersWidget(tournamentId: widget.tournamentId),
+                const SizedBox(height: 16),
+                GlassCard(
+                  borderColor: AppColors.cyan.withValues(alpha: 0.25),
+                  child: Column(
+                    children: [
+                      const Icon(Icons.account_tree,
+                          color: AppColors.cyan, size: 40),
+                      const SizedBox(height: 16),
+                      Text(
+                        'DIRECT KNOCKOUT BRACKET',
+                        style: GoogleFonts.orbitron(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Direct knockout tournaments use bracket progression rather than standings tables. View the bracket in the Fixtures tab.',
+                        style: GoogleFonts.rajdhani(
+                          color: AppColors.textMuted,
+                          fontSize: 14,
+                          height: 1.4,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 20),
+                      EsportsButton(
+                        label: 'GO TO FIXTURES & BRACKET',
+                        icon: Icons.calendar_month,
+                        gradient: const [AppColors.cyan, AppColors.purple],
+                        onPressed: widget.onGoToFixtures,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ).animate().fade(duration: 300.ms).slideY(begin: 0.06, duration: 300.ms)
+          else
+            LeagueTableWidget(tournamentId: widget.tournamentId)
+                .animate()
+                .fade(duration: 350.ms)
+                .slideY(begin: 0.06, duration: 350.ms),
+        ],
+      ),
     );
   }
 }

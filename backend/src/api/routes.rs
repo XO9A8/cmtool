@@ -68,6 +68,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/api/v1/tournaments/:id", axum::routing::delete(delete_tournament))
 
         .route("/api/v1/tournaments/:id/standings", get(get_league_standings))
+        .route("/api/v1/tournaments/:id/player-stats", get(get_tournament_player_stats))
         .route("/api/v1/tournaments/:id/start", post(start_tournament))
         .route("/api/v1/tournaments/:id/status", post(update_tournament_status))
         .route("/api/v1/tournaments/:id/matchdays", get(get_matchdays))
@@ -2116,6 +2117,22 @@ async fn get_league_standings(
         "standings": result,
         "groups_count": groups_count,
         "advancing_per_group": advancing_per_group,
+    })))
+}
+
+/// Returns aggregated player statistics and top leaders for a tournament.
+async fn get_tournament_player_stats(
+    State(state): State<Arc<AppState>>,
+    _auth: AuthenticatedUser,
+    Path(tournament_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ApiErrorResponse>)> {
+    let player_stats = db::get_tournament_player_stats(&state.pool, tournament_id)
+        .await
+        .map_err(|e| internal_error(e))?;
+
+    Ok(Json(serde_json::json!({
+        "tournament_id": tournament_id,
+        "player_stats": player_stats,
     })))
 }
 

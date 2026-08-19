@@ -2494,11 +2494,11 @@ class _H2hResultWidget extends ConsumerWidget {
                       size: 16, color: AppColors.purple),
                   const SizedBox(width: 6),
                   Text(
-                    'AI MATCH WIN PROBABILITY FORECAST',
+                    'WIN PROBABILITY',
                     style: GoogleFonts.rajdhani(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.purple,
+                      color: const Color.fromARGB(255, 220, 221, 222),
                       letterSpacing: 1.3,
                     ),
                   ),
