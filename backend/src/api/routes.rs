@@ -827,6 +827,10 @@ async fn get_tournament_bracket(
                 "group_name": m.group_name,
                 "player_1_rating": m.player_1_rating,
                 "player_2_rating": m.player_2_rating,
+                "matchday_id": m.matchday_id,
+                "matchday_number": m.matchday_number,
+                "scheduled_at": m.scheduled_at,
+                "is_rescheduled": m.is_rescheduled,
             })
         })
         .collect();
@@ -1755,6 +1759,11 @@ async fn start_tournament(
         .await
         .map_err(|e| internal_error(e))?;
     
+    sqlx::query!("DELETE FROM Matchdays WHERE tournament_id = $1", tournament_id)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| internal_error(e))?;
+    
     sqlx::query!("DELETE FROM League_Standings WHERE tournament_id = $1", tournament_id)
         .execute(&state.pool)
         .await
@@ -1882,48 +1891,62 @@ async fn start_tournament(
             .await
             .map_err(|e| internal_error(e))?;
     } else if format_type == "round_robin" || format_type == "league" {
+        tracing::info!("Generating round robin fixtures for {} players with {} legs", players.len(), legs);
         let fixtures = generate_round_robin_fixtures(tournament_id, players, legs);
         fixtures_count = fixtures.len();
+        tracing::info!("Generated {} fixtures in memory", fixtures_count);
         
         let max_round = fixtures.iter().map(|f| f.round_number).max().unwrap_or(0);
+        tracing::info!("Max round is {}", max_round);
         let matchday_dates = crate::domain::tournament::distribute_matchday_dates(start_date, end_date, max_round as usize);
         let matchdays_data: Vec<(i32, Option<chrono::NaiveDate>)> = (1..=max_round as i32).zip(matchday_dates).collect();
-        let matchday_ids = db::create_matchdays_batch(&state.pool, tournament_id, &matchdays_data).await.map_err(|e| internal_error(e))?;
+        tracing::info!("Creating {} matchdays", matchdays_data.len());
+        let matchday_ids = db::create_matchdays_batch(&state.pool, tournament_id, &matchdays_data).await.map_err(|e| {
+            tracing::error!("Failed to create matchdays: {:?}", e);
+            internal_error(e)
+        })?;
 
-        for f in fixtures.iter() {
+        tracing::info!("Starting to insert {} matches into DB (BULK INSERT)...", fixtures.len());
+        
+        let batch_matches: Vec<_> = fixtures.iter().map(|f| {
             let p1_id = f.player_1.as_ref().map(|p| p.id);
             let p2_id = f.player_2.as_ref().map(|p| p.id);
             let md_id = matchday_ids.get((f.round_number - 1) as usize).copied();
-            
-            db::insert_tournament_match(
-                &state.pool,
-                tournament_id,
-                p1_id,
-                p2_id,
-                f.round_number as i32,
-                f.match_number as i32,
-                None,
-                md_id,
-            )
+            (p1_id, p2_id, f.round_number as i32, f.match_number as i32, None, md_id)
+        }).collect();
+
+        db::insert_tournament_matches_batch(&state.pool, tournament_id, &batch_matches)
             .await
-            .map_err(|e| internal_error(e))?;
-        }
+            .map_err(|e| {
+                tracing::error!("Failed to bulk insert matches: {:?}", e);
+                internal_error(e)
+            })?;
+            
+        tracing::info!("Successfully inserted {} matches", fixtures.len());
         db::initialize_league_standings(&state.pool, tournament_id, &player_ids)
             .await
-            .map_err(|e| internal_error(e))?;
+            .map_err(|e| {
+                tracing::error!("Failed to initialize league standings: {:?}", e);
+                internal_error(e)
+            })?;
+        tracing::info!("Initialized league standings");
     } else {
         return Err(bad_request("INVALID_FORMAT", "Unsupported tournament format."));
     }
 
     db::insert_tournament_participants(&state.pool, tournament_id, &player_ids)
         .await
-        .map_err(|e| internal_error(e))?;
+        .map_err(|e| {
+            tracing::error!("Failed to insert participants: {:?}", e);
+            internal_error(e)
+        })?;
 
     // Set status to active
     db::update_tournament_status(&state.pool, tournament_id, "active")
         .await
         .map_err(|e| internal_error(e))?;
 
+    tracing::info!("Tournament generation complete!");
     Ok(Json(serde_json::json!({
         "tournament_id": tournament_id,
         "status": "active",

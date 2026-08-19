@@ -1459,6 +1459,41 @@ pub async fn insert_tournament_match(
     Ok(id)
 }
 
+pub async fn insert_tournament_matches_batch(
+    pool: &PgPool,
+    tournament_id: Uuid,
+    matches: &[(Option<Uuid>, Option<Uuid>, i32, i32, Option<String>, Option<Uuid>)],
+) -> Result<(), sqlx::Error> {
+    if matches.is_empty() {
+        return Ok(());
+    }
+
+    // Split into chunks if there are too many matches to avoid exceeding PostgreSQL's bind limit (65535)
+    // 9 binds per row. 65535 / 9 = ~7281. Using 1000 for safety.
+    for chunk in matches.chunks(1000) {
+        let mut query_builder = sqlx::QueryBuilder::new(
+            "INSERT INTO T_Matches (id, tournament_id, player_1_id, player_2_id, round_number, match_number, status, group_name, matchday_id) "
+        );
+
+        query_builder.push_values(chunk, |mut b, m| {
+            b.push_bind(Uuid::new_v4())
+             .push_bind(tournament_id)
+             .push_bind(m.0)
+             .push_bind(m.1)
+             .push_bind(m.2 as i16) // round_number is smallint
+             .push_bind(m.3)
+             .push_bind("scheduled")
+             .push_bind(m.4.clone())
+             .push_bind(m.5);
+        });
+
+        let query = query_builder.build();
+        query.execute(pool).await?;
+    }
+
+    Ok(())
+}
+
 /// Batch inserts a list of FixtureNodes into T_Matches.
 pub async fn save_tournament_fixtures(
     pool: &PgPool,

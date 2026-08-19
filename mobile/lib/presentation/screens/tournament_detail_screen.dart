@@ -838,7 +838,8 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
   }
 
   Widget _buildLoading() {
-    return Padding(
+    return SingleChildScrollView(
+      physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
       child: Column(
         children: List.generate(
