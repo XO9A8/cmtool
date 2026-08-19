@@ -88,7 +88,7 @@ pub async fn get_tournament_bracket(
             m.is_rescheduled,
             m.reschedule_reason,
             m.reschedule_count,
-            md.number as "matchday_number: i32",
+            md.matchday_number::INT4 as "matchday_number: i32",
             md.scheduled_date as "matchday_scheduled_date: chrono::NaiveDate"
         FROM T_Matches m
         LEFT JOIN Users u1 ON m.player_1_id = u1.id
@@ -344,6 +344,8 @@ pub async fn get_advancement_context(pool: &PgPool, match_id: Uuid) -> Result<Op
         LEFT JOIN Match_Records mr ON mr.t_match_id = m.id
         LEFT JOIN Tournaments t   ON t.id  = m.tournament_id
         WHERE m.id = $1 OR mr.id = $1
+        ORDER BY mr.created_at ASC
+        LIMIT 1
         "#,
         match_id
     )
@@ -374,7 +376,7 @@ pub async fn update_match_scores_completed(pool: &PgPool, match_id: Uuid, p1_goa
 
 pub async fn get_pending_matches_count(pool: &PgPool, tournament_id: Uuid) -> Result<i64, sqlx::Error> {
     let count: Option<i64> = sqlx::query_scalar!(
-        "SELECT COUNT(*) FROM T_Matches WHERE tournament_id = $1 AND status != 'completed'",
+        "SELECT COUNT(*) FROM T_Matches WHERE tournament_id = $1 AND status NOT IN ('completed', 'bye')",
         tournament_id
     )
     .fetch_one(pool)

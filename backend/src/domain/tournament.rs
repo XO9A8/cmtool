@@ -325,12 +325,6 @@ pub struct MatchPrediction {
     pub expected_score_p1: f64,
     /// Raw expected score for Player 2.
     pub expected_score_p2: f64,
-    #[serde(default)]
-    pub player_1_win_probability: f64,
-    #[serde(default)]
-    pub draw_probability: f64,
-    #[serde(default)]
-    pub player_2_win_probability: f64,
 }
 
 /// Advanced match prediction considering Elo, H2H record, player form, and draw tendencies.
@@ -397,9 +391,6 @@ pub fn predict_match_outcome_advanced(
         player_2_win_prob,
         expected_score_p1: (e1 * 1000.0).round() / 1000.0,
         expected_score_p2: (e2 * 1000.0).round() / 1000.0,
-        player_1_win_probability: player_1_win_prob,
-        draw_probability: draw_prob_rounded,
-        player_2_win_probability: player_2_win_prob,
     }
 }
 
@@ -483,7 +474,13 @@ pub async fn process_tournament_advancement(
         .map_err(|e| e.to_string())?;
 
     // 4. Determine winner
-    let winner_id = if p1_goals > p2_goals { p1_id } else { p2_id };
+    let winner_id = if p1_goals > p2_goals {
+        Some(p1_id)
+    } else if p2_goals > p1_goals {
+        Some(p2_id)
+    } else {
+        None
+    };
 
     // 5a. League / Group-stage path → update standings with idempotency guard
     if is_group_or_league {
@@ -515,7 +512,7 @@ pub async fn process_tournament_advancement(
             tm.t_match_id,
             tm.round_number as i32,
             tm.match_number,
-            winner_id,
+            winner_id.unwrap(),
         ).await {
             // Non-fatal: log but don't fail the confirmation
             eprintln!("[tournament] advance_knockout_winner failed for t_match {}: {}", tm.t_match_id, e);
@@ -548,10 +545,28 @@ pub async fn process_tournament_advancement(
                         f.round_number += round_offset;
                     }
                     
-                    let max_bracket_round = fixtures.iter().map(|f| f.round_number).max().unwrap_or(0);
+                    let max_bracket_round = round_offset + bracket.total_rounds;
                     let mut matchdays_data = Vec::new();
-                    for r in (round_offset + 1)..=max_bracket_round {
-                        matchdays_data.push((r as i32, None));
+                    
+                    let tournament_info: Option<(Option<chrono::NaiveDate>, Option<chrono::NaiveDate>)> = sqlx::query_as(
+                        "SELECT start_date, end_date FROM Tournaments WHERE id = $1"
+                    )
+                    .bind(tourney_id)
+                    .fetch_optional(pool)
+                    .await
+                    .unwrap_or(None);
+
+                    if let Some((_, Some(end_date))) = tournament_info {
+                        let start_date = chrono::Utc::now().naive_utc().date();
+                        let phase_two_rounds = bracket.total_rounds as usize;
+                        let phase_two_dates = distribute_matchday_dates(Some(start_date), Some(end_date), phase_two_rounds);
+                        for (r, d) in ((round_offset + 1)..=max_bracket_round).zip(phase_two_dates) {
+                            matchdays_data.push((r as i32, d));
+                        }
+                    } else {
+                        for r in (round_offset + 1)..=max_bracket_round {
+                            matchdays_data.push((r as i32, None));
+                        }
                     }
                     let matchday_ids = crate::infrastructure::postgres_adapter::create_matchdays_batch(pool, tourney_id, &matchdays_data).await.unwrap_or_default();
                     

@@ -273,7 +273,7 @@ pub async fn get_league_standings(
         LEFT JOIN Users u ON ls.player_id = u.id
         LEFT JOIN Player_Profiles pp ON u.id = pp.user_id
         WHERE ls.tournament_id = $1
-        ORDER BY ls.group_name ASC NULLS FIRST, ls.points DESC, ls.goal_diff DESC, ls.goals_for DESC
+        ORDER BY ls.group_name ASC NULLS FIRST, ls.points DESC, ls.goal_diff DESC, ls.goals_for DESC, ls.won DESC, ls.drawn DESC
         "#,
     )
     .bind(tournament_id)
@@ -350,19 +350,22 @@ pub async fn initialize_league_standings(
     tournament_id: Uuid,
     player_ids: &[Uuid],
 ) -> Result<(), sqlx::Error> {
-    for pid in player_ids {
-        sqlx::query(
-            r#"
-            INSERT INTO League_Standings (tournament_id, player_id)
-            VALUES ($1, $2)
-            ON CONFLICT (tournament_id, player_id) DO NOTHING
-            "#,
-        )
-        .bind(tournament_id)
-        .bind(pid)
-        .execute(pool)
-        .await?;
+    if player_ids.is_empty() {
+        return Ok(());
     }
+
+    let mut query_builder = sqlx::QueryBuilder::new(
+        "INSERT INTO League_Standings (tournament_id, player_id) "
+    );
+    
+    query_builder.push_values(player_ids, |mut b, pid| {
+        b.push_bind(tournament_id)
+         .push_bind(*pid);
+    });
+
+    query_builder.push(" ON CONFLICT (tournament_id, player_id) DO NOTHING");
+
+    query_builder.build().execute(pool).await?;
 
     Ok(())
 }
@@ -373,20 +376,23 @@ pub async fn initialize_league_standings_with_groups(
     tournament_id: Uuid,
     player_groups: &[(Uuid, String)],
 ) -> Result<(), sqlx::Error> {
-    for (pid, gname) in player_groups {
-        sqlx::query(
-            r#"
-            INSERT INTO League_Standings (tournament_id, player_id, group_name)
-            VALUES ($1, $2, $3)
-            ON CONFLICT (tournament_id, player_id) DO UPDATE SET group_name = EXCLUDED.group_name
-            "#,
-        )
-        .bind(tournament_id)
-        .bind(pid)
-        .bind(gname)
-        .execute(pool)
-        .await?;
+    if player_groups.is_empty() {
+        return Ok(());
     }
+
+    let mut query_builder = sqlx::QueryBuilder::new(
+        "INSERT INTO League_Standings (tournament_id, player_id, group_name) "
+    );
+    
+    query_builder.push_values(player_groups, |mut b, (pid, gname)| {
+        b.push_bind(tournament_id)
+         .push_bind(*pid)
+         .push_bind(gname);
+    });
+
+    query_builder.push(" ON CONFLICT (tournament_id, player_id) DO UPDATE SET group_name = EXCLUDED.group_name");
+
+    query_builder.build().execute(pool).await?;
 
     Ok(())
 }
@@ -484,7 +490,100 @@ pub async fn advance_knockout_winner(
     current_match_number: i32,
     winner_id: Uuid,
 ) -> Result<(), sqlx::Error> {
-    // BUG-7 Check if tournament is complete by ensuring no pending active matches remain
+    // Check if the current round is the final round (only 1 match in the round)
+    let matches_in_round: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM T_Matches WHERE tournament_id = $1 AND round_number = $2 AND group_name IS NULL"
+    )
+    .bind(tournament_id)
+    .bind(current_round)
+    .fetch_one(pool)
+    .await
+    .unwrap_or(0);
+
+    if matches_in_round > 1 {
+        let next_round = current_round + 1;
+        let next_slot  = (current_match_number + 1) / 2;
+
+        // Check if a TBD row exists for this next slot
+        let existing: Option<(Uuid, Option<Uuid>, Option<Uuid>)> = sqlx::query_as(
+            r#"
+            SELECT id, player_1_id, player_2_id
+            FROM T_Matches
+            WHERE tournament_id = $1 AND round_number = $2 AND match_number = $3
+            LIMIT 1
+            "#,
+        )
+        .bind(tournament_id)
+        .bind(next_round)
+        .bind(next_slot)
+        .fetch_optional(pool)
+        .await?;
+
+        if let Some((row_id, p1, p2)) = existing {
+            // Prevent double advancement if winner is already assigned
+            if p1 == Some(winner_id) || p2 == Some(winner_id) {
+                // already advanced
+            } else if p1.is_none() {
+                sqlx::query(
+                    "UPDATE T_Matches SET player_1_id = $1, updated_at = NOW() WHERE id = $2"
+                )
+                .bind(winner_id)
+                .bind(row_id)
+                .execute(pool)
+                .await?;
+            } else if p2.is_none() {
+                sqlx::query(
+                    "UPDATE T_Matches SET player_2_id = $1, updated_at = NOW() WHERE id = $2"
+                )
+                .bind(winner_id)
+                .bind(row_id)
+                .execute(pool)
+                .await?;
+            }
+        } else {
+            // Fetch matchday_id for the next round
+            let matchday_id: Option<Uuid> = sqlx::query_scalar(
+                "SELECT id FROM Matchdays WHERE tournament_id = $1 AND matchday_number = $2 LIMIT 1"
+            )
+            .bind(tournament_id)
+            .bind(next_round as i16)
+            .fetch_optional(pool)
+            .await
+            .unwrap_or(None);
+            
+            let scheduled_at: Option<chrono::DateTime<chrono::Utc>> = if let Some(md_id) = matchday_id {
+                let md_date: Option<chrono::NaiveDate> = sqlx::query_scalar("SELECT scheduled_date FROM Matchdays WHERE id = $1")
+                    .bind(md_id)
+                    .fetch_optional(pool)
+                    .await
+                    .unwrap_or(None)
+                    .flatten();
+                md_date.map(|d| d.and_hms_opt(12, 0, 0).unwrap().and_utc())
+            } else {
+                None
+            };
+
+            // No TBD row yet — create one with winner as player_1; sibling will fill player_2
+            let new_id = Uuid::new_v4();
+            sqlx::query(
+                r#"
+                INSERT INTO T_Matches (id, tournament_id, player_1_id, player_2_id, round_number, match_number, status, matchday_id, scheduled_at)
+                VALUES ($1, $2, $3, NULL, $4, $5, 'scheduled', $6, $7)
+                "#,
+            )
+            .bind(new_id)
+            .bind(tournament_id)
+            .bind(winner_id)
+            .bind(next_round)
+            .bind(next_slot)
+            .bind(matchday_id)
+            .bind(scheduled_at)
+            .execute(pool)
+            .await?;
+        }
+    }
+
+    // Now check if tournament is complete by ensuring no pending active matches remain
     let pending_count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM T_Matches WHERE tournament_id = $1 AND status NOT IN ('completed', 'bye')"
     )
@@ -499,68 +598,6 @@ pub async fn advance_knockout_winner(
             .bind(tournament_id)
             .execute(pool)
             .await;
-        return Ok(());
-    }
-
-
-    let next_round = current_round + 1;
-    let next_slot  = (current_match_number + 1) / 2;
-
-    // Check if a TBD row exists for this next slot
-    let existing: Option<(Uuid, Option<Uuid>, Option<Uuid>)> = sqlx::query_as(
-        r#"
-        SELECT id, player_1_id, player_2_id
-        FROM T_Matches
-        WHERE tournament_id = $1 AND round_number = $2 AND match_number = $3
-        LIMIT 1
-        "#,
-    )
-    .bind(tournament_id)
-    .bind(next_round)
-    .bind(next_slot)
-    .fetch_optional(pool)
-    .await?;
-
-    if let Some((row_id, p1, p2)) = existing {
-        // Prevent double advancement if winner is already assigned
-        if p1 == Some(winner_id) || p2 == Some(winner_id) {
-            return Ok(());
-        }
-        // Fill the empty slot
-        if p1.is_none() {
-            sqlx::query(
-                "UPDATE T_Matches SET player_1_id = $1, updated_at = NOW() WHERE id = $2"
-            )
-            .bind(winner_id)
-            .bind(row_id)
-            .execute(pool)
-            .await?;
-        } else if p2.is_none() {
-            sqlx::query(
-                "UPDATE T_Matches SET player_2_id = $1, updated_at = NOW() WHERE id = $2"
-            )
-            .bind(winner_id)
-            .bind(row_id)
-            .execute(pool)
-            .await?;
-        }
-        // Both slots filled means the match is ready to play (no action needed)
-    } else {
-        // No TBD row yet — create one with winner as player_1; sibling will fill player_2
-        let new_id = Uuid::new_v4();
-        sqlx::query(
-            r#"
-            INSERT INTO T_Matches (id, tournament_id, player_1_id, player_2_id, round_number, match_number, status)
-            VALUES ($1, $2, $3, NULL, $4, $5, 'scheduled')
-            "#,
-        )
-        .bind(new_id)
-        .bind(tournament_id)
-        .bind(winner_id)
-        .bind(next_round)
-        .bind(next_slot)
-        .execute(pool)
-        .await?;
     }
 
     Ok(())

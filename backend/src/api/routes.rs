@@ -1827,25 +1827,29 @@ async fn start_tournament(
     let legs = rules_config.get("legs").and_then(|v| v.as_u64()).unwrap_or(1) as u32;
 
     // Clean up any partially generated fixtures/participants from a previous failed start attempt
+    let mut tx = state.pool.begin().await.map_err(|e| internal_error(e))?;
+
     sqlx::query!("DELETE FROM T_Matches WHERE tournament_id = $1", tournament_id)
-        .execute(&state.pool)
+        .execute(&mut *tx)
         .await
         .map_err(|e| internal_error(e))?;
     
     sqlx::query!("DELETE FROM Matchdays WHERE tournament_id = $1", tournament_id)
-        .execute(&state.pool)
+        .execute(&mut *tx)
         .await
         .map_err(|e| internal_error(e))?;
     
     sqlx::query!("DELETE FROM League_Standings WHERE tournament_id = $1", tournament_id)
-        .execute(&state.pool)
+        .execute(&mut *tx)
         .await
         .map_err(|e| internal_error(e))?;
 
     sqlx::query!("DELETE FROM Tournament_Participants WHERE tournament_id = $1", tournament_id)
-        .execute(&state.pool)
+        .execute(&mut *tx)
         .await
         .map_err(|e| internal_error(e))?;
+
+    tx.commit().await.map_err(|e| internal_error(e))?;
 
     if players.is_empty() {
         let members = db::get_club_members(&state.pool, club_id)
@@ -1884,10 +1888,11 @@ async fn start_tournament(
     let fixtures_count: usize;
 
     if format_type == "knockout" {
-        let fixtures = generate_knockout_bracket(tournament_id, players).fixtures;
+        let bracket = generate_knockout_bracket(tournament_id, players);
+        let fixtures = bracket.fixtures;
         fixtures_count = fixtures.len();
         
-        let max_round = fixtures.iter().map(|f| f.round_number).max().unwrap_or(0);
+        let max_round = bracket.total_rounds;
         let matchday_dates = crate::domain::tournament::distribute_matchday_dates(start_date, end_date, max_round as usize);
         let matchdays_data: Vec<(i32, Option<chrono::NaiveDate>)> = (1..=max_round as i32).zip(matchday_dates).collect();
         let matchday_ids = db::create_matchdays_batch(&state.pool, tournament_id, &matchdays_data).await.map_err(|e| internal_error(e))?;
@@ -2539,13 +2544,17 @@ async fn reschedule_match(
     let is_official = db::is_club_official(&state.pool, club_id, auth.user_id).await.map_err(|e| internal_error(e))?;
     if !is_official { return Err(forbidden("FORBIDDEN", "Only officials can reschedule matches.")); }
 
-    let actual_match: Option<(Uuid, Option<Uuid>, Option<Uuid>, Option<Uuid>, i32)> = sqlx::query_as("SELECT tournament_id, matchday_id, player_1_id, player_2_id, reschedule_count FROM T_Matches WHERE id = $1")
+    let actual_match: Option<(Uuid, Option<Uuid>, Option<Uuid>, Option<Uuid>, i32, String)> = sqlx::query_as("SELECT tournament_id, matchday_id, player_1_id, player_2_id, reschedule_count, status FROM T_Matches WHERE id = $1")
         .bind(match_id)
         .fetch_optional(&state.pool)
         .await
         .map_err(|e| internal_error(e))?;
         
-    let (actual_t_id, matchday_id, p1_id, p2_id, reschedule_count) = actual_match.ok_or_else(|| bad_request("NOT_FOUND", "Match not found"))?;
+    let (actual_t_id, matchday_id, p1_id, p2_id, reschedule_count, status) = actual_match.ok_or_else(|| bad_request("NOT_FOUND", "Match not found"))?;
+    
+    if status == "completed" {
+        return Err(bad_request("ALREADY_COMPLETED", "Cannot reschedule a completed match"));
+    }
     
     if actual_t_id != tournament_id {
         return Err(bad_request("INVALID_MATCH", "Match does not belong to this tournament"));
