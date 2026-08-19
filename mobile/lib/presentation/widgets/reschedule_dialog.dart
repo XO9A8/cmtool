@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../core/theme/colors.dart';
+import '../../infrastructure/api_client.dart';
 import '../theme/app_theme.dart';
 import '../providers/match_provider.dart';
+import 'glass_card.dart';
 
 class RescheduleDialog extends ConsumerStatefulWidget {
   final String tournamentId;
@@ -139,8 +142,9 @@ class _RescheduleDialogState extends ConsumerState<RescheduleDialog> {
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
+        final errMsg = ApiClient.formatErrorMessage(e);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e', style: const TextStyle(color: Colors.white))),
+          SnackBar(content: Text(errMsg, style: const TextStyle(color: Colors.white))),
         );
       }
     } finally {

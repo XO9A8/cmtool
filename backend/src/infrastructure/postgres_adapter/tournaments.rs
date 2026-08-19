@@ -45,12 +45,14 @@ pub struct TMatchRow {
     pub reschedule_reason: Option<String>,
     pub matchday_number: Option<i32>,
     pub matchday_scheduled_date: Option<chrono::NaiveDate>,
+    pub reschedule_count: i32,
 }
 
 /// Fetches all T_Matches for a tournament, ordered by round number.
 pub async fn get_tournament_bracket(
     pool: &PgPool,
     tournament_id: Uuid,
+    matchday_id: Option<Uuid>,
 ) -> Result<Vec<TMatchRow>, sqlx::Error> {
     let rows = sqlx::query_as::<_, TMatchRow>(
         r#"
@@ -75,7 +77,7 @@ pub async fn get_tournament_bracket(
             END AS winner_player_id,
             COALESCE(m.player_1_score, CASE WHEN mr.id IS NOT NULL AND mr.player_id = m.player_1_id THEN mr.goals_for WHEN mr.id IS NOT NULL AND mr.player_id = m.player_2_id THEN mr.goals_against ELSE NULL END)::INT4 AS player_1_score,
             COALESCE(m.player_2_score, CASE WHEN mr.id IS NOT NULL AND mr.player_id = m.player_2_id THEN mr.goals_for WHEN mr.id IS NOT NULL AND mr.player_id = m.player_1_id THEN mr.goals_against ELSE NULL END)::INT4 AS player_2_score,
-            COALESCE(m.group_name, ls1.group_name, ls2.group_name) AS group_name,
+            m.group_name,
             cm1.skill_rating AS player_1_rating,
             cm2.skill_rating AS player_2_rating,
             pp1.avatar_graphic AS player_1_avatar,
@@ -85,25 +87,25 @@ pub async fn get_tournament_bracket(
             m.original_scheduled_at,
             m.is_rescheduled,
             m.reschedule_reason,
-            md.matchday_number::INT4 AS matchday_number,
-            md.scheduled_date AS matchday_scheduled_date
+            m.reschedule_count,
+            md.number as "matchday_number: i32",
+            md.scheduled_date as "matchday_scheduled_date: chrono::NaiveDate"
         FROM T_Matches m
         LEFT JOIN Users u1 ON m.player_1_id = u1.id
         LEFT JOIN Users u2 ON m.player_2_id = u2.id
         LEFT JOIN Player_Profiles pp1 ON u1.id = pp1.user_id
         LEFT JOIN Player_Profiles pp2 ON u2.id = pp2.user_id
         LEFT JOIN LATERAL (SELECT * FROM Match_Records WHERE t_match_id = m.id LIMIT 1) mr ON true
-        LEFT JOIN League_Standings ls1 ON ls1.tournament_id = m.tournament_id AND ls1.player_id = m.player_1_id
-        LEFT JOIN League_Standings ls2 ON ls2.tournament_id = m.tournament_id AND ls2.player_id = m.player_2_id
         LEFT JOIN Tournaments t ON m.tournament_id = t.id
         LEFT JOIN Club_Memberships cm1 ON cm1.player_id = m.player_1_id AND cm1.club_id = t.club_id
         LEFT JOIN Club_Memberships cm2 ON cm2.player_id = m.player_2_id AND cm2.club_id = t.club_id
         LEFT JOIN Matchdays md ON m.matchday_id = md.id
-        WHERE m.tournament_id = $1
+        WHERE m.tournament_id = $1 AND ($2::UUID IS NULL OR m.matchday_id = $2)
         ORDER BY m.round_number ASC, m.created_at ASC
         "#,
     )
     .bind(tournament_id)
+    .bind(matchday_id)
     .fetch_all(pool)
     .await?;
 
@@ -218,12 +220,13 @@ pub async fn insert_tournament_match(
     match_number: i32,
     group_name: Option<&str>,
     matchday_id: Option<Uuid>,
+    scheduled_at: Option<chrono::DateTime<chrono::Utc>>,
 ) -> Result<Uuid, sqlx::Error> {
     let id = Uuid::new_v4();
     sqlx::query(
         r#"
-        INSERT INTO T_Matches (id, tournament_id, player_1_id, player_2_id, round_number, match_number, status, group_name, matchday_id)
-        VALUES ($1, $2, $3, $4, $5, $6, 'scheduled', $7, $8)
+        INSERT INTO T_Matches (id, tournament_id, player_1_id, player_2_id, round_number, match_number, status, group_name, matchday_id, scheduled_at)
+        VALUES ($1, $2, $3, $4, $5, $6, 'scheduled', $7, $8, $9)
         "#,
     )
     .bind(id)
@@ -234,6 +237,7 @@ pub async fn insert_tournament_match(
     .bind(match_number)
     .bind(group_name)
     .bind(matchday_id)
+    .bind(scheduled_at)
     .execute(pool)
     .await?;
 
@@ -243,17 +247,17 @@ pub async fn insert_tournament_match(
 pub async fn insert_tournament_matches_batch(
     pool: &PgPool,
     tournament_id: Uuid,
-    matches: &[(Option<Uuid>, Option<Uuid>, i32, i32, Option<String>, Option<Uuid>)],
+    matches: &[(Option<Uuid>, Option<Uuid>, i32, i32, Option<String>, Option<Uuid>, Option<chrono::DateTime<chrono::Utc>>)],
 ) -> Result<(), sqlx::Error> {
     if matches.is_empty() {
         return Ok(());
     }
 
     // Split into chunks if there are too many matches to avoid exceeding PostgreSQL's bind limit (65535)
-    // 9 binds per row. 65535 / 9 = ~7281. Using 1000 for safety.
+    // 10 binds per row. 65535 / 10 = ~6553. Using 1000 for safety.
     for chunk in matches.chunks(1000) {
         let mut query_builder = sqlx::QueryBuilder::new(
-            "INSERT INTO T_Matches (id, tournament_id, player_1_id, player_2_id, round_number, match_number, status, group_name, matchday_id) "
+            "INSERT INTO T_Matches (id, tournament_id, player_1_id, player_2_id, round_number, match_number, status, group_name, matchday_id, scheduled_at) "
         );
 
         query_builder.push_values(chunk, |mut b, m| {
@@ -265,7 +269,8 @@ pub async fn insert_tournament_matches_batch(
              .push_bind(m.3)
              .push_bind("scheduled")
              .push_bind(m.4.clone())
-             .push_bind(m.5);
+             .push_bind(m.5)
+             .push_bind(m.6);
         });
 
         let query = query_builder.build();
@@ -280,19 +285,111 @@ pub async fn save_tournament_fixtures(
     pool: &PgPool,
     tournament_id: Uuid,
     fixtures: Vec<crate::domain::tournament::FixtureNode>,
+    matchday_ids: &[Uuid],
+    round_offset: u32,
 ) -> Result<(), sqlx::Error> {
-    for fixture in fixtures {
-        insert_tournament_match(
-            pool,
-            tournament_id,
-            fixture.player_1.map(|p| p.id),
-            fixture.player_2.map(|p| p.id),
-            fixture.round_number as i32,
-            fixture.match_number as i32,
-            None,
-            None,
-        ).await?;
-    }
+    let batch_matches: Vec<_> = fixtures.iter().map(|f| {
+        let p1_id = f.player_1.as_ref().map(|p| p.id);
+        let p2_id = f.player_2.as_ref().map(|p| p.id);
+        let idx = f.round_number.saturating_sub(round_offset).saturating_sub(1) as usize;
+        let md_id = matchday_ids.get(idx).copied();
+        (p1_id, p2_id, f.round_number as i32, f.match_number as i32, None, md_id, None)
+    }).collect();
+
+    insert_tournament_matches_batch(pool, tournament_id, &batch_matches).await?;
     Ok(())
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// IMP-7: Auto-Advancement SQL Extract
+// ─────────────────────────────────────────────────────────────────────────────
+
+pub struct AdvancementContext {
+    pub t_match_id: Uuid,
+    pub tournament_id: Uuid,
+    pub player_1_id: Option<Uuid>,
+    pub player_2_id: Option<Uuid>,
+    pub round_number: i32,
+    pub match_number: i32,
+    pub group_name: Option<String>,
+    pub match_status: String,
+    pub matchday_id: Option<Uuid>,
+    pub format_type: String,
+    pub mr_id: Option<Uuid>,
+    pub mr_player_id: Option<Uuid>,
+    pub goals_for: Option<i32>,
+    pub goals_against: Option<i32>,
+}
+
+pub async fn get_advancement_context(pool: &PgPool, match_id: Uuid) -> Result<Option<AdvancementContext>, sqlx::Error> {
+    sqlx::query_as!(
+        AdvancementContext,
+        r#"
+        SELECT
+            m.id          AS t_match_id,
+            m.tournament_id,
+            m.player_1_id,
+            m.player_2_id,
+            m.round_number,
+            m.match_number,
+            m.group_name,
+            m.status      AS "match_status: String",
+            m.matchday_id,
+            t.format_type,
+            mr.id         AS "mr_id?: Uuid",
+            mr.player_id  AS "mr_player_id?: Uuid",
+            mr.goals_for  AS "goals_for?: i32",
+            mr.goals_against AS "goals_against?: i32"
+        FROM T_Matches m
+        LEFT JOIN Match_Records mr ON mr.t_match_id = m.id
+        LEFT JOIN Tournaments t   ON t.id  = m.tournament_id
+        WHERE m.id = $1 OR mr.id = $1
+        "#,
+        match_id
+    )
+    .fetch_optional(pool)
+    .await
+}
+
+pub async fn get_match_scores(pool: &PgPool, match_id: Uuid) -> Result<Option<(Option<i32>, Option<i32>)>, sqlx::Error> {
+    let row = sqlx::query!(
+        "SELECT player_1_score, player_2_score FROM T_Matches WHERE id = $1",
+        match_id
+    )
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(row.map(|r| (r.player_1_score.map(|s| s as i32), r.player_2_score.map(|s| s as i32))))
+}
+
+pub async fn update_match_scores_completed(pool: &PgPool, match_id: Uuid, p1_goals: i32, p2_goals: i32) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        "UPDATE T_Matches SET player_1_score = $1, player_2_score = $2, status = 'completed' WHERE id = $3",
+        p1_goals as i16, p2_goals as i16, match_id
+    )
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub async fn get_pending_matches_count(pool: &PgPool, tournament_id: Uuid) -> Result<i64, sqlx::Error> {
+    let count: Option<i64> = sqlx::query_scalar!(
+        "SELECT COUNT(*) FROM T_Matches WHERE tournament_id = $1 AND status != 'completed'",
+        tournament_id
+    )
+    .fetch_one(pool)
+    .await?;
+    Ok(count.unwrap_or(0))
+}
+
+pub async fn get_max_group_round(pool: &PgPool, tournament_id: Uuid) -> Result<Option<i32>, sqlx::Error> {
+    let max = sqlx::query_scalar!(
+        "SELECT MAX(round_number) FROM T_Matches WHERE tournament_id = $1 AND group_name IS NOT NULL",
+        tournament_id
+    )
+    .fetch_optional(pool)
+    .await?
+    .flatten()
+    .map(|r| r as i32);
+    Ok(max)
+}

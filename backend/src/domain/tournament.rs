@@ -55,9 +55,12 @@ pub fn distribute_matchday_dates(
     if num_matchdays == 0 {
         return vec![];
     }
+    if num_matchdays == 1 {
+        return vec![start_date];
+    }
     
     match (start_date, end_date) {
-        (Some(start), Some(end)) if num_matchdays > 1 => {
+        (Some(start), Some(end)) => {
             let total_days = (end - start).num_days();
             if total_days <= 0 {
                 // If end date is before start date, fallback to 1 week per matchday
@@ -422,32 +425,9 @@ pub async fn process_tournament_advancement(
     println!("[tournament] Auto-advancement triggered for match_id: {}", match_id);
 
     // 1. Fetch full context — T_Match + linked Match_Records + tournament format
-    let t_match = sqlx::query!(
-        r#"
-        SELECT
-            m.id          AS t_match_id,
-            m.tournament_id,
-            m.player_1_id,
-            m.player_2_id,
-            m.round_number,
-            m.match_number,
-            m.group_name,
-            m.status      AS "match_status: String",
-            t.format_type,
-            mr.id         AS "mr_id?: Uuid",
-            mr.player_id  AS "mr_player_id?: Uuid",
-            mr.goals_for  AS "goals_for?: i32",
-            mr.goals_against AS "goals_against?: i32"
-        FROM T_Matches m
-        LEFT JOIN Match_Records mr ON mr.t_match_id = m.id
-        LEFT JOIN Tournaments t   ON t.id  = m.tournament_id
-        WHERE m.id = $1 OR mr.id = $1
-        "#,
-        match_id
-    )
-    .fetch_optional(pool)
-    .await
-    .map_err(|e| e.to_string())?;
+    let t_match = crate::infrastructure::postgres_adapter::get_advancement_context(pool, match_id)
+        .await
+        .map_err(|e| e.to_string())?;
 
     let tm = match t_match {
         Some(t) => t,
@@ -477,17 +457,13 @@ pub async fn process_tournament_advancement(
     } else {
         // No linked match record yet (e.g. forfeit path sets score directly)
         // Read scores from T_Matches columns instead
-        let scores = sqlx::query!(
-            "SELECT player_1_score, player_2_score FROM T_Matches WHERE id = $1",
-            tm.t_match_id
-        )
-        .fetch_optional(pool)
-        .await
-        .map_err(|e| e.to_string())?;
+        let scores = crate::infrastructure::postgres_adapter::get_match_scores(pool, tm.t_match_id)
+            .await
+            .map_err(|e| e.to_string())?;
 
-        match scores.and_then(|s| Some((s.player_1_score?, s.player_2_score?))) {
-            Some((s1, s2)) => (s1 as i32, s2 as i32),
-            None => return Ok(()), // No score data available yet
+        match scores {
+            Some((Some(s1), Some(s2))) => (s1, s2),
+            _ => return Ok(()), // No score data available yet
         }
     };
 
@@ -502,15 +478,9 @@ pub async fn process_tournament_advancement(
     }
 
     // 3. Mark T_Match as completed with final scores
-    sqlx::query(
-        "UPDATE T_Matches SET player_1_score = $1, player_2_score = $2, status = 'completed' WHERE id = $3"
-    )
-    .bind(p1_goals)
-    .bind(p2_goals)
-    .bind(tm.t_match_id)
-    .execute(pool)
-    .await
-    .map_err(|e| e.to_string())?;
+    crate::infrastructure::postgres_adapter::update_match_scores_completed(pool, tm.t_match_id, p1_goals, p2_goals)
+        .await
+        .map_err(|e| e.to_string())?;
 
     // 4. Determine winner
     let winner_id = if p1_goals > p2_goals { p1_id } else { p2_id };
@@ -524,6 +494,17 @@ pub async fn process_tournament_advancement(
         crate::infrastructure::postgres_adapter::update_league_standing_guarded(
             pool, tourney_id, tm.t_match_id, p2_id, p2_goals as i32, p1_goals as i32,
         ).await.map_err(|e| e.to_string())?;
+
+        // ADD-4: Check if league tournament is complete
+        if format == "round_robin" || format == "league" {
+            let pending_matches = crate::infrastructure::postgres_adapter::get_pending_matches_count(pool, tourney_id)
+                .await
+                .unwrap_or(1);
+
+            if pending_matches == 0 {
+                let _ = crate::infrastructure::postgres_adapter::update_tournament_status(pool, tourney_id, "completed").await;
+            }
+        }
     }
 
     // 5b. Knockout path → advance winner to next round
@@ -557,18 +538,34 @@ pub async fn process_tournament_advancement(
                     let bracket = generate_group_knockout_phase_two_fixtures(tourney_id, standings, advancing);
                     
                     // Offset the round_number for Phase Two fixtures to ensure they start after group matches
-                    // A safe high number is 10 to separate them from Group Stages (Round 1, 2, 3...)
+                    let max_group_round = crate::infrastructure::postgres_adapter::get_max_group_round(pool, tourney_id)
+                        .await
+                        .unwrap_or(None);
+                    
+                    let round_offset = max_group_round.unwrap_or(0) as u32;
                     let mut fixtures = bracket.fixtures;
                     for f in &mut fixtures {
-                        f.round_number += 10;
+                        f.round_number += round_offset;
                     }
                     
-                    if let Err(e) = crate::infrastructure::postgres_adapter::save_tournament_fixtures(pool, tourney_id, fixtures).await {
+                    let max_bracket_round = fixtures.iter().map(|f| f.round_number).max().unwrap_or(0);
+                    let mut matchdays_data = Vec::new();
+                    for r in (round_offset + 1)..=max_bracket_round {
+                        matchdays_data.push((r as i32, None));
+                    }
+                    let matchday_ids = crate::infrastructure::postgres_adapter::create_matchdays_batch(pool, tourney_id, &matchdays_data).await.unwrap_or_default();
+                    
+                    if let Err(e) = crate::infrastructure::postgres_adapter::save_tournament_fixtures(pool, tourney_id, fixtures, &matchday_ids, round_offset).await {
                         eprintln!("[tournament] Failed to save Phase Two knockout fixtures: {}", e);
                     }
                 }
             }
         }
+    }
+
+    // BUG-1: Auto-update matchday status
+    if let Some(md_id) = tm.matchday_id {
+        let _ = crate::infrastructure::postgres_adapter::update_matchday_status(pool, md_id).await;
     }
 
     Ok(())

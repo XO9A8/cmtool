@@ -39,20 +39,27 @@ pub async fn create_matchdays_batch(
     tournament_id: Uuid,
     matchdays: &[(i32, Option<chrono::NaiveDate>)],
 ) -> Result<Vec<Uuid>, sqlx::Error> {
-    let mut ids = Vec::new();
-    for (number, date) in matchdays {
-        let id = Uuid::new_v4();
-        sqlx::query(
-            "INSERT INTO Matchdays (id, tournament_id, matchday_number, scheduled_date, status) VALUES ($1, $2, $3, $4, 'upcoming')"
-        )
-        .bind(id)
-        .bind(tournament_id)
-        .bind(number)
-        .bind(date)
-        .execute(pool)
-        .await?;
-        ids.push(id);
+    if matchdays.is_empty() {
+        return Ok(Vec::new());
     }
+
+    let mut ids = Vec::with_capacity(matchdays.len());
+    let mut query_builder = sqlx::QueryBuilder::new(
+        "INSERT INTO Matchdays (id, tournament_id, matchday_number, scheduled_date, status) "
+    );
+
+    query_builder.push_values(matchdays, |mut b, (number, date)| {
+        let id = Uuid::new_v4();
+        ids.push(id);
+        b.push_bind(id)
+         .push_bind(tournament_id)
+         .push_bind(*number)
+         .push_bind(*date)
+         .push_bind("upcoming");
+    });
+
+    query_builder.build().execute(pool).await?;
+    
     Ok(ids)
 }
 
@@ -109,6 +116,7 @@ pub async fn reschedule_match(
             original_scheduled_at = COALESCE(original_scheduled_at, scheduled_at),
             scheduled_at = $1,
             is_rescheduled = true,
+            reschedule_count = reschedule_count + 1,
             reschedule_reason = $2,
             status = CASE WHEN status = 'scheduled' THEN 'rescheduled' ELSE status END,
             updated_at = NOW()
@@ -428,9 +436,9 @@ pub async fn update_league_standing_guarded(
     sqlx::query(
         r#"
         INSERT INTO League_Standings (
-            tournament_id, player_id, played, won, drawn, lost, goals_for, goals_against, goal_diff, points, last_processed_match_id, updated_at
+            tournament_id, player_id, played, won, drawn, lost, goals_for, goals_against, goal_diff, points, processed_match_ids, updated_at
         )
-        VALUES ($6, $7, 1, $1, $2, $3, $4, $5, $4 - $5, $1 * 3 + $2, $8, NOW())
+        VALUES ($6, $7, 1, $1, $2, $3, $4, $5, $4 - $5, $1 * 3 + $2, ARRAY[$8]::UUID[], NOW())
         ON CONFLICT (tournament_id, player_id) DO UPDATE
         SET played        = League_Standings.played + 1,
             won           = League_Standings.won + $1,
@@ -440,9 +448,9 @@ pub async fn update_league_standing_guarded(
             goals_against = League_Standings.goals_against + $5,
             goal_diff     = League_Standings.goals_for + $4 - (League_Standings.goals_against + $5),
             points        = (League_Standings.won + $1) * 3 + (League_Standings.drawn + $2),
-            last_processed_match_id = $8,
+            processed_match_ids = array_append(League_Standings.processed_match_ids, $8),
             updated_at    = NOW()
-        WHERE League_Standings.last_processed_match_id IS NULL OR League_Standings.last_processed_match_id != $8
+        WHERE NOT ($8 = ANY(League_Standings.processed_match_ids))
         "#,
     )
     .bind(won)
@@ -476,23 +484,24 @@ pub async fn advance_knockout_winner(
     current_match_number: i32,
     winner_id: Uuid,
 ) -> Result<(), sqlx::Error> {
-    // If this round only has 1 match, it's the final.
-    let max_match: Option<i32> = sqlx::query_scalar(
-        "SELECT MAX(match_number) FROM T_Matches WHERE tournament_id = $1 AND round_number = $2 AND group_name IS NULL"
+    // BUG-7 Check if tournament is complete by ensuring no pending active matches remain
+    let pending_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM T_Matches WHERE tournament_id = $1 AND status NOT IN ('completed', 'bye')"
     )
     .bind(tournament_id)
-    .bind(current_round)
     .fetch_one(pool)
-    .await?;
+    .await
+    .unwrap_or(1);
 
-    if max_match.unwrap_or(1) == 1 {
+    if pending_count == 0 {
         // Tournament is complete! Mark it as completed.
-        sqlx::query("UPDATE Tournaments SET status = 'completed', updated_at = NOW() WHERE id = $1")
+        let _ = sqlx::query("UPDATE Tournaments SET status = 'completed', updated_at = NOW() WHERE id = $1")
             .bind(tournament_id)
             .execute(pool)
-            .await?;
+            .await;
         return Ok(());
     }
+
 
     let next_round = current_round + 1;
     let next_slot  = (current_match_number + 1) / 2;

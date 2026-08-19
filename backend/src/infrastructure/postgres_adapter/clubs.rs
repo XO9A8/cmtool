@@ -688,7 +688,7 @@ pub async fn void_match(
             let p1_score: Option<i32> = tr.try_get("player_1_score").ok().flatten();
             let p2_score: Option<i32> = tr.try_get("player_2_score").ok().flatten();
 
-            let status: String = sqlx::query_scalar("SELECT status FROM Tournaments WHERE id = $1")
+            let (status, format_type): (String, String) = sqlx::query_as("SELECT status, format_type FROM Tournaments WHERE id = $1")
                 .bind(tournament_id)
                 .fetch_one(&mut *tx)
                 .await?;
@@ -739,73 +739,77 @@ pub async fn void_match(
                 }
             }
 
-            let (won, drawn, lost) = if goals_for > goals_against {
-                (1, 0, 0)
-            } else if goals_for == goals_against {
-                (0, 1, 0)
-            } else {
-                (0, 0, 1)
-            };
-            
-            sqlx::query(
-                r#"
-                UPDATE League_Standings
-                SET played = GREATEST(0, played - 1),
-                    won = GREATEST(0, won - $1),
-                    drawn = GREATEST(0, drawn - $2),
-                    lost = GREATEST(0, lost - $3),
-                    goals_for = GREATEST(0, goals_for - $4),
-                    goals_against = GREATEST(0, goals_against - $5),
-                    goal_diff = GREATEST(0, goals_for - $4) - GREATEST(0, goals_against - $5),
-                    points = GREATEST(0, won - $1) * 3 + GREATEST(0, drawn - $2),
-                    last_processed_match_id = NULL,
-                    updated_at = NOW()
-                WHERE tournament_id = $6 AND player_id = $7
-                "#
-            )
-            .bind(won)
-            .bind(drawn)
-            .bind(lost)
-            .bind(goals_for)
-            .bind(goals_against)
-            .bind(tournament_id)
-            .bind(player_id)
-            .execute(&mut *tx)
-            .await?;
-            
-            let (o_won, o_drawn, o_lost) = if goals_against > goals_for {
-                (1, 0, 0)
-            } else if goals_against == goals_for {
-                (0, 1, 0)
-            } else {
-                (0, 0, 1)
-            };
-            
-            sqlx::query(
-                r#"
-                UPDATE League_Standings
-                SET played = GREATEST(0, played - 1),
-                    won = GREATEST(0, won - $1),
-                    drawn = GREATEST(0, drawn - $2),
-                    lost = GREATEST(0, lost - $3),
-                    goals_for = GREATEST(0, goals_for - $4),
-                    goals_against = GREATEST(0, goals_against - $5),
-                    goal_diff = GREATEST(0, goals_for - $5) - GREATEST(0, goals_against - $4),
-                    points = GREATEST(0, won - $1) * 3 + GREATEST(0, drawn - $2),
-                    last_processed_match_id = NULL,
-                    updated_at = NOW()
-                WHERE tournament_id = $6 AND player_id = $7
-                "#
-            )
-            .bind(o_won)
-            .bind(o_drawn)
-            .bind(o_lost)
-            .bind(goals_against)
-            .bind(goals_for)
-            .bind(tournament_id)
-            .bind(opponent_id)
-            .execute(&mut *tx)
-            .await?;
+            if format_type == "round_robin" || format_type == "league" || (format_type == "group_knockout" && group_name.is_some()) {
+                let (won, drawn, lost) = if goals_for > goals_against {
+                    (1, 0, 0)
+                } else if goals_for == goals_against {
+                    (0, 1, 0)
+                } else {
+                    (0, 0, 1)
+                };
+                
+                sqlx::query(
+                    r#"
+                    UPDATE League_Standings
+                    SET played = GREATEST(0, played - 1),
+                        won = GREATEST(0, won - $1),
+                        drawn = GREATEST(0, drawn - $2),
+                        lost = GREATEST(0, lost - $3),
+                        goals_for = GREATEST(0, goals_for - $4),
+                        goals_against = GREATEST(0, goals_against - $5),
+                        goal_diff = GREATEST(0, goals_for - $4) - GREATEST(0, goals_against - $5),
+                        points = GREATEST(0, won - $1) * 3 + GREATEST(0, drawn - $2),
+                        processed_match_ids = array_remove(League_Standings.processed_match_ids, $8),
+                        updated_at = NOW()
+                    WHERE tournament_id = $6 AND player_id = $7
+                    "#
+                )
+                .bind(won)
+                .bind(drawn)
+                .bind(lost)
+                .bind(goals_for)
+                .bind(goals_against)
+                .bind(tournament_id)
+                .bind(player_id)
+                .bind(tm_id)
+                .execute(&mut *tx)
+                .await?;
+                
+                let (o_won, o_drawn, o_lost) = if goals_against > goals_for {
+                    (1, 0, 0)
+                } else if goals_against == goals_for {
+                    (0, 1, 0)
+                } else {
+                    (0, 0, 1)
+                };
+                
+                sqlx::query(
+                    r#"
+                    UPDATE League_Standings
+                    SET played = GREATEST(0, played - 1),
+                        won = GREATEST(0, won - $1),
+                        drawn = GREATEST(0, drawn - $2),
+                        lost = GREATEST(0, lost - $3),
+                        goals_for = GREATEST(0, goals_for - $4),
+                        goals_against = GREATEST(0, goals_against - $5),
+                        goal_diff = GREATEST(0, goals_for - $4) - GREATEST(0, goals_against - $5),
+                        points = GREATEST(0, won - $1) * 3 + GREATEST(0, drawn - $2),
+                        processed_match_ids = array_remove(League_Standings.processed_match_ids, $8),
+                        updated_at = NOW()
+                    WHERE tournament_id = $6 AND player_id = $7
+                    "#
+                )
+                .bind(o_won)
+                .bind(o_drawn)
+                .bind(o_lost)
+                .bind(goals_against)
+                .bind(goals_for)
+                .bind(tournament_id)
+                .bind(opponent_id)
+                .bind(tm_id)
+                .execute(&mut *tx)
+                .await?;
+            }
         }
     }
 

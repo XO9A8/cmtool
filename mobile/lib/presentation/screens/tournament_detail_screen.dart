@@ -1222,6 +1222,8 @@ class _MatchFixtureTile extends ConsumerWidget {
     final origSchedAt =
         fixture['original_scheduled_at'] ?? fixture['matchday_scheduled_date'];
     final reason = fixture['reschedule_reason']?.toString();
+    final rescheduleCount = (fixture['reschedule_count'] as num?)?.toInt() ?? 0;
+    const maxReschedules = 3;
 
     return GlassCard(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1254,7 +1256,7 @@ class _MatchFixtureTile extends ConsumerWidget {
                   ),
                 ),
                 if (isRescheduledSection) ...[
-                  const GlowBadge(label: 'RESCHEDULED', color: Colors.amber),
+                  GlowBadge(label: 'RESCHEDULED ($rescheduleCount/$maxReschedules)', color: Colors.amber),
                   const SizedBox(width: 6),
                 ],
                 if (isCompleted) ...[
@@ -1295,10 +1297,11 @@ class _MatchFixtureTile extends ConsumerWidget {
                   if (isAdmin) ...[
                     _IconActionButton(
                       icon: Icons.edit_calendar,
-                      label: 'RESCHEDULE',
-                      color: AppColors.cyan,
-                      onTap: () =>
-                          _showMatchRescheduleDialog(context, ref, matchId),
+                      label: rescheduleCount >= maxReschedules ? 'LIMIT REACHED' : 'RESCHEDULE',
+                      color: rescheduleCount >= maxReschedules ? AppColors.textMuted : AppColors.cyan,
+                      onTap: rescheduleCount >= maxReschedules
+                          ? () {}
+                          : () => _showMatchRescheduleDialog(context, ref, matchId),
                     ),
                     const SizedBox(width: 6),
                   ],
