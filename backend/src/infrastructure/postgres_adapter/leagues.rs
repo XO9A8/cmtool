@@ -94,11 +94,25 @@ pub async fn update_matchday_date(
     matchday_id: Uuid,
     new_date: Option<chrono::NaiveDate>,
 ) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await?;
+
     sqlx::query("UPDATE Matchdays SET scheduled_date = $1, updated_at = NOW() WHERE id = $2")
         .bind(new_date)
         .bind(matchday_id)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
+
+    // Propagate new date to child matches that haven't been individually rescheduled
+    let new_scheduled_at = new_date.map(|d| d.and_hms_opt(12, 0, 0).unwrap().and_utc());
+    sqlx::query(
+        "UPDATE T_Matches SET scheduled_at = $1, updated_at = NOW() WHERE matchday_id = $2 AND is_rescheduled = false"
+    )
+    .bind(new_scheduled_at)
+    .bind(matchday_id)
+    .execute(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
     Ok(())
 }
 
@@ -136,7 +150,10 @@ pub async fn update_matchday_status(
     matchday_id: Uuid,
 ) -> Result<String, sqlx::Error> {
     let stats = sqlx::query(
-        "SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE status = 'completed') as completed FROM T_Matches WHERE matchday_id = $1"
+        "SELECT COUNT(*) as total, 
+                COUNT(*) FILTER (WHERE status = 'completed') as completed,
+                COUNT(*) FILTER (WHERE status = 'rescheduled' OR is_rescheduled = true) as rescheduled
+         FROM T_Matches WHERE matchday_id = $1"
     )
     .bind(matchday_id)
     .fetch_one(pool)
@@ -144,12 +161,13 @@ pub async fn update_matchday_status(
 
     let total: i64 = stats.try_get("total").unwrap_or(0);
     let completed: i64 = stats.try_get("completed").unwrap_or(0);
+    let rescheduled: i64 = stats.try_get("rescheduled").unwrap_or(0);
 
     let new_status = if total == 0 {
         "upcoming"
     } else if completed == total {
         "completed"
-    } else if completed > 0 {
+    } else if completed > 0 || rescheduled > 0 {
         "in_progress"
     } else {
         "upcoming"
@@ -452,11 +470,11 @@ pub async fn update_league_standing_guarded(
             lost          = League_Standings.lost + $3,
             goals_for     = League_Standings.goals_for + $4,
             goals_against = League_Standings.goals_against + $5,
-            goal_diff     = League_Standings.goals_for + $4 - (League_Standings.goals_against + $5),
+            goal_diff     = (League_Standings.goals_for + $4) - (League_Standings.goals_against + $5),
             points        = (League_Standings.won + $1) * 3 + (League_Standings.drawn + $2),
-            processed_match_ids = array_append(League_Standings.processed_match_ids, $8),
+            processed_match_ids = array_append(COALESCE(League_Standings.processed_match_ids, ARRAY[]::UUID[]), $8),
             updated_at    = NOW()
-        WHERE NOT ($8 = ANY(League_Standings.processed_match_ids))
+        WHERE NOT COALESCE($8 = ANY(League_Standings.processed_match_ids), FALSE)
         "#,
     )
     .bind(won)

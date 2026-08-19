@@ -471,7 +471,7 @@ pub async fn get_player_scheduled_matches(
         LEFT JOIN Users u2 ON m.player_2_id = u2.id
         LEFT JOIN Player_Profiles pp1 ON u1.id = pp1.user_id
         LEFT JOIN Player_Profiles pp2 ON u2.id = pp2.user_id
-        LEFT JOIN Matchdays md ON (m.matchday_id = md.id OR (m.tournament_id = md.tournament_id AND m.round_number = md.matchday_number))
+        LEFT JOIN Matchdays md ON m.matchday_id = md.id
         WHERE (m.player_1_id = $1 OR m.player_2_id = $1)
           AND m.status IN ('scheduled', 'rescheduled')
           AND t.deleted_at IS NULL
@@ -759,7 +759,7 @@ pub async fn void_match(
                         goals_against = GREATEST(0, goals_against - $5),
                         goal_diff = GREATEST(0, goals_for - $4) - GREATEST(0, goals_against - $5),
                         points = GREATEST(0, won - $1) * 3 + GREATEST(0, drawn - $2),
-                        processed_match_ids = array_remove(League_Standings.processed_match_ids, $8),
+                        processed_match_ids = array_remove(COALESCE(League_Standings.processed_match_ids, ARRAY[]::UUID[]), $8),
                         updated_at = NOW()
                     WHERE tournament_id = $6 AND player_id = $7
                     "#
@@ -794,7 +794,7 @@ pub async fn void_match(
                         goals_against = GREATEST(0, goals_against - $5),
                         goal_diff = GREATEST(0, goals_for - $4) - GREATEST(0, goals_against - $5),
                         points = GREATEST(0, won - $1) * 3 + GREATEST(0, drawn - $2),
-                        processed_match_ids = array_remove(League_Standings.processed_match_ids, $8),
+                        processed_match_ids = array_remove(COALESCE(League_Standings.processed_match_ids, ARRAY[]::UUID[]), $8),
                         updated_at = NOW()
                     WHERE tournament_id = $6 AND player_id = $7
                     "#

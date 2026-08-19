@@ -532,74 +532,221 @@ pub async fn process_tournament_advancement(
 
     // 5c. Group Knockout Phase Transition Check (only for group stage matches)
     if format == "group_knockout" && tm.group_name.is_some() {
-        // Check if all group stage matches are finished
-        if let Ok(true) = crate::infrastructure::postgres_adapter::check_group_stage_completed(pool, tourney_id).await {
-            // Ensure we don't generate the bracket twice
-            if let Ok(false) = crate::infrastructure::postgres_adapter::check_knockout_stage_generated(pool, tourney_id).await {
-                println!("[tournament] Group stage complete! Transitioning to knockout phase for tournament {}", tourney_id);
-                
-                // Fetch standings
-                if let Ok(standings) = crate::infrastructure::postgres_adapter::get_league_standings(pool, tourney_id).await {
-                    let advancing = crate::infrastructure::postgres_adapter::get_tournament_advancing_count(pool, tourney_id).await.unwrap_or(2);
-                    
-                    // Generate Phase Two fixtures
-                    let bracket = generate_group_knockout_phase_two_fixtures(tourney_id, standings, advancing);
-                    
-                    // Offset the round_number for Phase Two fixtures to ensure they start after group matches
-                    let max_group_round = crate::infrastructure::postgres_adapter::get_max_group_round(pool, tourney_id)
-                        .await
-                        .unwrap_or(None);
-                    
-                    let round_offset = max_group_round.unwrap_or(0) as u32;
-                    let mut fixtures = bracket.fixtures;
-                    for f in &mut fixtures {
-                        f.round_number += round_offset;
-                    }
-                    
-                    let max_bracket_round = round_offset + bracket.total_rounds;
-                    let mut matchdays_data = Vec::new();
-                    
-                    let tournament_info: Option<(Option<chrono::NaiveDate>, Option<chrono::NaiveDate>)> = sqlx::query_as(
-                        "SELECT start_date, end_date FROM Tournaments WHERE id = $1"
-                    )
-                    .bind(tourney_id)
-                    .fetch_optional(pool)
-                    .await
-                    .unwrap_or(None);
-
-                    if let Some((_, Some(end_date))) = tournament_info {
-                        let start_date = chrono::Utc::now().naive_utc().date();
-                        let effective_end_date = if end_date <= start_date {
-                            start_date.checked_add_signed(chrono::Duration::days((bracket.total_rounds as i64) * 7)).unwrap_or(start_date)
-                        } else {
-                            end_date
-                        };
-                        let phase_two_rounds = bracket.total_rounds as usize;
-                        let phase_two_dates = distribute_matchday_dates(Some(start_date), Some(effective_end_date), phase_two_rounds);
-                        for (r, d) in ((round_offset + 1)..=max_bracket_round).zip(phase_two_dates) {
-                            matchdays_data.push((r as i32, d));
-                        }
-                    } else {
-                        for r in (round_offset + 1)..=max_bracket_round {
-                            matchdays_data.push((r as i32, None));
-                        }
-                    }
-                    let matchday_ids = crate::infrastructure::postgres_adapter::create_matchdays_batch(pool, tourney_id, &matchdays_data).await.unwrap_or_default();
-                    
-                    if let Err(e) = crate::infrastructure::postgres_adapter::save_tournament_fixtures(pool, tourney_id, fixtures, &matchday_ids, round_offset).await {
-                        eprintln!("[tournament] Failed to save Phase Two knockout fixtures: {}", e);
-                    }
-                }
-            }
+        if let Err(e) = transition_group_knockout_phase(pool, tourney_id).await {
+            eprintln!("[tournament] Failed to transition group knockout phase: {}", e);
         }
     }
 
-    // BUG-1: Auto-update matchday status
+    // Auto-update matchday status
     if let Some(md_id) = tm.matchday_id {
         let _ = crate::infrastructure::postgres_adapter::update_matchday_status(pool, md_id).await;
     }
 
     Ok(())
+}
+
+/// Atomically transitions a group_knockout tournament to its Phase Two knockout stage.
+/// Protected by a row lock (`FOR UPDATE`) on the Tournaments record to prevent concurrent duplicate generation.
+pub async fn transition_group_knockout_phase(
+    pool: &sqlx::PgPool,
+    tourney_id: Uuid,
+) -> Result<bool, String> {
+    // Fast-path checks before acquiring transaction lock
+    if !crate::infrastructure::postgres_adapter::check_group_stage_completed(pool, tourney_id).await.unwrap_or(false) {
+        return Ok(false);
+    }
+    if crate::infrastructure::postgres_adapter::check_knockout_stage_generated(pool, tourney_id).await.unwrap_or(true) {
+        return Ok(false);
+    }
+
+    // Begin transaction and acquire row lock on Tournaments table
+    let mut tx = pool.begin().await.map_err(|e| e.to_string())?;
+
+    let locked: Option<Uuid> = sqlx::query_scalar("SELECT id FROM Tournaments WHERE id = $1 FOR UPDATE")
+        .bind(tourney_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if locked.is_none() {
+        return Ok(false);
+    }
+
+    // Re-verify under lock
+    let group_pending: i64 = sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*)
+        FROM T_Matches
+        WHERE tournament_id = $1
+          AND group_name IS NOT NULL
+          AND status != 'completed'
+        "#,
+    )
+    .bind(tourney_id)
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    if group_pending != 0 {
+        return Ok(false);
+    }
+
+    let knockout_exists: bool = sqlx::query_scalar(
+        r#"
+        SELECT EXISTS(
+            SELECT 1 FROM T_Matches
+            WHERE tournament_id = $1
+              AND group_name IS NULL
+              AND round_number > COALESCE((
+                  SELECT MAX(round_number) 
+                  FROM T_Matches 
+                  WHERE tournament_id = $1 AND group_name IS NOT NULL
+              ), 0)
+        )
+        "#,
+    )
+    .bind(tourney_id)
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    if knockout_exists {
+        return Ok(false);
+    }
+
+    println!("[tournament] Group stage complete! Transitioning to knockout phase for tournament {}", tourney_id);
+
+    // Fetch standings
+    let standings = crate::infrastructure::postgres_adapter::get_league_standings(pool, tourney_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let advancing = crate::infrastructure::postgres_adapter::get_tournament_advancing_count(pool, tourney_id)
+        .await
+        .unwrap_or(2);
+
+    // Generate Phase Two fixtures
+    let bracket = generate_group_knockout_phase_two_fixtures(tourney_id, standings, advancing);
+
+    let max_group_round: Option<i32> = sqlx::query_scalar(
+        "SELECT MAX(round_number) FROM T_Matches WHERE tournament_id = $1 AND group_name IS NOT NULL"
+    )
+    .bind(tourney_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|e| e.to_string())?
+    .flatten()
+    .map(|r: i32| r);
+
+    let round_offset = max_group_round.unwrap_or(0) as u32;
+    let mut fixtures = bracket.fixtures;
+    for f in &mut fixtures {
+        f.round_number += round_offset;
+    }
+
+    let max_bracket_round = round_offset + bracket.total_rounds;
+    let mut matchdays_data = Vec::new();
+
+    let tournament_info: Option<(Option<chrono::NaiveDate>, Option<chrono::NaiveDate>)> = sqlx::query_as(
+        "SELECT start_date, end_date FROM Tournaments WHERE id = $1"
+    )
+    .bind(tourney_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    if let Some((_, Some(end_date))) = tournament_info {
+        let start_date = chrono::Utc::now().naive_utc().date();
+        let effective_end_date = if end_date <= start_date {
+            start_date.checked_add_signed(chrono::Duration::days((bracket.total_rounds as i64) * 7)).unwrap_or(start_date)
+        } else {
+            end_date
+        };
+        let phase_two_rounds = bracket.total_rounds as usize;
+        let phase_two_dates = distribute_matchday_dates(Some(start_date), Some(effective_end_date), phase_two_rounds);
+        for (r, d) in ((round_offset + 1)..=max_bracket_round).zip(phase_two_dates) {
+            matchdays_data.push((r as i32, d));
+        }
+    } else {
+        for r in (round_offset + 1)..=max_bracket_round {
+            matchdays_data.push((r as i32, None));
+        }
+    }
+
+    let mut matchday_ids = Vec::with_capacity(matchdays_data.len());
+    for (num, date) in &matchdays_data {
+        let id = Uuid::new_v4();
+        matchday_ids.push(id);
+        sqlx::query(
+            "INSERT INTO Matchdays (id, tournament_id, matchday_number, scheduled_date, status) VALUES ($1, $2, $3, $4, 'upcoming')"
+        )
+        .bind(id)
+        .bind(tourney_id)
+        .bind(*num)
+        .bind(*date)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| e.to_string())?;
+    }
+
+    let mut inserted_matches = Vec::new();
+    for f in &fixtures {
+        let p1_id = f.player_1.as_ref().map(|p| p.id);
+        let p2_id = f.player_2.as_ref().map(|p| p.id);
+        let idx = f.round_number.saturating_sub(round_offset).saturating_sub(1) as usize;
+        let md_id = matchday_ids.get(idx).copied();
+        let scheduled_at = md_id.and_then(|id| {
+            matchdays_data.iter().find(|(num, _)| {
+                let md_idx = (*num as u32).saturating_sub(round_offset).saturating_sub(1) as usize;
+                matchday_ids.get(md_idx).copied() == Some(id)
+            }).and_then(|(_, d)| *d).map(|d| d.and_hms_opt(12, 0, 0).unwrap().and_utc())
+        });
+
+        let inserted_match_id = Uuid::new_v4();
+        sqlx::query(
+            r#"
+            INSERT INTO T_Matches (id, tournament_id, player_1_id, player_2_id, round_number, match_number, status, matchday_id, scheduled_at)
+            VALUES ($1, $2, $3, $4, $5, $6, 'scheduled', $7, $8)
+            "#
+        )
+        .bind(inserted_match_id)
+        .bind(tourney_id)
+        .bind(p1_id)
+        .bind(p2_id)
+        .bind(f.round_number as i32)
+        .bind(f.match_number as i32)
+        .bind(md_id)
+        .bind(scheduled_at)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| e.to_string())?;
+
+        inserted_matches.push((inserted_match_id, f.clone()));
+    }
+
+    tx.commit().await.map_err(|e| e.to_string())?;
+
+    // Advance byes in Phase Two knockout round 1 if any
+    for (inserted_match_id, f) in inserted_matches {
+        if let Some(winner_id) = f.winner_id {
+            let _ = sqlx::query("UPDATE T_Matches SET status = 'completed', player_1_score = 0, player_2_score = 0 WHERE id = $1")
+                .bind(inserted_match_id)
+                .execute(pool)
+                .await;
+
+            let _ = crate::infrastructure::postgres_adapter::advance_knockout_winner(
+                pool,
+                tourney_id,
+                inserted_match_id,
+                f.round_number as i32,
+                f.match_number as i32,
+                winner_id,
+            )
+            .await;
+        }
+    }
+
+    Ok(true)
 }
 
 #[cfg(test)]
