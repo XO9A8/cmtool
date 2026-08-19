@@ -5,7 +5,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../providers/match_provider.dart';
 import '../theme/app_theme.dart';
 import '../screens/player_profile_screen.dart';
-import 'tournament_leaders_widget.dart';
 
 /// Group Stage Standings widget for Group-First Knockout tournaments (`group_knockout`).
 /// Renders group-segmented standings (Group A, Group B, etc.) with qualified playoff spot indicators.
@@ -56,10 +55,6 @@ class _GroupStandingsWidgetState extends ConsumerState<GroupStandingsWidget> {
           children: [
             // ─── Header Info Card ───
             _buildHeaderCard(advancingPerGroup),
-            const SizedBox(height: 16),
-
-            // ─── Tournament Leaders & Stats ───
-            TournamentLeadersWidget(tournamentId: widget.tournamentId),
             const SizedBox(height: 16),
 
             // ─── Group Filter Tabs ───

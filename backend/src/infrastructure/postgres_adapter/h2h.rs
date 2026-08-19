@@ -13,6 +13,7 @@ use crate::domain::{
     elo::EloResult,
     mps::MpsResult,
     play_style::{classify_play_style, PlayerMatchStatsSummary},
+    tournament::{predict_match_outcome_advanced, MatchPrediction},
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -72,6 +73,7 @@ pub struct H2hFullResult {
     pub player_2_overall_goals: i64,
     pub scope: String,
     pub match_limit: Option<i64>,
+    pub prediction: MatchPrediction,
 }
 
 /// Queries historical Head-to-Head match records between two players with optional match limit and scope.
@@ -279,11 +281,23 @@ pub async fn get_h2h_record_db(
             r#"
             SELECT
                 AVG(CASE WHEN player_id = $1 THEN possession::FLOAT8 ELSE (100.0 - possession::FLOAT8) END) as possession,
-                AVG(CASE WHEN passes_attempted > 0 THEN (passes_completed::FLOAT8 * 100.0 / passes_attempted::FLOAT8) ELSE NULL END) as passing,
-                AVG(CASE WHEN shots_total > 0 THEN (shots_on_target::FLOAT8 * 100.0 / shots_total::FLOAT8) ELSE NULL END) as shooting,
-                AVG(CASE WHEN player_id = $1 THEN (GREATEST(0.0, 10.0 - goals_against::FLOAT8) * 6.0 + LEAST(10.0, interceptions::FLOAT8) * 4.0) ELSE NULL END) as defending
+                AVG(CASE 
+                    WHEN player_id = $1 AND passes_attempted > 0 THEN (passes_completed::FLOAT8 * 100.0 / passes_attempted::FLOAT8)
+                    WHEN opponent_id = $1 AND passes_attempted > 0 THEN (passes_completed::FLOAT8 * 100.0 / passes_attempted::FLOAT8)
+                    ELSE NULL 
+                END) as passing,
+                AVG(CASE 
+                    WHEN player_id = $1 AND shots_total > 0 THEN (shots_on_target::FLOAT8 * 100.0 / shots_total::FLOAT8)
+                    WHEN opponent_id = $1 AND shots_total > 0 THEN (shots_on_target::FLOAT8 * 100.0 / shots_total::FLOAT8)
+                    ELSE NULL 
+                END) as shooting,
+                AVG(CASE 
+                    WHEN player_id = $1 THEN (GREATEST(0.0, 10.0 - goals_against::FLOAT8) * 6.0 + LEAST(10.0, COALESCE(interceptions::FLOAT8, 0.0)) * 4.0)
+                    WHEN opponent_id = $1 THEN (GREATEST(0.0, 10.0 - goals_for::FLOAT8) * 10.0)
+                    ELSE NULL 
+                END) as defending
             FROM (
-                SELECT player_id, opponent_id, possession, passes_attempted, passes_completed, shots_total, shots_on_target, goals_against, interceptions
+                SELECT player_id, opponent_id, possession, passes_attempted, passes_completed, shots_total, shots_on_target, goals_for, goals_against, interceptions
                 FROM Match_Records
                 WHERE ((player_id = $1 AND opponent_id = $2)
                    OR  (player_id = $2 AND opponent_id = $1))
@@ -305,11 +319,23 @@ pub async fn get_h2h_record_db(
             r#"
             SELECT
                 AVG(CASE WHEN player_id = $2 THEN possession::FLOAT8 ELSE (100.0 - possession::FLOAT8) END) as possession,
-                AVG(CASE WHEN passes_attempted > 0 THEN (passes_completed::FLOAT8 * 100.0 / passes_attempted::FLOAT8) ELSE NULL END) as passing,
-                AVG(CASE WHEN shots_total > 0 THEN (shots_on_target::FLOAT8 * 100.0 / shots_total::FLOAT8) ELSE NULL END) as shooting,
-                AVG(CASE WHEN player_id = $2 THEN (GREATEST(0.0, 10.0 - goals_against::FLOAT8) * 6.0 + LEAST(10.0, interceptions::FLOAT8) * 4.0) ELSE NULL END) as defending
+                AVG(CASE 
+                    WHEN player_id = $2 AND passes_attempted > 0 THEN (passes_completed::FLOAT8 * 100.0 / passes_attempted::FLOAT8)
+                    WHEN opponent_id = $2 AND passes_attempted > 0 THEN (passes_completed::FLOAT8 * 100.0 / passes_attempted::FLOAT8)
+                    ELSE NULL 
+                END) as passing,
+                AVG(CASE 
+                    WHEN player_id = $2 AND shots_total > 0 THEN (shots_on_target::FLOAT8 * 100.0 / shots_total::FLOAT8)
+                    WHEN opponent_id = $2 AND shots_total > 0 THEN (shots_on_target::FLOAT8 * 100.0 / shots_total::FLOAT8)
+                    ELSE NULL 
+                END) as shooting,
+                AVG(CASE 
+                    WHEN player_id = $2 THEN (GREATEST(0.0, 10.0 - goals_against::FLOAT8) * 6.0 + LEAST(10.0, COALESCE(interceptions::FLOAT8, 0.0)) * 4.0)
+                    WHEN opponent_id = $2 THEN (GREATEST(0.0, 10.0 - goals_for::FLOAT8) * 10.0)
+                    ELSE NULL 
+                END) as defending
             FROM (
-                SELECT player_id, opponent_id, possession, passes_attempted, passes_completed, shots_total, shots_on_target, goals_against, interceptions
+                SELECT player_id, opponent_id, possession, passes_attempted, passes_completed, shots_total, shots_on_target, goals_for, goals_against, interceptions
                 FROM Match_Records
                 WHERE ((player_id = $1 AND opponent_id = $2)
                    OR  (player_id = $2 AND opponent_id = $1))
@@ -333,11 +359,23 @@ pub async fn get_h2h_record_db(
             r#"
             SELECT
                 AVG(CASE WHEN player_id = $1 THEN possession::FLOAT8 ELSE (100.0 - possession::FLOAT8) END) as possession,
-                AVG(CASE WHEN passes_attempted > 0 THEN (passes_completed::FLOAT8 * 100.0 / passes_attempted::FLOAT8) ELSE NULL END) as passing,
-                AVG(CASE WHEN shots_total > 0 THEN (shots_on_target::FLOAT8 * 100.0 / shots_total::FLOAT8) ELSE NULL END) as shooting,
-                AVG(CASE WHEN player_id = $1 THEN (GREATEST(0.0, 10.0 - goals_against::FLOAT8) * 6.0 + LEAST(10.0, interceptions::FLOAT8) * 4.0) ELSE NULL END) as defending
+                AVG(CASE 
+                    WHEN player_id = $1 AND passes_attempted > 0 THEN (passes_completed::FLOAT8 * 100.0 / passes_attempted::FLOAT8)
+                    WHEN opponent_id = $1 AND passes_attempted > 0 THEN (passes_completed::FLOAT8 * 100.0 / passes_attempted::FLOAT8)
+                    ELSE NULL 
+                END) as passing,
+                AVG(CASE 
+                    WHEN player_id = $1 AND shots_total > 0 THEN (shots_on_target::FLOAT8 * 100.0 / shots_total::FLOAT8)
+                    WHEN opponent_id = $1 AND shots_total > 0 THEN (shots_on_target::FLOAT8 * 100.0 / shots_total::FLOAT8)
+                    ELSE NULL 
+                END) as shooting,
+                AVG(CASE 
+                    WHEN player_id = $1 THEN (GREATEST(0.0, 10.0 - goals_against::FLOAT8) * 6.0 + LEAST(10.0, COALESCE(interceptions::FLOAT8, 0.0)) * 4.0)
+                    WHEN opponent_id = $1 THEN (GREATEST(0.0, 10.0 - goals_for::FLOAT8) * 10.0)
+                    ELSE NULL 
+                END) as defending
             FROM (
-                SELECT player_id, opponent_id, possession, passes_attempted, passes_completed, shots_total, shots_on_target, goals_against, interceptions
+                SELECT player_id, opponent_id, possession, passes_attempted, passes_completed, shots_total, shots_on_target, goals_for, goals_against, interceptions
                 FROM Match_Records
                 WHERE (player_id = $1 OR opponent_id = $1)
                   AND deleted_at IS NULL
@@ -357,11 +395,23 @@ pub async fn get_h2h_record_db(
             r#"
             SELECT
                 AVG(CASE WHEN player_id = $1 THEN possession::FLOAT8 ELSE (100.0 - possession::FLOAT8) END) as possession,
-                AVG(CASE WHEN passes_attempted > 0 THEN (passes_completed::FLOAT8 * 100.0 / passes_attempted::FLOAT8) ELSE NULL END) as passing,
-                AVG(CASE WHEN shots_total > 0 THEN (shots_on_target::FLOAT8 * 100.0 / shots_total::FLOAT8) ELSE NULL END) as shooting,
-                AVG(CASE WHEN player_id = $1 THEN (GREATEST(0.0, 10.0 - goals_against::FLOAT8) * 6.0 + LEAST(10.0, interceptions::FLOAT8) * 4.0) ELSE NULL END) as defending
+                AVG(CASE 
+                    WHEN player_id = $1 AND passes_attempted > 0 THEN (passes_completed::FLOAT8 * 100.0 / passes_attempted::FLOAT8)
+                    WHEN opponent_id = $1 AND passes_attempted > 0 THEN (passes_completed::FLOAT8 * 100.0 / passes_attempted::FLOAT8)
+                    ELSE NULL 
+                END) as passing,
+                AVG(CASE 
+                    WHEN player_id = $1 AND shots_total > 0 THEN (shots_on_target::FLOAT8 * 100.0 / shots_total::FLOAT8)
+                    WHEN opponent_id = $1 AND shots_total > 0 THEN (shots_on_target::FLOAT8 * 100.0 / shots_total::FLOAT8)
+                    ELSE NULL 
+                END) as shooting,
+                AVG(CASE 
+                    WHEN player_id = $1 THEN (GREATEST(0.0, 10.0 - goals_against::FLOAT8) * 6.0 + LEAST(10.0, COALESCE(interceptions::FLOAT8, 0.0)) * 4.0)
+                    WHEN opponent_id = $1 THEN (GREATEST(0.0, 10.0 - goals_for::FLOAT8) * 10.0)
+                    ELSE NULL 
+                END) as defending
             FROM (
-                SELECT player_id, opponent_id, possession, passes_attempted, passes_completed, shots_total, shots_on_target, goals_against, interceptions
+                SELECT player_id, opponent_id, possession, passes_attempted, passes_completed, shots_total, shots_on_target, goals_for, goals_against, interceptions
                 FROM Match_Records
                 WHERE (player_id = $1 OR opponent_id = $1)
                   AND deleted_at IS NULL
@@ -460,6 +510,28 @@ pub async fn get_h2h_record_db(
         form: p2_form.clamp(10.0, 100.0),
     };
 
+    let historical_draw_rate = if stats.total_matches > 0 {
+        Some(stats.draws as f64 / stats.total_matches as f64)
+    } else {
+        let total_combined = p1_overall.total_matches + p2_overall.total_matches;
+        if total_combined > 0 {
+            Some((p1_overall.draws + p2_overall.draws) as f64 / total_combined as f64)
+        } else {
+            None
+        }
+    };
+
+    let prediction = predict_match_outcome_advanced(
+        p1_elo,
+        p2_elo,
+        stats.p1_wins as u32,
+        stats.p2_wins as u32,
+        Some(p1_form),
+        Some(p2_form),
+        historical_draw_rate,
+        Some(stats.avg_goal_diff),
+    );
+
     Ok(H2hFullResult {
         player_1_id: p1_id,
         player_1_name: p1_name,
@@ -492,6 +564,7 @@ pub async fn get_h2h_record_db(
         player_2_overall_goals: p2_overall.goals_for,
         scope: effective_scope.to_string(),
         match_limit: limit,
+        prediction,
     })
 }
 

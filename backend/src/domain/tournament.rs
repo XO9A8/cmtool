@@ -310,7 +310,7 @@ pub fn generate_group_knockout_phase_two_fixtures(
 }
 
 /// Match Prediction Engine: Calculates Win / Draw / Loss Probabilities using Elo math & H2H adjustment.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MatchPrediction {
     /// Player 1 win probability (0.0 to 1.0).
     pub player_1_win_prob: f64,
@@ -330,12 +330,16 @@ pub struct MatchPrediction {
     pub player_2_win_probability: f64,
 }
 
-/// Calculates predicted match probabilities combining expected Elo scores and historical H2H records.
-pub fn predict_match_outcome(
+/// Advanced match prediction considering Elo, H2H record, player form, and draw tendencies.
+pub fn predict_match_outcome_advanced(
     p1_rating: i32,
     p2_rating: i32,
     h2h_p1_wins: u32,
     h2h_p2_wins: u32,
+    p1_form: Option<f64>,
+    p2_form: Option<f64>,
+    historical_draw_rate: Option<f64>,
+    _avg_goal_diff: Option<f64>,
 ) -> MatchPrediction {
     let r1 = p1_rating as f64;
     let r2 = p2_rating as f64;
@@ -351,16 +355,38 @@ pub fn predict_match_outcome(
         0.0
     };
 
-    let adj_e1 = (e1 + h2h_bonus).clamp(0.04, 0.96);
+    let form_bonus = match (p1_form, p2_form) {
+        (Some(f1), Some(f2)) => ((f1.clamp(10.0, 100.0) - f2.clamp(10.0, 100.0)) / 100.0) * 0.05,
+        _ => 0.0,
+    };
 
-    // Dynamic draw probability: higher when ratings are even, lower when there is a large gap
+    let adj_e1 = (e1 + h2h_bonus + form_bonus).clamp(0.04, 0.96);
+
+    // Dynamic draw probability: blend theoretical and historical draw rate
     let elo_gap = (r1 - r2).abs();
-    let draw_prob = (0.24 * (-elo_gap / 500.0).exp()).clamp(0.06, 0.24);
+    let theoretical_draw = (0.24 * (-elo_gap / 500.0).exp()).clamp(0.06, 0.24);
+    let draw_prob = match historical_draw_rate {
+        Some(hdr) if hdr > 0.0 => (0.6 * theoretical_draw + 0.4 * hdr.clamp(0.05, 0.35)).clamp(0.05, 0.30),
+        _ => theoretical_draw,
+    };
 
     let remaining_prob = 1.0 - draw_prob;
-    let player_1_win_prob = (adj_e1 * remaining_prob * 100.0).round() / 100.0;
-    let player_2_win_prob = (((1.0 - adj_e1) * remaining_prob) * 100.0).round() / 100.0;
-    let draw_prob_rounded = ((1.0 - (player_1_win_prob + player_2_win_prob)) * 100.0).round() / 100.0;
+    let raw_p1 = adj_e1 * remaining_prob;
+    let raw_p2 = (1.0 - adj_e1) * remaining_prob;
+
+    // Normalization to ensure exact 1.0 (100.0%) sum
+    let total_raw = raw_p1 + raw_p2 + draw_prob;
+    let norm_p1 = raw_p1 / total_raw;
+    let norm_p2 = raw_p2 / total_raw;
+    let _norm_draw = draw_prob / total_raw;
+
+    let p1_pct = (norm_p1 * 1000.0).round() / 10.0;
+    let p2_pct = (norm_p2 * 1000.0).round() / 10.0;
+    let draw_pct = ((100.0 - (p1_pct + p2_pct)) * 10.0).round() / 10.0;
+
+    let player_1_win_prob = (p1_pct / 100.0 * 1000.0).round() / 1000.0;
+    let player_2_win_prob = (p2_pct / 100.0 * 1000.0).round() / 1000.0;
+    let draw_prob_rounded = (draw_pct / 100.0 * 1000.0).round() / 1000.0;
 
     MatchPrediction {
         player_1_win_prob,
@@ -372,6 +398,16 @@ pub fn predict_match_outcome(
         draw_probability: draw_prob_rounded,
         player_2_win_probability: player_2_win_prob,
     }
+}
+
+/// Calculates predicted match probabilities combining expected Elo scores and historical H2H records.
+pub fn predict_match_outcome(
+    p1_rating: i32,
+    p2_rating: i32,
+    h2h_p1_wins: u32,
+    h2h_p2_wins: u32,
+) -> MatchPrediction {
+    predict_match_outcome_advanced(p1_rating, p2_rating, h2h_p1_wins, h2h_p2_wins, None, None, None, None)
 }
 
 /// Triggers tournament auto-advancement when a match is confirmed.

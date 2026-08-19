@@ -13,7 +13,6 @@ import '../widgets/group_standings_widget.dart';
 import '../widgets/forfeit_claim_modal.dart';
 import '../widgets/ocr_upload_modal.dart';
 import 'player_profile_screen.dart';
-import '../widgets/tournament_leaders_widget.dart';
 import '../widgets/tournament_player_standings_widget.dart';
 import '../widgets/reschedule_dialog.dart';
 
@@ -1509,7 +1508,8 @@ class _MatchFixtureTile extends ConsumerWidget {
 
               // Draw prediction label
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1.5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 7, vertical: 1.5),
                 decoration: BoxDecoration(
                   color: Colors.amber.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(6),
@@ -1624,8 +1624,7 @@ class _MatchFixtureTile extends ConsumerWidget {
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(20),
-              border:
-                  Border.all(color: Colors.white12),
+              border: Border.all(color: Colors.white12),
             ),
             child: Text(
               'VS',
@@ -1807,7 +1806,8 @@ class _PlayerColumn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final playerThemeColor = color ?? (rightAlign ? AppColors.cyan : AppColors.primary);
+    final playerThemeColor =
+        color ?? (rightAlign ? AppColors.cyan : AppColors.primary);
 
     return Column(
       crossAxisAlignment:
@@ -2068,7 +2068,8 @@ class _StandingsTabState extends State<_StandingsTab> {
                             : Colors.transparent,
                         borderRadius: BorderRadius.circular(10),
                         border: _viewMode == 0
-                            ? Border.all(color: AppColors.primary.withValues(alpha: 0.5))
+                            ? Border.all(
+                                color: AppColors.primary.withValues(alpha: 0.5))
                             : null,
                       ),
                       alignment: Alignment.center,
@@ -2078,7 +2079,9 @@ class _StandingsTabState extends State<_StandingsTab> {
                           Icon(
                             Icons.table_chart_outlined,
                             size: 16,
-                            color: _viewMode == 0 ? AppColors.primary : AppColors.textMuted,
+                            color: _viewMode == 0
+                                ? AppColors.primary
+                                : AppColors.textMuted,
                           ),
                           const SizedBox(width: 6),
                           Text(
@@ -2086,7 +2089,9 @@ class _StandingsTabState extends State<_StandingsTab> {
                             style: GoogleFonts.orbitron(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              color: _viewMode == 0 ? Colors.white : AppColors.textMuted,
+                              color: _viewMode == 0
+                                  ? Colors.white
+                                  : AppColors.textMuted,
                             ),
                           ),
                         ],
@@ -2105,7 +2110,8 @@ class _StandingsTabState extends State<_StandingsTab> {
                             : Colors.transparent,
                         borderRadius: BorderRadius.circular(10),
                         border: _viewMode == 1
-                            ? Border.all(color: AppColors.primary.withValues(alpha: 0.5))
+                            ? Border.all(
+                                color: AppColors.primary.withValues(alpha: 0.5))
                             : null,
                       ),
                       alignment: Alignment.center,
@@ -2115,15 +2121,19 @@ class _StandingsTabState extends State<_StandingsTab> {
                           Icon(
                             Icons.military_tech,
                             size: 16,
-                            color: _viewMode == 1 ? AppColors.primary : AppColors.textMuted,
+                            color: _viewMode == 1
+                                ? AppColors.primary
+                                : AppColors.textMuted,
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            'TOP 5 LEADERS',
+                            'TOP RANKERS',
                             style: GoogleFonts.orbitron(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              color: _viewMode == 1 ? Colors.white : AppColors.textMuted,
+                              color: _viewMode == 1
+                                  ? Colors.white
+                                  : AppColors.textMuted,
                             ),
                           ),
                         ],
@@ -2145,47 +2155,44 @@ class _StandingsTabState extends State<_StandingsTab> {
                 .fade(duration: 350.ms)
                 .slideY(begin: 0.06, duration: 350.ms)
           else if (isDirectKnockout)
-            Column(
-              children: [
-                TournamentLeadersWidget(tournamentId: widget.tournamentId),
-                const SizedBox(height: 16),
-                GlassCard(
-                  borderColor: AppColors.cyan.withValues(alpha: 0.25),
-                  child: Column(
-                    children: [
-                      const Icon(Icons.account_tree,
-                          color: AppColors.cyan, size: 40),
-                      const SizedBox(height: 16),
-                      Text(
-                        'DIRECT KNOCKOUT BRACKET',
-                        style: GoogleFonts.orbitron(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Direct knockout tournaments use bracket progression rather than standings tables. View the bracket in the Fixtures tab.',
-                        style: GoogleFonts.rajdhani(
-                          color: AppColors.textMuted,
-                          fontSize: 14,
-                          height: 1.4,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 20),
-                      EsportsButton(
-                        label: 'GO TO FIXTURES & BRACKET',
-                        icon: Icons.calendar_month,
-                        gradient: const [AppColors.cyan, AppColors.purple],
-                        onPressed: widget.onGoToFixtures,
-                      ),
-                    ],
+            GlassCard(
+              borderColor: AppColors.cyan.withValues(alpha: 0.25),
+              child: Column(
+                children: [
+                  const Icon(Icons.account_tree,
+                      color: AppColors.cyan, size: 40),
+                  const SizedBox(height: 16),
+                  Text(
+                    'DIRECT KNOCKOUT BRACKET',
+                    style: GoogleFonts.orbitron(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-              ],
-            ).animate().fade(duration: 300.ms).slideY(begin: 0.06, duration: 300.ms)
+                  const SizedBox(height: 8),
+                  Text(
+                    'Direct knockout tournaments use bracket progression rather than standings tables. View the bracket in the Fixtures tab.',
+                    style: GoogleFonts.rajdhani(
+                      color: AppColors.textMuted,
+                      fontSize: 14,
+                      height: 1.4,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20),
+                  EsportsButton(
+                    label: 'GO TO FIXTURES & BRACKET',
+                    icon: Icons.calendar_month,
+                    gradient: const [AppColors.cyan, AppColors.purple],
+                    onPressed: widget.onGoToFixtures,
+                  ),
+                ],
+              ),
+            )
+                .animate()
+                .fade(duration: 300.ms)
+                .slideY(begin: 0.06, duration: 300.ms)
           else
             LeagueTableWidget(tournamentId: widget.tournamentId)
                 .animate()

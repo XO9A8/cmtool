@@ -27,8 +27,8 @@ use crate::{
         mps::{calculate_ewma_form, calculate_mps, MpsInput},
         play_style::{classify_play_style, PlayStyleTag, PlayerMatchStatsSummary},
         tournament::{
-            generate_group_knockout_fixtures, generate_knockout_bracket, generate_round_robin_fixtures, predict_match_outcome,
-            MatchPrediction, TournamentPlayer,
+            generate_group_knockout_fixtures, generate_knockout_bracket, generate_round_robin_fixtures,
+            predict_match_outcome, predict_match_outcome_advanced, MatchPrediction, TournamentPlayer,
         },
     },
     infrastructure::postgres_adapter as db,
@@ -719,17 +719,23 @@ pub struct PredictParams {
     pub p2_rating: i32,
     pub p1_h2h_wins: Option<u32>,
     pub p2_h2h_wins: Option<u32>,
+    pub p1_form: Option<f64>,
+    pub p2_form: Option<f64>,
 }
 
 async fn predict_match(
     _auth: AuthenticatedUser,
     Query(params): Query<PredictParams>,
 ) -> Json<MatchPrediction> {
-    let prediction = predict_match_outcome(
+    let prediction = predict_match_outcome_advanced(
         params.p1_rating,
         params.p2_rating,
         params.p1_h2h_wins.unwrap_or(0),
         params.p2_h2h_wins.unwrap_or(0),
+        params.p1_form,
+        params.p2_form,
+        None,
+        None,
     );
     Json(prediction)
 }
@@ -892,6 +898,7 @@ pub struct H2hRecordResponse {
     pub player_2_overall_goals: i64,
     pub scope: String,
     pub match_limit: Option<i64>,
+    pub prediction: MatchPrediction,
 }
 
 /// Returns live H2H stats from the database between two players.
@@ -934,6 +941,7 @@ async fn get_h2h_record(
             player_2_overall_goals: res.player_2_overall_goals,
             scope: res.scope,
             match_limit: res.match_limit,
+            prediction: res.prediction,
         })),
         Err(e) => Err(internal_error(e)),
     }

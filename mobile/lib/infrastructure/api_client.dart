@@ -75,10 +75,18 @@ class ApiClient {
 
   // ─────────────────────────────────────────────────────────────────────────
   // Caching GET requests
-  // ─────────────────────────────────────────────────────────────────────────
+  String _buildCacheKey(String path, Map<String, dynamic>? queryParameters) {
+    if (queryParameters == null || queryParameters.isEmpty) {
+      return 'cache_$path';
+    }
+    final sortedKeys = queryParameters.keys.toList()..sort();
+    final queryString = sortedKeys.map((k) => '$k=${queryParameters[k]}').join('&');
+    return 'cache_${path}_$queryString';
+  }
+
   Future<Response<T>> _getWithCache<T>(String path, {Map<String, dynamic>? queryParameters, bool forceRefresh = false}) async {
     final prefs = await SharedPreferences.getInstance();
-    final cacheKey = 'cache_${path}_${queryParameters?.toString() ?? ''}';
+    final cacheKey = _buildCacheKey(path, queryParameters);
     final timeKey = '${cacheKey}_time';
     
     final cachedStr = prefs.getString(cacheKey);
@@ -346,6 +354,7 @@ class ApiClient {
     String p2Id, {
     int? limit,
     String? scope,
+    bool forceRefresh = false,
   }) async {
     final response = await _getWithCache(
       '/api/v1/players/$p1Id/h2h/$p2Id',
@@ -353,6 +362,7 @@ class ApiClient {
         if (limit != null) 'limit': limit,
         if (scope != null) 'scope': scope,
       },
+      forceRefresh: forceRefresh,
     );
     return response.data as Map<String, dynamic>;
   }
