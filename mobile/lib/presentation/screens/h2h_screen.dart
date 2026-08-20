@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -10,7 +11,7 @@ import '../widgets/h2h/player_picker_bottom_sheet.dart';
 import '../widgets/h2h/hero_arena.dart';
 import '../widgets/h2h/h2h_result_widget.dart';
 
-/// Head-to-Head Rivalry Tracker screen showing live H2H stats between two players.
+/// Head-to-Head Rivalry Tracker — redesigned with Graphify charts.
 class H2hScreen extends ConsumerStatefulWidget {
   const H2hScreen({super.key});
 
@@ -18,14 +19,33 @@ class H2hScreen extends ConsumerStatefulWidget {
   ConsumerState<H2hScreen> createState() => _H2hScreenState();
 }
 
-class _H2hScreenState extends ConsumerState<H2hScreen> {
+class _H2hScreenState extends ConsumerState<H2hScreen>
+    with SingleTickerProviderStateMixin {
   String? _selectedClubId;
   String? _p1Id;
   String? _p2Id;
-  String _selectedScope =
-      'overall'; // 'overall' (All opponents avg) or 'direct' (Direct H2H only)
-  int? _selectedMatchLimit = 10; // 5, 10, 20, or null (All)
+  String _selectedScope = 'overall';
+  int? _selectedMatchLimit = 10;
   H2hParams? _currentParams;
+
+  late final AnimationController _pulseCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _pulseCtrl.dispose();
+    super.dispose();
+  }
+
+  // ── State helpers ──────────────────────────────────────────────────────────
 
   void _search() {
     if (_p1Id == null || _p2Id == null || _p1Id == _p2Id) return;
@@ -111,16 +131,14 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
     setState(() {
       _p1Id = p1;
       _p2Id = p2;
-      if (autoSearch) {
-        _currentParams = H2hParams(
-          p1Id: p1,
-          p2Id: p2,
-          limit: _selectedMatchLimit,
-          scope: _selectedScope,
-        );
-      } else {
-        _currentParams = null;
-      }
+      _currentParams = autoSearch
+          ? H2hParams(
+              p1Id: p1,
+              p2Id: p2,
+              limit: _selectedMatchLimit,
+              scope: _selectedScope,
+            )
+          : null;
     });
   }
 
@@ -164,6 +182,8 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
     );
   }
 
+  // ── Build ──────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     final clubsAsync = ref.watch(myClubsProvider);
@@ -171,183 +191,224 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Screen Header Badge
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [AppColors.primary, AppColors.cyan],
-                            ),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            'ARENA',
-                            style: GoogleFonts.orbitron(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.black,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'RIVALRY HUB',
-                          style: GoogleFonts.rajdhani(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                            letterSpacing: 1.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    const Text(
-                      'Historical Head-to-Head Matrix & Tactical Clash',
-                      style:
-                          TextStyle(color: AppColors.textMuted, fontSize: 12),
-                    ),
-                  ],
-                ),
-                if (_currentParams != null)
-                  TextButton.icon(
-                    onPressed: _clearSelection,
-                    icon: const Icon(Icons.refresh,
-                        size: 14, color: AppColors.cyan),
-                    label: Text(
-                      'RESET',
-                      style: GoogleFonts.rajdhani(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.cyan,
-                        letterSpacing: 1.1,
-                      ),
-                    ),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      backgroundColor: Colors.white.withValues(alpha: 0.04),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Club Selector Bar
-            clubsAsync.when(
-              loading: () => const Center(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 16),
-                  child: CircularProgressIndicator(color: AppColors.primary),
-                ),
-              ),
-              error: (e, _) => GlassCard(
-                child: Text('Error loading clubs: $e',
-                    style: const TextStyle(color: Colors.redAccent)),
-              ),
-              data: (data) {
-                final clubs = data['clubs'] as List<dynamic>? ?? [];
-                if (clubs.isEmpty) {
-                  return const GlassCard(
-                    child: Text('Join a club first to track rivalries.',
-                        style: TextStyle(color: AppColors.textMuted)),
-                  );
-                }
-
-                if (_selectedClubId == null && clubs.isNotEmpty) {
-                  _selectedClubId = clubs.first['id']?.toString();
-                }
-
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.shield_outlined,
-                            size: 14, color: AppColors.cyan),
-                        const SizedBox(width: 6),
-                        Text(
-                          'ACTIVE CLUB',
-                          style: GoogleFonts.rajdhani(
-                            fontSize: 11,
-                            color: AppColors.textMuted,
-                            letterSpacing: 1.5,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      height: 38,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: clubs.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 8),
-                        itemBuilder: (_, i) {
-                          final club = clubs[i];
-                          final isSelected = club['id'] == _selectedClubId;
-                          return ChoiceChip(
-                            avatar: Icon(
-                              Icons.groups,
-                              size: 16,
-                              color: isSelected ? Colors.black : Colors.white60,
-                            ),
-                            label: Text(club['name'] ?? 'Club'),
-                            selected: isSelected,
-                            onSelected: (_) {
-                              setState(() {
-                                _selectedClubId = club['id'];
-                                _p1Id = null;
-                                _p2Id = null;
-                                _currentParams = null;
-                              });
-                            },
-                            backgroundColor:
-                                Colors.white.withValues(alpha: 0.04),
-                            selectedColor: AppColors.primary,
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                            labelStyle: GoogleFonts.rajdhani(
-                              color: isSelected ? Colors.black : Colors.white70,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // Main Duel Stage & Discovery
-            if (_selectedClubId != null) ...[
-              _buildClubArena(context, _selectedClubId!, currentUserId),
-            ],
-          ],
+      body: clubsAsync.when(
+        loading: () => const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
         ),
+        error: (e, _) => Center(
+          child: GlassCard(
+            margin: const EdgeInsets.all(24),
+            child: Text('Error loading clubs: $e',
+                style: const TextStyle(color: Colors.redAccent)),
+          ),
+        ),
+        data: (data) {
+          final clubs = data['clubs'] as List<dynamic>? ?? [];
+
+          if (clubs.isEmpty) {
+            return _buildEmptyState();
+          }
+
+          if (_selectedClubId == null && clubs.isNotEmpty) {
+            _selectedClubId = clubs.first['id']?.toString();
+          }
+
+          return CustomScrollView(
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              // ── STICKY HEADER ────────────────────────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: _buildHeader(),
+                ),
+              ),
+
+              // ── CLUB SELECTOR ─────────────────────────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                  child: _buildClubSelector(clubs),
+                ),
+              ),
+
+              // ── ARENA ─────────────────────────────────────────────────────
+              if (_selectedClubId != null)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                    child: _buildClubArena(
+                        context, _selectedClubId!, currentUserId),
+                  ),
+                ),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 32)),
+            ],
+          );
+        },
       ),
     );
   }
+
+  // ── HEADER ─────────────────────────────────────────────────────────────────
+
+  Widget _buildHeader() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [AppColors.primary, AppColors.cyan],
+                      ),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'ARENA',
+                      style: GoogleFonts.orbitron(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.black,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      'RIVALRY HUB',
+                      style: GoogleFonts.rajdhani(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        letterSpacing: 1.5,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              const Text(
+                'Head-to-Head Matrix & Tactical Clash Analytics',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+        if (_currentParams != null) ...[
+          const SizedBox(width: 8),
+          TextButton.icon(
+            onPressed: _clearSelection,
+            icon: const Icon(Icons.refresh, size: 13, color: AppColors.cyan),
+            label: Text(
+              'RESET',
+              style: GoogleFonts.rajdhani(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: AppColors.cyan,
+                letterSpacing: 1.1,
+              ),
+            ),
+            style: TextButton.styleFrom(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              backgroundColor: Colors.white.withValues(alpha: 0.04),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
+        ],
+      ],
+    ).animate().fade(duration: 400.ms).slideY(begin: -0.1);
+  }
+
+  // ── CLUB SELECTOR ──────────────────────────────────────────────────────────
+
+  Widget _buildClubSelector(List<dynamic> clubs) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.shield_outlined,
+                size: 13, color: AppColors.cyan),
+            const SizedBox(width: 5),
+            Text(
+              'ACTIVE CLUB',
+              style: GoogleFonts.rajdhani(
+                fontSize: 10,
+                color: AppColors.textMuted,
+                letterSpacing: 1.5,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 36,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: clubs.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (_, i) {
+              final club = clubs[i];
+              final isSelected = club['id'] == _selectedClubId;
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                child: FilterChip(
+                  avatar: Icon(
+                    Icons.groups,
+                    size: 14,
+                    color: isSelected ? Colors.black : Colors.white60,
+                  ),
+                  label: Text(club['name'] ?? 'Club'),
+                  selected: isSelected,
+                  onSelected: (_) {
+                    setState(() {
+                      _selectedClubId = club['id'];
+                      _p1Id = null;
+                      _p2Id = null;
+                      _currentParams = null;
+                    });
+                  },
+                  backgroundColor: Colors.white.withValues(alpha: 0.04),
+                  selectedColor: AppColors.primary,
+                  checkmarkColor: Colors.black,
+                  showCheckmark: false,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  labelStyle: GoogleFonts.rajdhani(
+                    color: isSelected ? Colors.black : Colors.white70,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                  side: BorderSide(
+                    color: isSelected
+                        ? AppColors.primary
+                        : Colors.white.withValues(alpha: 0.12),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── CLUB ARENA ─────────────────────────────────────────────────────────────
 
   Widget _buildClubArena(
       BuildContext context, String clubId, String? currentUserId) {
@@ -368,17 +429,24 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
         final members = data['members'] as List<dynamic>? ?? [];
         if (members.length < 2) {
           return const GlassCard(
-            child: Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Text(
-                'At least 2 club members are required to compare head-to-head stats.',
-                style: TextStyle(color: AppColors.textMuted),
-              ),
+            padding: EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Icon(Icons.group_add_outlined,
+                    color: AppColors.textMuted, size: 28),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'At least 2 club members are required to compare head-to-head stats.',
+                    style: TextStyle(
+                        color: AppColors.textMuted, fontSize: 13),
+                  ),
+                ),
+              ],
             ),
           );
         }
 
-        // Find selected member objects
         final p1Member = members.cast<Map<String, dynamic>?>().firstWhere(
               (m) => m?['user_id'] == _p1Id,
               orElse: () => null,
@@ -388,12 +456,13 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
               orElse: () => null,
             );
 
-        final isReadyToDuel = _p1Id != null && _p2Id != null && _p1Id != _p2Id;
+        final isReadyToDuel =
+            _p1Id != null && _p2Id != null && _p1Id != _p2Id;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 🏟️ HERO DUEL ARENA (Face-Off Card)
+            // Hero Arena face-off card
             HeroArena(
               members: members,
               p1Member: p1Member,
@@ -403,8 +472,10 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
               isReadyToDuel: isReadyToDuel,
               isAnalyzing: _currentParams != null,
               onRandomDuel: () => _selectRandomDuel(members),
-              onPickPlayer1: () => _showPlayerPickerModal(context, members, isPlayer1: true),
-              onPickPlayer2: () => _showPlayerPickerModal(context, members, isPlayer1: false),
+              onPickPlayer1: () =>
+                  _showPlayerPickerModal(context, members, isPlayer1: true),
+              onPickPlayer2: () =>
+                  _showPlayerPickerModal(context, members, isPlayer1: false),
               onClearPlayer1: () {
                 setState(() {
                   _p1Id = null;
@@ -420,13 +491,13 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
               onSwapPlayers: _swapPlayers,
               onAnalyze: _search,
             ),
+            const SizedBox(height: 12),
+
+            // Filter bar (scope + sample size)
+            _buildFilterBar(),
             const SizedBox(height: 16),
 
-            // 🎛️ MATCH SCOPE & SAMPLE SIZE CONTROLS
-            _buildMatchFilterBar(),
-            const SizedBox(height: 16),
-
-            // If a duel is analyzed, show the full result breakdown
+            // Results or Discovery
             if (_currentParams != null) ...[
               H2hResultWidget(
                 params: _currentParams!,
@@ -436,12 +507,8 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
                 onLimitChanged: _setLimit,
               ),
             ] else ...[
-              // 🌟 RICH INITIAL DISCOVERY STATE
-              _buildInitialDiscovery(
-                context: context,
-                members: members,
-                currentUserId: currentUserId,
-              ),
+              _buildDiscovery(
+                  members: members, currentUserId: currentUserId),
             ],
           ],
         );
@@ -449,100 +516,66 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
     );
   }
 
-  Widget _buildMatchFilterBar() {
+  // ── FILTER BAR ─────────────────────────────────────────────────────────────
+
+  Widget _buildFilterBar() {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Row 1: Scope Selector
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Scope toggle
+            Container(
+              height: 30,
+              width: 164,
+              decoration: BoxDecoration(
+                color: Colors.black26,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.white10),
+              ),
+              padding: const EdgeInsets.all(2),
+              child: Row(
                 children: [
-                  const Icon(Icons.tune, size: 14, color: AppColors.cyan),
-                  const SizedBox(width: 6),
-                  Text(
-                    'COMPARISON SCOPE',
-                    style: GoogleFonts.rajdhani(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
-                      color: AppColors.textMuted,
-                    ),
-                  ),
+                  Expanded(child: _buildScopeBtn('All', 'overall')),
+                  Expanded(child: _buildScopeBtn('Direct', 'direct')),
                 ],
               ),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.black26,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.white10),
-                ),
-                padding: const EdgeInsets.all(2),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildScopeButton('🌐 All Opponents', 'overall'),
-                    const SizedBox(width: 4),
-                    _buildScopeButton('⚔️ Direct H2H', 'direct'),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          const Divider(color: Colors.white10, height: 1),
-          const SizedBox(height: 10),
-
-          // Row 2: Match Sample Size / Count
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'MATCH SAMPLE',
-                style: GoogleFonts.rajdhani(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
-                  color: AppColors.textMuted,
-                ),
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildLimitChip('Last 5', 5),
-                  const SizedBox(width: 6),
-                  _buildLimitChip('Last 10', 10),
-                  const SizedBox(width: 6),
-                  _buildLimitChip('Last 20', 20),
-                  const SizedBox(width: 6),
-                  _buildLimitChip('All', null),
-                ],
-              ),
-            ],
-          ),
-        ],
+            ),
+            const SizedBox(width: 8),
+            Container(width: 1, height: 18, color: Colors.white12),
+            const SizedBox(width: 8),
+            // Sample size chips
+            _buildLimitChip('L5', 5),
+            const SizedBox(width: 4),
+            _buildLimitChip('L10', 10),
+            const SizedBox(width: 4),
+            _buildLimitChip('L20', 20),
+            const SizedBox(width: 4),
+            _buildLimitChip('All', null),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildScopeButton(String label, String scopeVal) {
+  Widget _buildScopeBtn(String label, String scopeVal) {
     final isSelected = _selectedScope == scopeVal;
-    return InkWell(
+    return GestureDetector(
       onTap: () => _setScope(scopeVal),
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.cyan.withValues(alpha: 0.25)
+              ? AppColors.cyan.withValues(alpha: 0.22)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
@@ -550,12 +583,14 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
             width: 1,
           ),
         ),
-        child: Text(
-          label,
-          style: GoogleFonts.rajdhani(
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
-            color: isSelected ? Colors.white : Colors.white60,
+        child: Center(
+          child: Text(
+            label,
+            style: GoogleFonts.rajdhani(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: isSelected ? Colors.white : Colors.white60,
+            ),
           ),
         ),
       ),
@@ -564,19 +599,18 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
 
   Widget _buildLimitChip(String label, int? limitVal) {
     final isSelected = _selectedMatchLimit == limitVal;
-    return InkWell(
+    return GestureDetector(
       onTap: () => _setLimit(limitVal),
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.primary.withValues(alpha: 0.2)
+              ? AppColors.primary.withValues(alpha: 0.18)
               : Colors.white.withValues(alpha: 0.04),
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
             color: isSelected ? AppColors.primary : Colors.white10,
-            width: 1,
           ),
         ),
         child: Text(
@@ -591,12 +625,12 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
     );
   }
 
-  Widget _buildInitialDiscovery({
-    required BuildContext context,
+  // ── DISCOVERY STATE ────────────────────────────────────────────────────────
+
+  Widget _buildDiscovery({
     required List<dynamic> members,
     required String? currentUserId,
   }) {
-    // Sort members by Elo descending for quick rankings
     final sortedMembers = List<dynamic>.from(members)
       ..sort((a, b) {
         final rA = (a['skill_rating'] as num?)?.toInt() ?? 1000;
@@ -604,7 +638,6 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
         return rB.compareTo(rA);
       });
 
-    // Check if logged-in user is in the club
     final currentUserMember = members.cast<Map<String, dynamic>?>().firstWhere(
           (m) => m?['user_id'] == currentUserId,
           orElse: () => null,
@@ -613,83 +646,74 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ⚔️ Current User Fast Challenge Prompt
+        // ── My Rivalry Card ───────────────────────────────────────────────
         if (currentUserMember != null && _p1Id != currentUserId) ...[
-          _buildUserQuickChallengeCard(currentUserMember),
-          const SizedBox(height: 18),
+          _buildMyRivalryCard(currentUserMember),
+          const SizedBox(height: 16),
         ],
 
-        // 🔥 TOP CLUB RIVALRIES SECTION
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.local_fire_department,
-                    color: AppColors.primary, size: 18),
-                const SizedBox(width: 6),
-                Text(
-                  'HOT CLUB MATCHUPS',
-                  style: GoogleFonts.rajdhani(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.3,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-            Text(
-              '1-Tap Duel',
-              style: GoogleFonts.rajdhani(
-                  fontSize: 11, color: AppColors.textMuted),
-            ),
-          ],
+        // ── Hot Matchups ──────────────────────────────────────────────────
+        _buildSectionHeader(
+          icon: Icons.local_fire_department,
+          color: AppColors.primary,
+          title: 'HOT MATCHUPS',
+          subtitle: '1-tap duel',
         ),
         const SizedBox(height: 10),
+        _buildHotMatchups(sortedMembers),
+        const SizedBox(height: 20),
 
-        _buildHotMatchupsList(sortedMembers),
-        const SizedBox(height: 22),
-
-        // ⚡ CLUB CONTENDERS ROSTER
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.sports_esports,
-                    color: AppColors.cyan, size: 18),
-                const SizedBox(width: 6),
-                Text(
-                  'CLUB CONTENDERS (${members.length})',
-                  style: GoogleFonts.rajdhani(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.3,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-            Text(
-              'Pick to slot',
-              style: GoogleFonts.rajdhani(
-                  fontSize: 11, color: AppColors.textMuted),
-            ),
-          ],
+        // ── Contender Roster ──────────────────────────────────────────────
+        _buildSectionHeader(
+          icon: Icons.sports_esports,
+          color: AppColors.cyan,
+          title: 'CLUB CONTENDERS (${members.length})',
+          subtitle: 'Pick to slot',
         ),
         const SizedBox(height: 10),
+        _buildContenderRoster(sortedMembers),
+        const SizedBox(height: 20),
 
-        _buildContendersRoster(sortedMembers),
-        const SizedBox(height: 24),
-
-        // 📊 RIVALRY INTELLIGENCE HIGHLIGHTS
+        // ── Feature Highlights ────────────────────────────────────────────
         _buildFeatureHighlights(),
+      ],
+    ).animate().fade(duration: 350.ms).slideY(begin: 0.06);
+  }
+
+  Widget _buildSectionHeader({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String subtitle,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            Icon(icon, color: color, size: 16),
+            const SizedBox(width: 6),
+            Text(
+              title,
+              style: GoogleFonts.rajdhani(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.2,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+        Text(
+          subtitle,
+          style: GoogleFonts.rajdhani(
+              fontSize: 10, color: AppColors.textMuted),
+        ),
       ],
     );
   }
 
-  Widget _buildUserQuickChallengeCard(Map<String, dynamic> userMember) {
+  Widget _buildMyRivalryCard(Map<String, dynamic> userMember) {
     final username = userMember['username']?.toString() ?? 'You';
     final elo = (userMember['skill_rating'] as num?)?.toInt() ?? 1000;
     final avatarId = userMember['avatar_graphic']?.toString();
@@ -700,10 +724,10 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
       child: Row(
         children: [
           CircleAvatar(
-            radius: 18,
+            radius: 20,
             backgroundColor: AppColors.primary.withValues(alpha: 0.2),
             child: Icon(getAvatarById(avatarId).icon,
-                color: AppColors.primary, size: 20),
+                color: AppColors.primary, size: 22),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -713,14 +737,14 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
                 Text(
                   'YOUR RIVALRY DOSSIER',
                   style: GoogleFonts.rajdhani(
-                    fontSize: 11,
+                    fontSize: 10,
                     fontWeight: FontWeight.bold,
                     color: AppColors.primary,
                     letterSpacing: 1.1,
                   ),
                 ),
                 Text(
-                  '$username ($elo Elo)',
+                  '$username · $elo Elo',
                   style: GoogleFonts.rajdhani(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -741,12 +765,13 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.black,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8)),
             ),
             child: Text(
-              'SET AS P1',
+              'SET P1',
               style: GoogleFonts.rajdhani(
                   fontSize: 12, fontWeight: FontWeight.bold),
             ),
@@ -756,33 +781,30 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
     );
   }
 
-  Widget _buildHotMatchupsList(List<dynamic> sortedMembers) {
+  Widget _buildHotMatchups(List<dynamic> sortedMembers) {
     if (sortedMembers.length < 2) return const SizedBox.shrink();
 
-    final List<Map<String, dynamic>> pairs = [];
-
-    // Pair 1: #1 vs #2 (Clash of Titans)
+    final pairs = <Map<String, dynamic>>[];
     pairs.add({
-      'title': 'TITAN CLASH (#1 vs #2)',
+      'title': 'TITAN CLASH',
+      'label': '#1 vs #2',
       'p1': sortedMembers[0],
       'p2': sortedMembers[1],
       'color': AppColors.primary,
     });
-
-    // Pair 2: #1 vs #3
     if (sortedMembers.length >= 3) {
       pairs.add({
         'title': 'PODIUM SHOWDOWN',
+        'label': '#1 vs #3',
         'p1': sortedMembers[0],
         'p2': sortedMembers[2],
-        'color': AppColors.purple,
+        'color': AppColors.offWhite,
       });
     }
-
-    // Pair 3: #2 vs #3
     if (sortedMembers.length >= 4) {
       pairs.add({
         'title': 'MID-TABLE RIVALRY',
+        'label': '#3 vs #4',
         'p1': sortedMembers[2],
         'p2': sortedMembers[3],
         'color': AppColors.cyan,
@@ -790,7 +812,9 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
     }
 
     return Column(
-      children: pairs.map((pair) {
+      children: pairs.asMap().entries.map((entry) {
+        final i = entry.key;
+        final pair = entry.value;
         final p1 = pair['p1'] as Map<String, dynamic>;
         final p2 = pair['p2'] as Map<String, dynamic>;
         final p1Name = p1['username']?.toString() ?? 'Player 1';
@@ -798,11 +822,13 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
         final p1Elo = (p1['skill_rating'] as num?)?.toInt() ?? 1000;
         final p2Elo = (p2['skill_rating'] as num?)?.toInt() ?? 1000;
         final title = pair['title'] as String;
+        final label = pair['label'] as String;
         final color = pair['color'] as Color;
 
         return Container(
           margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(12),
@@ -810,24 +836,44 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
           ),
           child: Row(
             children: [
-              // Badge & Title
+              // Left: title + players
               Expanded(
-                flex: 3,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      title,
-                      style: GoogleFonts.rajdhani(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: color,
-                        letterSpacing: 1.1,
-                      ),
+                    Row(
+                      children: [
+                        Text(
+                          title,
+                          style: GoogleFonts.rajdhani(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: color,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            label,
+                            style: GoogleFonts.rajdhani(
+                              fontSize: 9,
+                              color: color.withValues(alpha: 0.8),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 3),
                     Text(
-                      '$p1Name vs $p2Name',
+                      '$p1Name  vs  $p2Name',
                       style: GoogleFonts.rajdhani(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
@@ -836,21 +882,16 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    Text(
+                      '$p1Elo  vs  $p2Elo ELO',
+                      style: GoogleFonts.orbitron(
+                          fontSize: 9, color: Colors.white54),
+                    ),
                   ],
                 ),
               ),
 
-              // Elo Comparison
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Text(
-                  '$p1Elo vs $p2Elo',
-                  style:
-                      GoogleFonts.orbitron(fontSize: 11, color: Colors.white60),
-                ),
-              ),
-
-              // Load Action Button
+              // Duel button
               ElevatedButton(
                 onPressed: () => _setMatchup(
                   p1['user_id'].toString(),
@@ -858,31 +899,31 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
                   autoSearch: true,
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: color.withValues(alpha: 0.15),
+                  backgroundColor: color.withValues(alpha: 0.12),
                   foregroundColor: color,
                   elevation: 0,
                   side: BorderSide(color: color.withValues(alpha: 0.5)),
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8)),
                 ),
                 child: Text(
-                  '⚔️ DUEL',
+                  'DUEL',
                   style: GoogleFonts.rajdhani(
                       fontSize: 12, fontWeight: FontWeight.bold),
                 ),
               ),
             ],
           ),
-        );
+        ).animate(delay: (60 * i).ms).fade().slideX(begin: 0.05);
       }).toList(),
     );
   }
 
-  Widget _buildContendersRoster(List<dynamic> sortedMembers) {
+  Widget _buildContenderRoster(List<dynamic> sortedMembers) {
     return SizedBox(
-      height: 120,
+      height: 118,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: sortedMembers.length,
@@ -900,39 +941,44 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
           if (isP1) borderColor = AppColors.primary;
           if (isP2) borderColor = AppColors.cyan;
 
-          return Container(
-            width: 110,
-            padding: const EdgeInsets.all(8),
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: 102,
+            padding: const EdgeInsets.all(7),
             decoration: BoxDecoration(
               color: isP1 || isP2
                   ? (isP1 ? AppColors.primary : AppColors.cyan)
                       .withValues(alpha: 0.08)
                   : AppColors.surface,
               borderRadius: BorderRadius.circular(12),
-              border:
-                  Border.all(color: borderColor, width: isP1 || isP2 ? 1.5 : 1),
+              border: Border.all(
+                  color: borderColor, width: isP1 || isP2 ? 1.5 : 1),
             ),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 CircleAvatar(
-                  radius: 16,
+                  radius: 15,
                   backgroundColor: (isP1
                           ? AppColors.primary
-                          : (isP2 ? AppColors.cyan : Colors.white12))
+                          : isP2
+                              ? AppColors.cyan
+                              : Colors.white12)
                       .withValues(alpha: 0.2),
                   child: Icon(
                     getAvatarById(avatarId).icon,
-                    size: 18,
+                    size: 16,
                     color: isP1
                         ? AppColors.primary
-                        : (isP2 ? AppColors.cyan : Colors.white70),
+                        : isP2
+                            ? AppColors.cyan
+                            : Colors.white70,
                   ),
                 ),
                 Text(
                   username,
                   style: GoogleFonts.rajdhani(
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
@@ -940,7 +986,7 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  '$elo ELO',
+                  '$elo',
                   style: GoogleFonts.orbitron(
                     fontSize: 9,
                     fontWeight: FontWeight.bold,
@@ -950,7 +996,10 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    InkWell(
+                    _buildSlotBtn(
+                      label: 'P1',
+                      active: isP1,
+                      color: AppColors.primary,
                       onTap: () {
                         setState(() {
                           _p1Id = id;
@@ -958,27 +1007,12 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
                           _currentParams = null;
                         });
                       },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: isP1
-                              ? AppColors.primary
-                              : Colors.white.withValues(alpha: 0.06),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          'P1',
-                          style: GoogleFonts.rajdhani(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: isP1 ? Colors.black : Colors.white70,
-                          ),
-                        ),
-                      ),
                     ),
-                    const SizedBox(width: 6),
-                    InkWell(
+                    const SizedBox(width: 4),
+                    _buildSlotBtn(
+                      label: 'P2',
+                      active: isP2,
+                      color: AppColors.cyan,
                       onTap: () {
                         setState(() {
                           _p2Id = id;
@@ -986,24 +1020,6 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
                           _currentParams = null;
                         });
                       },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: isP2
-                              ? AppColors.cyan
-                              : Colors.white.withValues(alpha: 0.06),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          'P2',
-                          style: GoogleFonts.rajdhani(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: isP2 ? Colors.black : Colors.white70,
-                          ),
-                        ),
-                      ),
                     ),
                   ],
                 ),
@@ -1015,14 +1031,62 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
     );
   }
 
+  Widget _buildSlotBtn({
+    required String label,
+    required bool active,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: active ? color : Colors.white.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.rajdhani(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: active ? Colors.black : Colors.white70,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildFeatureHighlights() {
+    final features = [
+      (
+        Icons.analytics_outlined,
+        'All-Time Record',
+        'Wins, draws, goal differentials.',
+        AppColors.primary
+      ),
+      (
+        Icons.radar,
+        '5-Axis Radar',
+        'Possession, pass, shot, def & form.',
+        AppColors.cyan
+      ),
+      (
+        Icons.psychology_outlined,
+        'AI Win Odds',
+        'Bayesian outcome predictions.',
+        AppColors.offWhite
+      ),
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'RIVALRY INTELLIGENCE SUITE',
           style: GoogleFonts.rajdhani(
-            fontSize: 11,
+            fontSize: 10,
             fontWeight: FontWeight.bold,
             letterSpacing: 1.4,
             color: AppColors.textMuted,
@@ -1030,79 +1094,85 @@ class _H2hScreenState extends ConsumerState<H2hScreen> {
         ),
         const SizedBox(height: 10),
         Row(
-          children: [
-            Expanded(
-              child: _buildFeatureCard(
-                icon: Icons.analytics_outlined,
-                title: 'All-Time Record',
-                desc:
-                    'Wins, draws, goal differentials & historical clash record.',
-                color: AppColors.primary,
+          children: features.asMap().entries.map((e) {
+            final (icon, title, desc, color) = e.value;
+            return Expanded(
+              child: Container(
+                margin:
+                    EdgeInsets.only(left: e.key > 0 ? 6 : 0),
+                padding: const EdgeInsets.all(10),
+                height: 105,
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                      color: color.withValues(alpha: 0.2)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(icon, color: color, size: 18),
+                    const SizedBox(height: 6),
+                    Text(
+                      title,
+                      style: GoogleFonts.rajdhani(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      desc,
+                      style: const TextStyle(
+                          fontSize: 10,
+                          color: AppColors.textMuted,
+                          height: 1.3),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _buildFeatureCard(
-                icon: Icons.radar,
-                title: '5-Axis Radar',
-                desc:
-                    'Tactical clash across possession, pass, shot, def & form.',
-                color: AppColors.cyan,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _buildFeatureCard(
-                icon: Icons.psychology_outlined,
-                title: 'AI Win Odds',
-                desc: 'Real-time Bayesian outcome predictions.',
-                color: AppColors.purple,
-              ),
-            ),
-          ],
+            );
+          }).toList(),
         ),
       ],
     );
   }
 
-  Widget _buildFeatureCard({
-    required IconData icon,
-    required String title,
-    required String desc,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      height: 110,
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(height: 6),
-          Text(
-            title,
-            style: GoogleFonts.rajdhani(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
+  // ── EMPTY STATE ────────────────────────────────────────────────────────────
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: GlassCard(
+        margin: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.shield_outlined,
+                color: AppColors.textMuted, size: 40),
+            const SizedBox(height: 12),
+            Text(
+              'NO CLUBS YET',
+              style: GoogleFonts.orbitron(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            desc,
-            style: const TextStyle(
-                fontSize: 10, color: AppColors.textMuted, height: 1.2),
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+            const SizedBox(height: 8),
+            const Text(
+              'Join or create a club to start tracking head-to-head rivalries.',
+              textAlign: TextAlign.center,
+              style:
+                  TextStyle(color: AppColors.textMuted, fontSize: 13),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../domain/models/match_record.dart';
 
 /// HTTP Client infrastructure service using Dio to communicate with the Axum REST API backend.
-/// Automatically attaches the stored JWT token to all protected requests.
+/// Automatically attaches the stored JWT token to all protected requests and silently refreshes expired tokens.
 class ApiClient {
   final Dio _dio;
   static const _tokenKey = 'jwt_token';
@@ -14,6 +15,29 @@ class ApiClient {
 
   String get baseUrl => _dio.options.baseUrl;
 
+  /// Helper to get a valid, non-expired access token from Supabase or local storage.
+  Future<String?> _getValidToken() async {
+    try {
+      final session = Supabase.instance.client.auth.currentSession;
+      if (session != null) {
+        if (session.isExpired) {
+          final res = await Supabase.instance.client.auth.refreshSession();
+          if (res.session != null) {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString(_tokenKey, res.session!.accessToken);
+            await prefs.setString(_userIdKey, res.session!.user.id);
+            return res.session!.accessToken;
+          }
+        } else {
+          return session.accessToken;
+        }
+      }
+    } catch (_) {}
+
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_tokenKey);
+  }
+
   ApiClient({String baseUrl = 'http://localhost:3000', this.onUnauthorized})
       : _dio = Dio(BaseOptions(
           baseUrl: baseUrl,
@@ -22,8 +46,7 @@ class ApiClient {
         )) {
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
-        final prefs = await SharedPreferences.getInstance();
-        final token = prefs.getString(_tokenKey);
+        final token = await _getValidToken();
         if (token != null && token.isNotEmpty) {
           options.headers['Authorization'] = 'Bearer $token';
         }
@@ -44,6 +67,26 @@ class ApiClient {
       },
       onError: (error, handler) async {
         if (error.response?.statusCode == 401) {
+          // Attempt silent session refresh before logging out
+          try {
+            final res = await Supabase.instance.client.auth.refreshSession();
+            if (res.session != null) {
+              final newToken = res.session!.accessToken;
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setString(_tokenKey, newToken);
+              await prefs.setString(_userIdKey, res.session!.user.id);
+
+              // Retry the original failed request with the new access token
+              final reqOptions = error.requestOptions;
+              reqOptions.headers['Authorization'] = 'Bearer $newToken';
+
+              final retryResponse = await _dio.fetch(reqOptions);
+              return handler.resolve(retryResponse);
+            }
+          } catch (_) {
+            // Refresh failed (e.g. refresh token expired / revoked)
+          }
+
           final prefs = await SharedPreferences.getInstance();
           await prefs.remove(_tokenKey);
           await prefs.remove(_userIdKey);
@@ -409,12 +452,15 @@ class ApiClient {
 
   /// Exports matchday PDF
   Future<List<int>> exportMatchdayPdf(String tournamentId, String matchdayId, bool includeResults) async {
+    final endpoint = includeResults ? 'results' : 'fixtures';
     final response = await _dio.get(
-      '/api/v1/tournaments/$tournamentId/matchdays/$matchdayId/export/pdf',
-      queryParameters: {'include_results': includeResults},
+      '/api/v1/tournaments/$tournamentId/matchdays/$matchdayId/export/$endpoint',
       options: Options(responseType: ResponseType.bytes),
     );
-    return response.data as List<int>;
+    if (response.data is List<int>) {
+      return response.data as List<int>;
+    }
+    return (response.data as List).cast<int>();
   }
 
   /// Starts a tournament with given players - generates fixtures and sets status to active.

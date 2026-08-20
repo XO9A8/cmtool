@@ -495,21 +495,21 @@ pub async fn is_club_official(
     club_id: Uuid,
     user_id: Uuid,
 ) -> Result<bool, sqlx::Error> {
-    let row = sqlx::query!(
+    let is_official: bool = sqlx::query_scalar(
         r#"
         SELECT EXISTS (
             SELECT 1 FROM Club_Memberships
             WHERE club_id = $1 AND player_id = $2
               AND LOWER(role) IN ('admin', 'organizer', 'president', 'captain', 'vice-captain')
-        ) AS is_official
+        )
         "#,
-        club_id,
-        user_id
     )
+    .bind(club_id)
+    .bind(user_id)
     .fetch_one(pool)
     .await?;
 
-    Ok(row.is_official.unwrap_or(false))
+    Ok(is_official)
 }
 
 /// Checks if a user is the owner of a club.
@@ -624,15 +624,14 @@ pub async fn get_tournament_advancing_count(
     pool: &PgPool,
     tournament_id: Uuid,
 ) -> Result<usize, sqlx::Error> {
-    let row = sqlx::query!(
+    let row: Option<serde_json::Value> = sqlx::query_scalar(
         "SELECT rules_config FROM Tournaments WHERE id = $1",
-        tournament_id
     )
+    .bind(tournament_id)
     .fetch_optional(pool)
     .await?;
 
-    if let Some(row) = row {
-        let config = row.rules_config;
+    if let Some(config) = row {
         let advancing = config.get("advancing_per_group").and_then(|v| v.as_u64()).unwrap_or(2);
         return Ok(advancing as usize);
     }
@@ -757,8 +756,6 @@ pub async fn void_match(
                         lost = GREATEST(0, lost - $3),
                         goals_for = GREATEST(0, goals_for - $4),
                         goals_against = GREATEST(0, goals_against - $5),
-                        goal_diff = GREATEST(0, goals_for - $4) - GREATEST(0, goals_against - $5),
-                        points = GREATEST(0, won - $1) * 3 + GREATEST(0, drawn - $2),
                         processed_match_ids = array_remove(COALESCE(League_Standings.processed_match_ids, ARRAY[]::UUID[]), $8),
                         updated_at = NOW()
                     WHERE tournament_id = $6 AND player_id = $7
@@ -792,8 +789,6 @@ pub async fn void_match(
                         lost = GREATEST(0, lost - $3),
                         goals_for = GREATEST(0, goals_for - $4),
                         goals_against = GREATEST(0, goals_against - $5),
-                        goal_diff = GREATEST(0, goals_for - $4) - GREATEST(0, goals_against - $5),
-                        points = GREATEST(0, won - $1) * 3 + GREATEST(0, drawn - $2),
                         processed_match_ids = array_remove(COALESCE(League_Standings.processed_match_ids, ARRAY[]::UUID[]), $8),
                         updated_at = NOW()
                     WHERE tournament_id = $6 AND player_id = $7

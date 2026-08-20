@@ -77,44 +77,53 @@ class HeroArena extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: isReadyToDuel
-                            ? AppColors.winGreen
-                            : AppColors.primary,
-                        boxShadow: [
-                          BoxShadow(
-                            color: (isReadyToDuel
-                                    ? AppColors.winGreen
-                                    : AppColors.primary)
-                                .withValues(alpha: 0.6),
-                            blurRadius: 6,
+                Flexible(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isReadyToDuel
+                              ? AppColors.winGreen
+                              : AppColors.primary,
+                          boxShadow: [
+                            BoxShadow(
+                              color: (isReadyToDuel
+                                      ? AppColors.winGreen
+                                      : AppColors.primary)
+                                  .withValues(alpha: 0.6),
+                              blurRadius: 6,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          isReadyToDuel
+                              ? 'DUEL READY'
+                              : (p1Id != null || p2Id != null
+                                  ? 'SELECT OPPONENT'
+                                  : 'CHOOSE CONTENDERS'),
+                          style: GoogleFonts.orbitron(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.2,
+                            color: isReadyToDuel
+                                ? AppColors.winGreen
+                                : Colors.white70,
                           ),
-                        ],
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      isReadyToDuel
-                          ? 'DUEL READY'
-                          : (p1Id != null || p2Id != null
-                              ? 'SELECT OPPONENT'
-                              : 'CHOOSE CONTENDERS'),
-                      style: GoogleFonts.orbitron(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.2,
-                        color:
-                            isReadyToDuel ? AppColors.winGreen : Colors.white70,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 // Random Duel Button
                 InkWell(
                   onTap: onRandomDuel,
@@ -300,6 +309,7 @@ class HeroArena extends StatelessWidget {
               // Avatar Circle
               Stack(
                 alignment: Alignment.center,
+                clipBehavior: Clip.none,
                 children: [
                   Container(
                     width: 52,
@@ -330,6 +340,23 @@ class HeroArena extends StatelessWidget {
                       size: 26,
                     ),
                   ),
+                  if (hasPlayer)
+                    Positioned(
+                      top: -2,
+                      right: -2,
+                      child: GestureDetector(
+                        onTap: onClear,
+                        child: Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: const Color(0xFF1E2130),
+                            border: Border.all(color: Colors.white24, width: 1),
+                          ),
+                          child: const Icon(Icons.close, size: 10, color: Colors.white70),
+                        ),
+                      ),
+                    ),
                 ],
               ),
               const SizedBox(height: 8),

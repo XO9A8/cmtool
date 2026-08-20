@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../../infrastructure/api_client.dart';
 import '../../domain/models/match_record.dart';
 
@@ -32,11 +33,20 @@ final authStateProvider = StateNotifierProvider<AuthNotifier, String?>((ref) {
 });
 
 class AuthNotifier extends StateNotifier<String?> {
-  AuthNotifier() : super(null) {
+  AuthNotifier() : super(Supabase.instance.client.auth.currentSession?.user.id) {
     _initSupabaseAuth();
   }
 
   void _initSupabaseAuth() {
+    final currentSession = Supabase.instance.client.auth.currentSession;
+    if (currentSession != null) {
+      state = currentSession.user.id;
+      SharedPreferences.getInstance().then((prefs) {
+        prefs.setString('jwt_token', currentSession.accessToken);
+        prefs.setString('user_id', currentSession.user.id);
+      });
+    }
+
     Supabase.instance.client.auth.onAuthStateChange.listen((data) async {
       final session = data.session;
       final prefs = await SharedPreferences.getInstance();
@@ -80,7 +90,53 @@ class AuthNotifier extends StateNotifier<String?> {
     await client.syncSupabaseUser(username);
   }
 
+  Future<void> signInWithGoogle(ApiClient client) async {
+    const defaultWebClientId = '1037810700370-qpscvkf6dbnd93b010rals24ojjrhb7f.apps.googleusercontent.com';
+    const webClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID', defaultValue: defaultWebClientId);
+
+    final googleSignIn = GoogleSignIn(
+      serverClientId: webClientId,
+    );
+
+    final googleUser = await googleSignIn.signIn();
+    if (googleUser == null) {
+      return; // User aborted
+    }
+
+    final googleAuth = await googleUser.authentication;
+    final accessToken = googleAuth.accessToken;
+    final idToken = googleAuth.idToken;
+
+    if (idToken == null) {
+      throw Exception('Failed to obtain Google ID token.');
+    }
+
+    final response = await Supabase.instance.client.auth.signInWithIdToken(
+      provider: OAuthProvider.google,
+      idToken: idToken,
+      accessToken: accessToken,
+    );
+
+    if (response.session != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('jwt_token', response.session!.accessToken);
+      await prefs.setString('user_id', response.session!.user.id);
+    }
+
+    final username = (googleUser.displayName != null && googleUser.displayName!.trim().isNotEmpty)
+        ? googleUser.displayName!.trim()
+        : googleUser.email.split('@').first;
+
+    await client.syncSupabaseUser(username);
+  }
+
   Future<void> logout(ApiClient client) async {
+    try {
+      final googleSignIn = GoogleSignIn();
+      if (await googleSignIn.isSignedIn()) {
+        await googleSignIn.signOut();
+      }
+    } catch (_) {}
     await Supabase.instance.client.auth.signOut();
   }
 

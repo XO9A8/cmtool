@@ -8,7 +8,8 @@ class AppColors {
   static const Color surfaceLight = Color(0xFF1C1F2E);
   static const Color primary = Color(0xFFFF6D00); // Electric Orange
   static const Color cyan = Color(0xFF00E5FF);    // Cyber Neon Cyan
-  static const Color purple = Color(0xFFB000FF);  // Vivid Purple Accent
+  static const Color offWhite = Color(0xFFE2E8F0); // Sleek Off-White / Platinum Accent
+  static const Color purple = offWhite;           // Legacy alias mapped to offWhite
   static const Color winGreen = Color(0xFF00E676);
   static const Color lossRed = Color(0xFFFF1744);
   static const Color textMuted = Color(0xFFA5ACBC); // Lightened for better contrast

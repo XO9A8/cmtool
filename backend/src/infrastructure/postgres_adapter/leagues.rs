@@ -457,12 +457,11 @@ pub async fn update_league_standing_guarded(
         (0, 0, 1)
     };
 
-    sqlx::query(
-        r#"
+    let query_str = r#"
         INSERT INTO League_Standings (
-            tournament_id, player_id, played, won, drawn, lost, goals_for, goals_against, goal_diff, points, processed_match_ids, group_name, updated_at
+            tournament_id, player_id, played, won, drawn, lost, goals_for, goals_against, processed_match_ids, group_name, updated_at
         )
-        VALUES ($6, $7, 1, $1, $2, $3, $4, $5, $4 - $5, $1 * 3 + $2, ARRAY[$8]::UUID[], (SELECT group_name FROM T_Matches WHERE id = $8), NOW())
+        VALUES ($6, $7, 1, $1, $2, $3, $4, $5, ARRAY[$8]::UUID[], (SELECT group_name FROM T_Matches WHERE id = $8), NOW())
         ON CONFLICT (tournament_id, player_id) DO UPDATE
         SET played        = League_Standings.played + 1,
             won           = League_Standings.won + $1,
@@ -470,25 +469,46 @@ pub async fn update_league_standing_guarded(
             lost          = League_Standings.lost + $3,
             goals_for     = League_Standings.goals_for + $4,
             goals_against = League_Standings.goals_against + $5,
-            goal_diff     = (League_Standings.goals_for + $4) - (League_Standings.goals_against + $5),
-            points        = (League_Standings.won + $1) * 3 + (League_Standings.drawn + $2),
             processed_match_ids = array_append(COALESCE(League_Standings.processed_match_ids, ARRAY[]::UUID[]), $8),
             updated_at    = NOW()
         WHERE NOT COALESCE($8 = ANY(League_Standings.processed_match_ids), FALSE)
-        "#,
-    )
-    .bind(won)
-    .bind(drawn)
-    .bind(lost)
-    .bind(goals_for)
-    .bind(goals_against)
-    .bind(tournament_id)
-    .bind(player_id)
-    .bind(t_match_id)
-    .execute(pool)
-    .await?;
+    "#;
 
-    Ok(())
+    let res = sqlx::query(query_str)
+        .bind(won)
+        .bind(drawn)
+        .bind(lost)
+        .bind(goals_for)
+        .bind(goals_against)
+        .bind(tournament_id)
+        .bind(player_id)
+        .bind(t_match_id)
+        .execute(pool)
+        .await;
+
+    match res {
+        Ok(_) => Ok(()),
+        Err(e) if e.to_string().contains("processed_match_ids") => {
+            // Column is missing on unmigrated database: create it and retry
+            let _ = sqlx::query("ALTER TABLE public.league_standings ADD COLUMN IF NOT EXISTS processed_match_ids UUID[] DEFAULT '{}'::UUID[];")
+                .execute(pool)
+                .await;
+
+            sqlx::query(query_str)
+                .bind(won)
+                .bind(drawn)
+                .bind(lost)
+                .bind(goals_for)
+                .bind(goals_against)
+                .bind(tournament_id)
+                .bind(player_id)
+                .bind(t_match_id)
+                .execute(pool)
+                .await
+                .map(|_| ())
+        }
+        Err(e) => Err(e),
+    }
 }
 
 /// Advances the winner of a knockout match to the correct slot in the next round.

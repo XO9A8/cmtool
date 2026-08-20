@@ -82,6 +82,18 @@ pub struct PlayerAnalyticsRow {
     pub wins: i64,
     pub draws: i64,
     pub losses: i64,
+    pub goals_for: i64,
+    pub goals_against: i64,
+    pub clean_sheets: i64,
+    pub passes_completed: i64,
+    pub passes_attempted: i64,
+    pub shots_on_target: i64,
+    pub shots_total: i64,
+    pub avg_possession: f64,
+    pub interceptions: i64,
+    pub tackles: i64,
+    pub fouls: i64,
+    pub peak_elo_rating: i32,
     pub efootball_game_id: Option<String>,
     pub preferred_foot: Option<String>,
     pub jersey_number: Option<i32>,
@@ -99,6 +111,57 @@ pub struct PlayerAnalyticsRow {
     pub node_state: Option<String>,
     pub auth_status: Option<String>,
     pub source_feed: Option<String>,
+}
+
+/// Computes recent form list, current win streak, and best win streak from match history.
+pub async fn get_player_streak_and_form(
+    pool: &PgPool,
+    player_id: Uuid,
+) -> Result<(Vec<String>, i64, i64), sqlx::Error> {
+    let rows = sqlx::query_as::<_, (String,)>(
+        r#"
+        SELECT 
+            CASE WHEN m.player_id = $1 THEN m.result 
+                 ELSE CASE WHEN m.result = 'win' THEN 'loss' WHEN m.result = 'loss' THEN 'win' ELSE m.result END 
+            END AS result
+        FROM Match_Records m
+        WHERE (m.player_id = $1 OR m.opponent_id = $1) AND m.deleted_at IS NULL AND m.verification_status = 'approved'
+        ORDER BY m.created_at DESC
+        "#,
+    )
+    .bind(player_id)
+    .fetch_all(pool)
+    .await?;
+
+    let results: Vec<String> = rows.into_iter().map(|(r,)| r).collect();
+    let recent_form: Vec<String> = results.iter().take(10).cloned().collect();
+
+    let mut current_streak: i64 = 0;
+    for r in &results {
+        if r == "win" {
+            current_streak += 1;
+        } else {
+            break;
+        }
+    }
+
+    let mut best_streak: i64 = 0;
+    let mut temp_streak: i64 = 0;
+    // Reverse for chronological streak calculation
+    let mut chronological = results.clone();
+    chronological.reverse();
+    for r in &chronological {
+        if r == "win" {
+            temp_streak += 1;
+            if temp_streak > best_streak {
+                best_streak = temp_streak;
+            }
+        } else {
+            temp_streak = 0;
+        }
+    }
+
+    Ok((recent_form, current_streak, best_streak))
 }
 
 /// Retrieves aggregated player analytics from the database.
@@ -120,6 +183,18 @@ pub async fn get_player_analytics(
             COUNT(*) FILTER (WHERE (m.player_id = p.user_id AND m.goals_for > m.goals_against) OR (m.opponent_id = p.user_id AND m.goals_against > m.goals_for))::INT8 AS wins,
             COUNT(*) FILTER (WHERE m.goals_for = m.goals_against)::INT8 AS draws,
             COUNT(*) FILTER (WHERE (m.player_id = p.user_id AND m.goals_for < m.goals_against) OR (m.opponent_id = p.user_id AND m.goals_against < m.goals_for))::INT8 AS losses,
+            COALESCE(SUM(CASE WHEN m.player_id = p.user_id THEN m.goals_for ELSE m.goals_against END), 0)::INT8 AS goals_for,
+            COALESCE(SUM(CASE WHEN m.player_id = p.user_id THEN m.goals_against ELSE m.goals_for END), 0)::INT8 AS goals_against,
+            COUNT(*) FILTER (WHERE (m.player_id = p.user_id AND m.goals_against = 0) OR (m.opponent_id = p.user_id AND m.goals_for = 0))::INT8 AS clean_sheets,
+            COALESCE(SUM(CASE WHEN m.player_id = p.user_id THEN m.passes_completed ELSE 0 END), 0)::INT8 AS passes_completed,
+            COALESCE(SUM(CASE WHEN m.player_id = p.user_id THEN m.passes_attempted ELSE 0 END), 0)::INT8 AS passes_attempted,
+            COALESCE(SUM(CASE WHEN m.player_id = p.user_id THEN m.shots_on_target ELSE 0 END), 0)::INT8 AS shots_on_target,
+            COALESCE(SUM(CASE WHEN m.player_id = p.user_id THEN m.shots_total ELSE 0 END), 0)::INT8 AS shots_total,
+            COALESCE(AVG(CASE WHEN m.player_id = p.user_id THEN m.possession ELSE (100.0 - m.possession) END), 50.0)::FLOAT8 AS avg_possession,
+            COALESCE(SUM(CASE WHEN m.player_id = p.user_id THEN m.interceptions ELSE 0 END), 0)::INT8 AS interceptions,
+            COALESCE(SUM(CASE WHEN m.player_id = p.user_id THEN m.tackles ELSE 0 END), 0)::INT8 AS tackles,
+            COALESCE(SUM(CASE WHEN m.player_id = p.user_id THEN m.fouls ELSE 0 END), 0)::INT8 AS fouls,
+            COALESCE(GREATEST(COALESCE(cm.skill_rating, 1000), (SELECT MAX(rating_after) FROM Elo_History WHERE player_id = p.user_id)), 1000)::INT4 AS peak_elo_rating,
             p.efootball_game_id,
             p.preferred_foot,
             p.jersey_number::INT4                                    AS jersey_number,
@@ -172,6 +247,18 @@ pub async fn get_player_analytics(
         wins: 0,
         draws: 0,
         losses: 0,
+        goals_for: 0,
+        goals_against: 0,
+        clean_sheets: 0,
+        passes_completed: 0,
+        passes_attempted: 0,
+        shots_on_target: 0,
+        shots_total: 0,
+        avg_possession: 50.0,
+        interceptions: 0,
+        tackles: 0,
+        fouls: 0,
+        peak_elo_rating: 1000,
         efootball_game_id: None,
         preferred_foot: None,
         jersey_number: None,

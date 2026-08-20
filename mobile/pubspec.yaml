@@ -24,10 +24,15 @@ dependencies:
   path_provider: ^2.1.6
   screenshot: ^3.0.0
   supabase_flutter: ^2.16.0
+  google_sign_in: ^6.2.1
   image_picker: ^1.2.3
   google_mlkit_text_recognition: ^0.16.0
   flutter_displaymode: ^0.7.0
   image: ^4.9.1
+  flutter_markdown: ^0.7.7+1
+  pdf: ^3.10.8
+  printing: ^5.13.3
+  graphify: ^1.2.1
 dev_dependencies:
   flutter_test:
     sdk: flutter

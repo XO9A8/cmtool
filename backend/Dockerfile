@@ -18,12 +18,9 @@ RUN rm -rf src
 
 # Now copy the actual source code
 COPY src ./src
-COPY .sqlx ./.sqlx
 
-# Update the timestamp of main.rs to force cargo to recompile our code (and not use the dummy build)
-RUN touch src/main.rs
-
-ENV SQLX_OFFLINE=true
+# Clean dummy crate artifacts to ensure a fresh, clean build of real code
+RUN rm -rf target/release/deps/cmtool_backend* target/release/cmtool-backend*
 RUN cargo build --release
 
 # ---------------------------------------------------

@@ -39,8 +39,10 @@ class _PlayerPickerBottomSheetState extends State<PlayerPickerBottomSheet> {
       return username.contains(query) || playStyle.contains(query);
     }).toList();
 
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     return Container(
-      height: MediaQuery.of(context).size.height * 0.70,
+      height: MediaQuery.of(context).size.height * 0.75 + (bottomInset > 0 ? bottomInset * 0.5 : 0),
+      padding: EdgeInsets.only(bottom: bottomInset),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -191,12 +193,16 @@ class _PlayerPickerBottomSheetState extends State<PlayerPickerBottomSheet> {
                                     children: [
                                       Row(
                                         children: [
-                                          Text(
-                                            username,
-                                            style: GoogleFonts.rajdhani(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.white,
+                                          Flexible(
+                                            child: Text(
+                                              username,
+                                              style: GoogleFonts.rajdhani(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.white,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
                                             ),
                                           ),
                                           if (isOtherSelected) ...[

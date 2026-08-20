@@ -10,6 +10,7 @@ import '../screens/clubs_screen.dart';
 import '../screens/player_profile_screen.dart';
 import '../screens/tournament_screen.dart';
 import '../widgets/pending_verifications_modal.dart';
+import '../widgets/guide_tip_card.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Custom Painter — subtle diagonal grid for hero banner background
@@ -62,9 +63,7 @@ class _ShimmerCard extends StatelessWidget {
         color: AppColors.surfaceLight,
         borderRadius: BorderRadius.circular(16),
       ),
-    )
-        .animate(onPlay: (c) => c.repeat(reverse: true))
-        .shimmer(
+    ).animate(onPlay: (c) => c.repeat(reverse: true)).shimmer(
           duration: 1200.ms,
           color: Colors.white.withValues(alpha: 0.07),
         );
@@ -76,8 +75,8 @@ class _ShimmerCard extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _FormChip extends StatelessWidget {
-  final String result;   // 'W', 'D', or 'L'
-  final String score;    // e.g. '3-1'
+  final String result; // 'W', 'D', or 'L'
+  final String score; // e.g. '3-1'
   final String opponent;
   final VoidCallback? onTap;
 
@@ -254,8 +253,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final authUserId = ref.watch(authStateProvider);
-    final userId =
-        authUserId ?? '00000000-0000-0000-0000-000000000001';
+    final userId = authUserId ?? '00000000-0000-0000-0000-000000000001';
 
     final myClubsAsync = ref.watch(myClubsProvider);
     final clubsList =
@@ -264,9 +262,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final clubId = hasClub
         ? clubsList.first['id'].toString()
         : '00000000-0000-0000-0000-000000000001';
-    final clubName = hasClub
-        ? (clubsList.first['name']?.toString() ?? 'My Club')
-        : null;
+    final clubName =
+        hasClub ? (clubsList.first['name']?.toString() ?? 'My Club') : null;
 
     final pendingAsync = ref.watch(pendingMatchesProvider);
     final pendingCount = pendingAsync.asData?.value.length ?? 0;
@@ -330,7 +327,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       .fade(delay: 240.ms, duration: 400.ms)
                       .slideY(begin: 0.05, duration: 400.ms),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
+
+                  // ── Contextual Tip of the Day ───────────────────────────
+                  const GuideTipCard(),
+
+                  const SizedBox(height: 20),
 
                   // ── 6. Club Leaderboard Snapshot ────────────────────────
                   _buildLeaderboardSnapshot(hasClub, clubId, clubName)
@@ -404,7 +406,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '$_greeting, COMMANDER',
+                      '$_greeting, BALLER',
                       style: GoogleFonts.rajdhani(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
@@ -431,9 +433,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           letterSpacing: 1.5,
                         ),
                       ),
-                    )
-                        .animate(onPlay: (c) => c.repeat(reverse: true))
-                        .shimmer(
+                    ).animate(onPlay: (c) => c.repeat(reverse: true)).shimmer(
                           duration: 3000.ms,
                           color: AppColors.cyan.withValues(alpha: 0.15),
                         ),
@@ -476,7 +476,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ),
                   ),
                 ),
-              ).animate().fade(delay: 200.ms).scale(begin: const Offset(0.85, 0.85)),
+              )
+                  .animate()
+                  .fade(delay: 200.ms)
+                  .scale(begin: const Offset(0.85, 0.85)),
             ],
           ),
         ],
@@ -498,9 +501,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         final wins = data['wins'] ?? 0;
         final losses = data['losses'] ?? 0;
         final winRate = data['win_rate'];
-        final winRateStr = winRate != null
-            ? '${(winRate as num).toStringAsFixed(0)}%'
-            : '—';
+        final winRateStr =
+            winRate != null ? '${(winRate as num).toStringAsFixed(0)}%' : '—';
 
         return GlassCard(
           gradientColors: const [Color(0xFF1C0A00), Color(0xFF090A0F)],
@@ -664,8 +666,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ),
                 if (streakLabel.isNotEmpty)
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                     decoration: BoxDecoration(
                       color: AppColors.winGreen.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(20),
@@ -696,8 +698,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         ? 'L'
                         : 'D';
                 final score = '$gf-$ga';
-                final opponent =
-                    m['opponent_name']?.toString() ?? 'Opponent';
+                final opponent = m['opponent_name']?.toString() ?? 'Opponent';
 
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
@@ -753,7 +754,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final startDate = m['start_date']?.toString();
     if (startDate != null && startDate.isNotEmpty) {
       try {
-        final d = DateTime.parse(startDate).add(Duration(days: roundNum > 1 ? roundNum - 1 : 0));
+        final d = DateTime.parse(startDate)
+            .add(Duration(days: roundNum > 1 ? roundNum - 1 : 0));
         return DateTime(d.year, d.month, d.day, 23, 59);
       } catch (_) {}
     }
@@ -787,15 +789,26 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final diffDays = target.difference(today).inDays;
 
     const monthNames = [
-      'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
-      'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'
+      'JAN',
+      'FEB',
+      'MAR',
+      'APR',
+      'MAY',
+      'JUN',
+      'JUL',
+      'AUG',
+      'SEP',
+      'OCT',
+      'NOV',
+      'DEC'
     ];
     const dayNames = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
     final dayName = dayNames[dt.weekday - 1];
     final monthName = monthNames[dt.month - 1];
 
-    final mdNum = sampleMatch?['matchday_number'] ?? sampleMatch?['round_number'];
+    final mdNum =
+        sampleMatch?['matchday_number'] ?? sampleMatch?['round_number'];
     final mdPrefix = mdNum != null ? 'MATCHDAY $mdNum • ' : '';
 
     if (diffDays == 0) {
@@ -829,7 +842,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     if (groupName != null && groupName.isNotEmpty) {
       return '$groupName • R$roundNum';
     }
-    if (formatType == 'knockout' || (formatType == 'group_knockout' && roundNum >= 10)) {
+    if (formatType == 'knockout' ||
+        (formatType == 'group_knockout' && roundNum >= 10)) {
       if (roundNum >= 10) return 'KNOCKOUT R$roundNum';
       return 'ROUND $roundNum';
     }
@@ -934,18 +948,23 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   const Icon(Icons.calendar_month,
                       color: AppColors.primary, size: 18),
                   const SizedBox(width: 8),
-                  Text(
-                    'NEXT 3 MATCH DAYS SCHEDULE',
-                    style: GoogleFonts.rajdhani(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
-                      letterSpacing: 1.5,
+                  Expanded(
+                    child: Text(
+                      'MATCH SCHEDULE',
+                      style: GoogleFonts.rajdhani(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                        letterSpacing: 1.2,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 8),
                   GlowBadge(
-                    label: '$displayedMatchesCount ${displayedMatchesCount == 1 ? 'MATCH' : 'MATCHES'} (${next3DateKeys.length} ${next3DateKeys.length == 1 ? 'DAY' : 'DAYS'})',
+                    label:
+                        '$displayedMatchesCount ${displayedMatchesCount == 1 ? 'MATCH' : 'MATCHES'} (${next3DateKeys.length} ${next3DateKeys.length == 1 ? 'DAY' : 'DAYS'})',
                     color: AppColors.cyan,
                   ),
                 ],
@@ -962,7 +981,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   final dateKey = next3DateKeys[dateIdx];
                   final dayMatches = dateGroups[dateKey] ?? [];
                   final dateDt = dateObjects[dateKey] ?? DateTime.now();
-                  final sampleMatch = dayMatches.isNotEmpty ? (dayMatches.first as Map<String, dynamic>) : null;
+                  final sampleMatch = dayMatches.isNotEmpty
+                      ? (dayMatches.first as Map<String, dynamic>)
+                      : null;
                   final dateLabel = _formatDateHeader(dateDt, sampleMatch);
 
                   return Container(
@@ -1067,10 +1088,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                             horizontal: 5, vertical: 1.5),
                                         margin: const EdgeInsets.only(right: 6),
                                         decoration: BoxDecoration(
-                                          color: Colors.amber.withValues(alpha: 0.15),
-                                          borderRadius: BorderRadius.circular(4),
+                                          color: Colors.amber
+                                              .withValues(alpha: 0.15),
+                                          borderRadius:
+                                              BorderRadius.circular(4),
                                           border: Border.all(
-                                              color: Colors.amber.withValues(alpha: 0.4)),
+                                              color: Colors.amber
+                                                  .withValues(alpha: 0.4)),
                                         ),
                                         child: Text(
                                           'RESCHEDULED',
@@ -1137,7 +1161,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                         style: GoogleFonts.orbitron(
                                           fontSize: 10,
                                           fontWeight: FontWeight.w900,
-                                          color: AppColors.cyan.withValues(alpha: 0.7),
+                                          color: AppColors.cyan
+                                              .withValues(alpha: 0.7),
                                         ),
                                       ),
                                     ),
@@ -1175,13 +1200,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 InkWell(
                   onTap: () => Navigator.push(
                     context,
-                    MaterialPageRoute(
-                        builder: (_) => const TournamentScreen()),
+                    MaterialPageRoute(builder: (_) => const TournamentScreen()),
                   ),
                   borderRadius: BorderRadius.circular(8),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        vertical: 8, horizontal: 12),
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                     decoration: BoxDecoration(
                       color: AppColors.cyan.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(8),
@@ -1234,12 +1258,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         'label': 'DISPUTES',
         'sub': 'Admin Judgments',
         'icon': Icons.gavel_outlined,
-        'color': AppColors.purple,
+        'color': AppColors.offWhite,
         'badge': null,
         'action': () => Navigator.push(
               context,
-              MaterialPageRoute(
-                  builder: (_) => const AdminDisputeScreen()),
+              MaterialPageRoute(builder: (_) => const AdminDisputeScreen()),
             ),
       },
       {
@@ -1261,8 +1284,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         'badge': null,
         'action': () => Navigator.push(
               context,
-              MaterialPageRoute(
-                  builder: (_) => const TournamentScreen()),
+              MaterialPageRoute(builder: (_) => const TournamentScreen()),
             ),
       },
     ];
@@ -1306,8 +1328,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         ),
                       ],
                     ),
-                    child:
-                        Icon(item['icon'] as IconData, color: col, size: 22),
+                    child: Icon(item['icon'] as IconData, color: col, size: 22),
                   ),
                   if (badge != null)
                     Positioned(
@@ -1381,17 +1402,25 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'CLUB STANDINGS',
-              style: GoogleFonts.rajdhani(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: AppColors.cyan,
-                letterSpacing: 1.5,
+            Expanded(
+              child: Text(
+                'CLUB STANDINGS',
+                style: GoogleFonts.rajdhani(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.cyan,
+                  letterSpacing: 1.5,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-            if (clubName != null)
-              GlowBadge(label: clubName, color: AppColors.purple),
+            if (clubName != null) ...[
+              const SizedBox(width: 8),
+              Flexible(
+                child: GlowBadge(label: clubName, color: AppColors.offWhite),
+              ),
+            ],
           ],
         ),
         const SizedBox(height: 14),
@@ -1455,13 +1484,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ...rest.asMap().entries.map((entry) {
                       final rank = entry.key + 4;
                       final p = entry.value;
-                      final name =
-                          p['player_name']?.toString() ?? '—';
+                      final name = p['player_name']?.toString() ?? '—';
                       final rating = p['skill_rating'] ?? 0;
 
                       return GestureDetector(
-                        onTap: () =>
-                            _showPlayerBottomSheet(name, rating),
+                        onTap: () => _showPlayerBottomSheet(name, rating),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 5),
                           child: Row(
@@ -1572,8 +1599,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   Navigator.pop(ctx);
                   Navigator.push(
                     context,
-                    MaterialPageRoute(
-                        builder: (_) => const ClubsScreen()),
+                    MaterialPageRoute(builder: (_) => const ClubsScreen()),
                   );
                 },
               ),
@@ -1588,8 +1614,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Widget _buildActivityFeed(bool hasClub, String clubId, String userId) {
     if (!hasClub) {
-      return _noClubCard(
-          'CLUB ACTIVITY', 'Join a club to see activity.');
+      return _noClubCard('CLUB ACTIVITY', 'Join a club to see activity.');
     }
 
     final activityAsync = ref.watch(clubActivityProvider(clubId));
@@ -1618,22 +1643,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             return Column(
               children: activities.take(5).map((a) {
                 final act = a as Map<String, dynamic>;
-                final playerName =
-                    act['player_name']?.toString() ?? '—';
-                final opponentName =
-                    act['opponent_name']?.toString() ?? '—';
-                final gf = int.tryParse(
-                        act['goals_for']?.toString() ?? '') ??
-                    0;
-                final ga = int.tryParse(
-                        act['goals_against']?.toString() ?? '') ??
-                    0;
-                final matchType =
-                    act['match_type']?.toString() ?? 'Match';
+                final playerName = act['player_name']?.toString() ?? '—';
+                final opponentName = act['opponent_name']?.toString() ?? '—';
+                final gf =
+                    int.tryParse(act['goals_for']?.toString() ?? '') ?? 0;
+                final ga =
+                    int.tryParse(act['goals_against']?.toString() ?? '') ?? 0;
+                final matchType = act['match_type']?.toString() ?? 'Match';
                 final time = act['created_at']?.toString() ?? '';
-                final dateStr = time.length >= 10
-                    ? time.substring(0, 10)
-                    : time;
+                final dateStr =
+                    time.length >= 10 ? time.substring(0, 10) : time;
 
                 final isP1Win = gf > ga;
                 final isP2Win = ga > gf;
@@ -1726,8 +1745,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           decoration: BoxDecoration(
                             color: col.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                                color: col.withValues(alpha: 0.4)),
+                            border:
+                                Border.all(color: col.withValues(alpha: 0.4)),
                           ),
                           child: Text(
                             resultLabel,
@@ -1772,7 +1791,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
-          const Icon(Icons.notification_important, color: Colors.amber, size: 28)
+          const Icon(Icons.notification_important,
+                  color: Colors.amber, size: 28)
               .animate(onPlay: (c) => c.repeat())
               .shimmer(duration: 1500.ms, color: Colors.amber),
           const SizedBox(width: 14),
@@ -1822,8 +1842,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       padding: const EdgeInsets.all(14),
       child: Row(
         children: [
-          const Icon(Icons.error_outline,
-              color: AppColors.lossRed, size: 18),
+          const Icon(Icons.error_outline, color: AppColors.lossRed, size: 18),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -1845,8 +1864,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
-          const Icon(Icons.info_outline,
-              color: AppColors.textMuted, size: 18),
+          const Icon(Icons.info_outline, color: AppColors.textMuted, size: 18),
           const SizedBox(width: 10),
           Expanded(
             child: Text(

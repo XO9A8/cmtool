@@ -629,14 +629,13 @@ pub async fn transition_group_knockout_phase(
     let bracket = generate_group_knockout_phase_two_fixtures(tourney_id, standings, advancing);
 
     let max_group_round: Option<i32> = sqlx::query_scalar(
-        "SELECT MAX(round_number) FROM T_Matches WHERE tournament_id = $1 AND group_name IS NOT NULL"
+        "SELECT MAX(round_number)::INT4 FROM T_Matches WHERE tournament_id = $1 AND group_name IS NOT NULL"
     )
     .bind(tourney_id)
     .fetch_optional(&mut *tx)
     .await
     .map_err(|e| e.to_string())?
-    .flatten()
-    .map(|r: i32| r);
+    .flatten();
 
     let round_offset = max_group_round.unwrap_or(0) as u32;
     let mut fixtures = bracket.fixtures;

@@ -207,66 +207,85 @@ class AdminDisputeScreen extends ConsumerWidget {
     );
   }
 
-  void _resolve(BuildContext context, WidgetRef ref, String disputeId, {required bool dismiss}) {
-    showDialog(
+  void _resolve(BuildContext context, WidgetRef ref, String disputeId, {required bool dismiss}) async {
+    bool isLoading = false;
+    final result = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.cyan),
-        ),
-        title: Text(
-          dismiss ? 'DISMISS DISPUTE' : 'UPHOLD DISPUTE',
-          style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        content: Text(
-          dismiss
-              ? 'Mark this dispute as dismissed? No rating changes will be applied.'
-              : 'Uphold this dispute and VOID the match? This will reverse all Elo and Standings updates so players can resubmit.',
-          style: const TextStyle(color: Colors.white70, fontSize: 13),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('CANCEL', style: TextStyle(color: Colors.white54)),
+      useRootNavigator: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          backgroundColor: AppColors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: AppColors.cyan),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              try {
-                final client = ref.read(apiClientProvider);
-                await client.resolveAdminDispute(
-                  disputeId: disputeId,
-                  dismiss: dismiss,
-                  voidMatch: !dismiss,
-                );
-                await client.clearAllCache();
-                ref.invalidate(adminDisputesProvider);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(dismiss ? 'Dispute dismissed.' : 'Dispute upheld and resolved.'),
-                      backgroundColor: dismiss ? AppColors.lossRed : AppColors.winGreen,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.lossRed),
-                  );
-                }
-              }
-            },
-            child: Text(
-              'CONFIRM',
-              style: GoogleFonts.rajdhani(color: Colors.black, fontWeight: FontWeight.bold),
+          title: Text(
+            dismiss ? 'DISMISS DISPUTE' : 'UPHOLD DISPUTE',
+            style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+          content: Text(
+            dismiss
+                ? 'Mark this dispute as dismissed? No rating changes will be applied.'
+                : 'Uphold this dispute and VOID the match? This will reverse all Elo and Standings updates so players can resubmit.',
+            style: const TextStyle(color: Colors.white70, fontSize: 13),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isLoading ? null : () => Navigator.of(ctx).pop(false),
+              child: const Text('CANCEL', style: TextStyle(color: Colors.white54)),
             ),
-          ),
-        ],
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      setState(() => isLoading = true);
+                      try {
+                        final client = ref.read(apiClientProvider);
+                        await client.resolveAdminDispute(
+                          disputeId: disputeId,
+                          dismiss: dismiss,
+                          voidMatch: !dismiss,
+                        );
+                        await client.clearAllCache();
+                        if (ctx.mounted) {
+                          Navigator.of(ctx).pop(true);
+                        }
+                      } catch (e) {
+                        if (ctx.mounted) {
+                          setState(() => isLoading = false);
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.lossRed),
+                          );
+                        }
+                      }
+                    },
+              child: isLoading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                    )
+                  : Text(
+                      'CONFIRM',
+                      style: GoogleFonts.rajdhani(color: Colors.black, fontWeight: FontWeight.bold),
+                    ),
+            ),
+          ],
+        ),
       ),
     );
+
+    if (result == true) {
+      ref.invalidate(adminDisputesProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(dismiss ? 'Dispute dismissed.' : 'Dispute upheld and resolved.'),
+            backgroundColor: dismiss ? AppColors.lossRed : AppColors.winGreen,
+          ),
+        );
+      }
+    }
   }
 }

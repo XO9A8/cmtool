@@ -91,8 +91,16 @@ pub async fn get_h2h_record_db(
     let is_direct = effective_scope == "direct";
     let effective_limit = limit.unwrap_or(10000);
 
+    #[derive(FromRow)]
+    struct PlayerInfoRow {
+        name: Option<String>,
+        avatar_graphic: Option<String>,
+        elo: Option<i32>,
+        form: Option<f64>,
+    }
+
     // 1. Get Player 1 Info
-    let p1_row = sqlx::query!(
+    let p1_row = sqlx::query_as::<_, PlayerInfoRow>(
         r#"
         SELECT COALESCE(NULLIF(u.full_name, ''), u.username, 'Player 1') AS name,
                pp.avatar_graphic,
@@ -107,8 +115,8 @@ pub async fn get_h2h_record_db(
         ) cm ON cm.player_id = u.id
         WHERE u.id = $1
         "#,
-        p1_id
     )
+    .bind(p1_id)
     .fetch_optional(pool)
     .await?;
 
@@ -118,7 +126,7 @@ pub async fn get_h2h_record_db(
     let p1_form = p1_row.as_ref().and_then(|r| r.form).unwrap_or(50.0);
 
     // 2. Get Player 2 Info
-    let p2_row = sqlx::query!(
+    let p2_row = sqlx::query_as::<_, PlayerInfoRow>(
         r#"
         SELECT COALESCE(NULLIF(u.full_name, ''), u.username, 'Player 2') AS name,
                pp.avatar_graphic,
@@ -133,8 +141,8 @@ pub async fn get_h2h_record_db(
         ) cm ON cm.player_id = u.id
         WHERE u.id = $1
         "#,
-        p2_id
     )
+    .bind(p2_id)
     .fetch_optional(pool)
     .await?;
 

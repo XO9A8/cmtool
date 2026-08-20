@@ -10,6 +10,11 @@ class MpsRadarChart extends StatelessWidget {
   final double shotEfficiency;
   final double interceptions;
   final double formRating;
+  final double? attackingScore;
+  final double? resilienceScore;
+  final Color? primaryColor;
+  final List<String>? customLabels;
+  final List<double>? customValues;
 
   const MpsRadarChart({
     super.key,
@@ -18,31 +23,61 @@ class MpsRadarChart extends StatelessWidget {
     required this.shotEfficiency,
     required this.interceptions,
     required this.formRating,
+    this.attackingScore,
+    this.resilienceScore,
+    this.primaryColor,
+    this.customLabels,
+    this.customValues,
   });
 
   @override
   Widget build(BuildContext context) {
-    // Normalize values to 0.0 - 1.0 range based on hypothetical maximums
-    final normalizedPossession = (possession / 100.0).clamp(0.0, 1.0);
-    final normalizedPasses = (passAccuracy / 100.0).clamp(0.0, 1.0);
-    final normalizedShots = (shotEfficiency / 100.0).clamp(0.0, 1.0);
-    // Assuming max 20 interceptions is top tier
-    final normalizedInterceptions = (interceptions / 20.0).clamp(0.0, 1.0);
-    final normalizedForm = (formRating / 100.0).clamp(0.0, 1.0);
+    if (customValues != null && customLabels != null) {
+      return AspectRatio(
+        aspectRatio: 1,
+        child: CustomPaint(
+          painter: RadarChartPainter(
+            values: customValues!,
+            labels: customLabels!,
+            color: primaryColor ?? AppColors.cyan,
+          ),
+        ),
+      );
+    }
+
+    // 6-Pillar Performance Calculations (Normalized 0.05 - 1.0 range)
+    final normalizedPossession = (possession / 100.0).clamp(0.05, 1.0);
+    final normalizedPasses = (passAccuracy / 100.0).clamp(0.05, 1.0);
+    final normalizedShots = attackingScore != null
+        ? (attackingScore! / 100.0).clamp(0.05, 1.0)
+        : (shotEfficiency / 100.0).clamp(0.05, 1.0);
+    final normalizedDefending = (interceptions / 15.0).clamp(0.05, 1.0);
+    final normalizedResilience = resilienceScore != null
+        ? (resilienceScore! / 100.0).clamp(0.05, 1.0)
+        : ((100.0 - (shotEfficiency * 0.5)) / 100.0).clamp(0.05, 1.0);
+    final normalizedForm = (formRating / 100.0).clamp(0.05, 1.0);
 
     return AspectRatio(
-      aspectRatio: 1,
+      aspectRatio: 1.05,
       child: CustomPaint(
         painter: RadarChartPainter(
           values: [
-            normalizedPossession,
-            normalizedPasses,
             normalizedShots,
-            normalizedInterceptions,
-            normalizedForm
+            normalizedPasses,
+            normalizedPossession,
+            normalizedDefending,
+            normalizedResilience,
+            normalizedForm,
           ],
-          labels: ['Possession', 'Passing', 'Shooting', 'Defending', 'Form'],
-          color: AppColors.cyan,
+          labels: const [
+            'ATTACK',
+            'PASSING',
+            'POSSESSION',
+            'DEFENDING',
+            'RESILIENCE',
+            'FORM',
+          ],
+          color: primaryColor ?? AppColors.cyan,
         ),
       ),
     );
@@ -63,14 +98,14 @@ class RadarChartPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = min(center.dx, center.dy) * 0.8;
+    final radius = min(center.dx, center.dy) * 0.68;
     final angle = 2 * pi / values.length;
 
-    // Draw background web
+    // Draw background concentric polygon web
     final gridPaint = Paint()
-      ..color = Colors.white24
+      ..color = Colors.white.withValues(alpha: 0.12)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
+      ..strokeWidth = 1.0;
 
     for (var i = 1; i <= 4; i++) {
       final r = radius * (i / 4);
@@ -88,45 +123,80 @@ class RadarChartPainter extends CustomPainter {
       canvas.drawPath(path, gridPaint);
     }
 
-    // Draw axes
+    // Draw radial axes and glowing labels
+    final axisPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.15)
+      ..strokeWidth = 1.0;
+
     for (var i = 0; i < values.length; i++) {
       final x = center.dx + radius * cos(i * angle - pi / 2);
       final y = center.dy + radius * sin(i * angle - pi / 2);
-      canvas.drawLine(center, Offset(x, y), gridPaint);
-      
-      // Draw labels
+      canvas.drawLine(center, Offset(x, y), axisPaint);
+
+      // Value percentage badge text
+      final valPct = (values[i] * 100).round();
       final labelSpan = TextSpan(
-        style: const TextStyle(color: Colors.white70, fontSize: 10),
-        text: labels[i],
+        children: [
+          TextSpan(
+            text: '${labels[i]}\n',
+            style: GoogleFonts.rajdhani(
+              color: Colors.white70,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.0,
+            ),
+          ),
+          TextSpan(
+            text: '$valPct',
+            style: GoogleFonts.orbitron(
+              color: color,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
       );
       final textPainter = TextPainter(
         text: labelSpan,
+        textAlign: TextAlign.center,
         textDirection: TextDirection.ltr,
       );
       textPainter.layout();
-      
-      // Adjust label position slightly outwards
-      const labelOffset = 15.0;
+
+      const labelOffset = 22.0;
       final lx = center.dx + (radius + labelOffset) * cos(i * angle - pi / 2) - textPainter.width / 2;
       final ly = center.dy + (radius + labelOffset) * sin(i * angle - pi / 2) - textPainter.height / 2;
       textPainter.paint(canvas, Offset(lx, ly));
     }
 
-    // Draw data polygon
+    // Draw gradient filled data polygon
     final dataPaint = Paint()
-      ..color = color.withValues(alpha: 0.4)
+      ..color = color.withValues(alpha: 0.30)
       ..style = PaintingStyle.fill;
-    
+
     final dataOutlinePaint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
+      ..strokeWidth = 2.4
+      ..strokeCap = StrokeCap.round;
+
+    final dotPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final dotCenterPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
 
     final dataPath = Path();
+    final points = <Offset>[];
+
     for (var i = 0; i < values.length; i++) {
-      final valRadius = radius * values[i];
+      final valRadius = radius * values[i].clamp(0.05, 1.0);
       final x = center.dx + valRadius * cos(i * angle - pi / 2);
       final y = center.dy + valRadius * sin(i * angle - pi / 2);
+      final pt = Offset(x, y);
+      points.add(pt);
       if (i == 0) {
         dataPath.moveTo(x, y);
       } else {
@@ -134,9 +204,15 @@ class RadarChartPainter extends CustomPainter {
       }
     }
     dataPath.close();
-    
+
     canvas.drawPath(dataPath, dataPaint);
     canvas.drawPath(dataPath, dataOutlinePaint);
+
+    // Draw glowing data points
+    for (final pt in points) {
+      canvas.drawCircle(pt, 4.0, dotPaint);
+      canvas.drawCircle(pt, 2.0, dotCenterPaint);
+    }
   }
 
   @override
@@ -194,17 +270,19 @@ class H2hDualRadarChart extends StatelessWidget {
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  title ?? 'HEAD-TO-HEAD PERFORMANCE RADAR',
+                  title ?? 'PERFORMANCE RADAR',
                   style: GoogleFonts.rajdhani(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    letterSpacing: 1.4,
+                    letterSpacing: 1.2,
                     color: Colors.white70,
                   ),
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
               if (subtitle != null) ...[
+                const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
@@ -280,31 +358,36 @@ class H2hDualRadarChart extends StatelessWidget {
   }
 
   Widget _buildLegend(String name, Color color) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(3),
-            boxShadow: [
-              BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 4),
-            ],
+    return Flexible(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(3),
+              boxShadow: [
+                BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 4),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          name,
-          style: GoogleFonts.rajdhani(
-            color: Colors.white,
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              name,
+              style: GoogleFonts.rajdhani(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
+        ],
+      ),
     );
   }
 

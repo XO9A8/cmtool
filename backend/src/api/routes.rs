@@ -14,7 +14,7 @@ use axum::{
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
-use sqlx::Row;
+use sqlx::{FromRow, Row};
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use uuid::Uuid;
 
@@ -77,6 +77,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/api/v1/tournaments/:id/matches/:match_id/reschedule", axum::routing::put(reschedule_match))
         .route("/api/v1/tournaments/:id/matchdays/:md_id/export/fixtures", get(export_matchday_fixtures))
         .route("/api/v1/tournaments/:id/matchdays/:md_id/export/results", get(export_matchday_results))
+        .route("/api/v1/tournaments/:id/matchdays/:md_id/export/pdf", get(export_matchday_pdf))
         .route("/api/v1/tournaments/:id/progress", get(get_tournament_progress))
         .route("/api/v1/players/:id/profile", get(get_player_profile).put(update_player_profile))
         .route("/api/v1/players/:id/matches", get(get_player_matches))
@@ -257,20 +258,22 @@ async fn join_club(
     auth: AuthenticatedUser,
     Json(payload): Json<JoinClubRequest>,
 ) -> Result<Json<JoinClubResponse>, (StatusCode, Json<ApiErrorResponse>)> {
-    let club = sqlx::query!("SELECT id FROM Clubs WHERE invite_code = $1 AND deleted_at IS NULL", payload.invite_code)
+    let club_id: Option<Uuid> = sqlx::query_scalar("SELECT id FROM Clubs WHERE invite_code = $1 AND deleted_at IS NULL")
+        .bind(&payload.invite_code)
         .fetch_optional(&state.pool)
         .await
         .map_err(|e| internal_error(e))?;
         
-    let club_id = match club {
-        Some(c) => c.id,
+    let club_id = match club_id {
+        Some(c) => c,
         None => return Err(bad_request("INVALID_INVITE_CODE", "No club found with that invite code")),
     };
     
-    let is_member = sqlx::query_scalar!("SELECT EXISTS(SELECT 1 FROM Club_Memberships WHERE club_id = $1 AND player_id = $2)", club_id, auth.user_id)
+    let is_member: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM Club_Memberships WHERE club_id = $1 AND player_id = $2)")
+        .bind(club_id)
+        .bind(auth.user_id)
         .fetch_one(&state.pool)
         .await
-        .unwrap_or(Some(false))
         .unwrap_or(false);
         
     if is_member {
@@ -395,16 +398,19 @@ async fn ocr_submit(
 
     // --- T_Match Participant Check ---
     if let Some(tm_id) = payload.t_match_id {
-        let t_match = sqlx::query!("SELECT player_1_id, player_2_id FROM T_Matches WHERE id = $1", tm_id)
-            .fetch_optional(&state.pool).await.map_err(|e| internal_error(e))?;
-        if let Some(tm) = t_match {
-            if tm.player_1_id.is_none() || tm.player_2_id.is_none() {
+        let t_match: Option<(Option<Uuid>, Option<Uuid>)> = sqlx::query_as("SELECT player_1_id, player_2_id FROM T_Matches WHERE id = $1")
+            .bind(tm_id)
+            .fetch_optional(&state.pool)
+            .await
+            .map_err(|e| internal_error(e))?;
+        if let Some((p1, p2)) = t_match {
+            if p1.is_none() || p2.is_none() {
                 return Err(bad_request("TBD_SLOT", "Match not ready – TBD slot not filled yet."));
             }
-            if tm.player_1_id != Some(actual_player_id) && tm.player_2_id != Some(actual_player_id) {
+            if p1 != Some(actual_player_id) && p2 != Some(actual_player_id) {
                 return Err(forbidden("FORBIDDEN", "You are not a participant in this match."));
             }
-            if tm.player_1_id != Some(payload.opponent_id) && tm.player_2_id != Some(payload.opponent_id) {
+            if p1 != Some(payload.opponent_id) && p2 != Some(payload.opponent_id) {
                 return Err(bad_request("INVALID_OPPONENT", "The specified opponent does not match the scheduled tournament fixture."));
             }
         }
@@ -424,11 +430,11 @@ async fn ocr_submit(
 
     let mut auto_match_id = None;
     if let Some(opponent_match_id) = pending_match {
-        let opponent_t_match_id: Option<Uuid> = sqlx::query_scalar!("SELECT t_match_id FROM Match_Records WHERE id = $1", opponent_match_id)
+        let opponent_t_match_id: Option<Uuid> = sqlx::query_scalar("SELECT t_match_id FROM Match_Records WHERE id = $1")
+            .bind(opponent_match_id)
             .fetch_optional(&state.pool)
             .await
             .ok()
-            .flatten()
             .flatten();
 
         if payload.t_match_id == opponent_t_match_id {
@@ -489,20 +495,28 @@ async fn ocr_submit(
 
         let mut final_new_rating = player_rating;
         let mut final_rating_delta = 0;
-        let hist = sqlx::query!("SELECT rating_after, rating_after - rating_before AS delta FROM Elo_History WHERE match_record_id = $1 AND player_id = $2", opponent_match_id, actual_player_id)
+        let hist: Option<(i32, Option<i32>)> = sqlx::query_as("SELECT rating_after, rating_after - rating_before AS delta FROM Elo_History WHERE match_record_id = $1 AND player_id = $2")
+            .bind(opponent_match_id)
+            .bind(actual_player_id)
             .fetch_optional(&state.pool)
             .await
             .ok()
             .flatten();
-        if let Some(h) = hist {
-            final_new_rating = h.rating_after;
-            final_rating_delta = h.delta.unwrap_or(0);
+        if let Some((rating_after, delta)) = hist {
+            final_new_rating = rating_after;
+            final_rating_delta = delta.unwrap_or(0);
         }
 
         let current_form = db::get_player_current_form(&state.pool, actual_player_id).await.unwrap_or(50.0);
         
-        let play_style = sqlx::query_scalar!("SELECT play_style FROM Club_Memberships WHERE player_id = $1 AND club_id = $2", actual_player_id, payload.club_id)
-            .fetch_optional(&state.pool).await.ok().flatten().unwrap_or_else(|| "Balanced".to_string());
+        let play_style: String = sqlx::query_scalar("SELECT play_style FROM Club_Memberships WHERE player_id = $1 AND club_id = $2")
+            .bind(actual_player_id)
+            .bind(payload.club_id)
+            .fetch_optional(&state.pool)
+            .await
+            .ok()
+            .flatten()
+            .unwrap_or_else(|| "Balanced".to_string());
 
         return Ok(Json(OcrSubmitResponse {
             match_id: opponent_match_id,
@@ -956,6 +970,7 @@ pub struct PlayerAnalyticsResponse {
     pub player_id: Uuid,
     pub username: Option<String>,
     pub skill_rating: i32,
+    pub peak_elo_rating: i32,
     pub form_rating: f64,
     pub play_style: String,
     pub matches_played: i64,
@@ -963,6 +978,27 @@ pub struct PlayerAnalyticsResponse {
     pub draws: i64,
     pub losses: i64,
     pub win_rate: f64,
+    pub goals_for: i64,
+    pub goals_against: i64,
+    pub goal_difference: i64,
+    pub goals_per_match: f64,
+    pub conceded_per_match: f64,
+    pub clean_sheets: i64,
+    pub clean_sheet_percentage: f64,
+    pub passes_completed: i64,
+    pub passes_attempted: i64,
+    pub avg_pass_accuracy: f64,
+    pub shots_on_target: i64,
+    pub shots_total: i64,
+    pub shot_efficiency: f64,
+    pub shot_conversion: f64,
+    pub avg_possession: f64,
+    pub interceptions: i64,
+    pub tackles: i64,
+    pub fouls: i64,
+    pub current_win_streak: i64,
+    pub best_win_streak: i64,
+    pub recent_form: Vec<String>,
     pub efootball_game_id: Option<String>,
     pub preferred_foot: Option<String>,
     pub jersey_number: Option<i32>,
@@ -992,23 +1028,85 @@ async fn get_player_analytics(
         .await
         .map_err(|e| internal_error(e))?;
 
+    let (recent_form, current_win_streak, best_win_streak) = db::get_player_streak_and_form(&state.pool, player_id)
+        .await
+        .unwrap_or_else(|_| (vec![], 0, 0));
+
     let win_rate = if row.matches_played > 0 {
         (row.wins as f64 / row.matches_played as f64 * 100.0 * 100.0).round() / 100.0
     } else {
         0.0
     };
 
+    let goals_per_match = if row.matches_played > 0 {
+        (row.goals_for as f64 / row.matches_played as f64 * 100.0).round() / 100.0
+    } else {
+        0.0
+    };
+
+    let conceded_per_match = if row.matches_played > 0 {
+        (row.goals_against as f64 / row.matches_played as f64 * 100.0).round() / 100.0
+    } else {
+        0.0
+    };
+
+    let clean_sheet_percentage = if row.matches_played > 0 {
+        (row.clean_sheets as f64 / row.matches_played as f64 * 100.0 * 100.0).round() / 100.0
+    } else {
+        0.0
+    };
+
+    let avg_pass_accuracy = if row.passes_attempted > 0 {
+        (row.passes_completed as f64 / row.passes_attempted as f64 * 100.0 * 100.0).round() / 100.0
+    } else {
+        0.0
+    };
+
+    let shot_efficiency = if row.shots_total > 0 {
+        (row.shots_on_target as f64 / row.shots_total as f64 * 100.0 * 100.0).round() / 100.0
+    } else {
+        0.0
+    };
+
+    let shot_conversion = if row.shots_total > 0 {
+        (row.goals_for as f64 / row.shots_total as f64 * 100.0 * 100.0).round() / 100.0
+    } else {
+        0.0
+    };
+
     Ok(Json(PlayerAnalyticsResponse {
         player_id,
-        username:       row.username,
-        skill_rating:   row.skill_rating,
-        form_rating:    row.form_rating,
-        play_style:     row.play_style.unwrap_or_else(|| "Unclassified".into()),
-        matches_played: row.matches_played,
-        wins:           row.wins,
-        draws:          row.draws,
-        losses:         row.losses,
+        username:          row.username,
+        skill_rating:      row.skill_rating,
+        peak_elo_rating:   row.peak_elo_rating,
+        form_rating:       row.form_rating,
+        play_style:        row.play_style.unwrap_or_else(|| "Unclassified".into()),
+        matches_played:    row.matches_played,
+        wins:              row.wins,
+        draws:             row.draws,
+        losses:            row.losses,
         win_rate,
+        goals_for:         row.goals_for,
+        goals_against:     row.goals_against,
+        goal_difference:   row.goals_for - row.goals_against,
+        goals_per_match,
+        conceded_per_match,
+        clean_sheets:      row.clean_sheets,
+        clean_sheet_percentage,
+        passes_completed:  row.passes_completed,
+        passes_attempted:  row.passes_attempted,
+        avg_pass_accuracy,
+        shots_on_target:   row.shots_on_target,
+        shots_total:       row.shots_total,
+        shot_efficiency,
+        shot_conversion,
+        avg_possession:    (row.avg_possession * 10.0).round() / 10.0,
+        interceptions:     row.interceptions,
+        tackles:           row.tackles,
+        fouls:             row.fouls,
+        current_win_streak,
+        best_win_streak,
+        recent_form,
         efootball_game_id: row.efootball_game_id,
         preferred_foot:    row.preferred_foot,
         jersey_number:     row.jersey_number,
@@ -1066,7 +1164,7 @@ async fn submit_dispute(
 
     let t_match_row = if record_row.is_none() {
         sqlx::query(
-            "SELECT id, tournament_id, player_1_id, player_2_id, player_1_score, player_2_score, status FROM T_Matches WHERE id = $1"
+            "SELECT id, tournament_id, player_1_id, player_2_id, player_1_score::INT4 AS player_1_score, player_2_score::INT4 AS player_2_score, status FROM T_Matches WHERE id = $1"
         )
         .bind(payload.match_record_id)
         .fetch_optional(&state.pool)
@@ -1224,10 +1322,10 @@ async fn snapshot_season(
     let mut tx = state.pool.begin().await.map_err(|e| internal_error(e))?;
 
     // Mark season as inactive
-    let rows_affected = sqlx::query!(
+    let rows_affected = sqlx::query(
         "UPDATE Seasons SET is_active = false, end_date = CURRENT_DATE WHERE id = $1 AND is_active = true",
-        payload.season_id
     )
+    .bind(payload.season_id)
     .execute(&mut *tx)
     .await
     .map_err(|e| internal_error(e))?
@@ -1261,13 +1359,12 @@ async fn update_feature_flags(
     Json(payload): Json<UpdateFlagsRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ApiErrorResponse>)> {
     // Only allow club owners to update feature flags for now
-    let is_owner = sqlx::query_scalar!(
+    let is_owner: bool = sqlx::query_scalar(
         "SELECT EXISTS(SELECT 1 FROM Clubs WHERE owner_id = $1)",
-        auth.user_id
     )
+    .bind(auth.user_id)
     .fetch_one(&state.pool)
     .await
-    .unwrap_or(Some(false))
     .unwrap_or(false);
 
     if !is_owner {
@@ -1485,14 +1582,52 @@ async fn get_player_profile(
         .await
         .map_err(|e| internal_error(e))?;
 
+    let (recent_form, current_win_streak, best_win_streak) = db::get_player_streak_and_form(&state.pool, player_id)
+        .await
+        .unwrap_or_else(|_| (vec![], 0, 0));
+
     let clubs = db::get_player_clubs(&state.pool, player_id)
         .await
         .unwrap_or_default();
 
-
-
     let win_rate = if analytics.matches_played > 0 {
         (analytics.wins as f64 / analytics.matches_played as f64 * 100.0 * 100.0).round() / 100.0
+    } else {
+        0.0
+    };
+
+    let goals_per_match = if analytics.matches_played > 0 {
+        (analytics.goals_for as f64 / analytics.matches_played as f64 * 100.0).round() / 100.0
+    } else {
+        0.0
+    };
+
+    let conceded_per_match = if analytics.matches_played > 0 {
+        (analytics.goals_against as f64 / analytics.matches_played as f64 * 100.0).round() / 100.0
+    } else {
+        0.0
+    };
+
+    let clean_sheet_percentage = if analytics.matches_played > 0 {
+        (analytics.clean_sheets as f64 / analytics.matches_played as f64 * 100.0 * 100.0).round() / 100.0
+    } else {
+        0.0
+    };
+
+    let avg_pass_accuracy = if analytics.passes_attempted > 0 {
+        (analytics.passes_completed as f64 / analytics.passes_attempted as f64 * 100.0 * 100.0).round() / 100.0
+    } else {
+        0.0
+    };
+
+    let shot_efficiency = if analytics.shots_total > 0 {
+        (analytics.shots_on_target as f64 / analytics.shots_total as f64 * 100.0 * 100.0).round() / 100.0
+    } else {
+        0.0
+    };
+
+    let shot_conversion = if analytics.shots_total > 0 {
+        (analytics.goals_for as f64 / analytics.shots_total as f64 * 100.0 * 100.0).round() / 100.0
     } else {
         0.0
     };
@@ -1501,6 +1636,7 @@ async fn get_player_profile(
         "player_id": player_id,
         "username": analytics.username,
         "skill_rating": analytics.skill_rating,
+        "peak_elo_rating": analytics.peak_elo_rating,
         "form_rating": analytics.form_rating,
         "play_style": analytics.play_style.unwrap_or_else(|| "Unclassified".into()),
         "matches_played": analytics.matches_played,
@@ -1508,6 +1644,27 @@ async fn get_player_profile(
         "draws": analytics.draws,
         "losses": analytics.losses,
         "win_rate": win_rate,
+        "goals_for": analytics.goals_for,
+        "goals_against": analytics.goals_against,
+        "goal_difference": analytics.goals_for - analytics.goals_against,
+        "goals_per_match": goals_per_match,
+        "conceded_per_match": conceded_per_match,
+        "clean_sheets": analytics.clean_sheets,
+        "clean_sheet_percentage": clean_sheet_percentage,
+        "passes_completed": analytics.passes_completed,
+        "passes_attempted": analytics.passes_attempted,
+        "avg_pass_accuracy": avg_pass_accuracy,
+        "shots_on_target": analytics.shots_on_target,
+        "shots_total": analytics.shots_total,
+        "shot_efficiency": shot_efficiency,
+        "shot_conversion": shot_conversion,
+        "avg_possession": (analytics.avg_possession * 10.0).round() / 10.0,
+        "interceptions": analytics.interceptions,
+        "tackles": analytics.tackles,
+        "fouls": analytics.fouls,
+        "current_win_streak": current_win_streak,
+        "best_win_streak": best_win_streak,
+        "recent_form": recent_form,
         "efootball_game_id": analytics.efootball_game_id,
         "preferred_foot": analytics.preferred_foot,
         "jersey_number": analytics.jersey_number,
@@ -1829,22 +1986,26 @@ async fn start_tournament(
     // Clean up any partially generated fixtures/participants from a previous failed start attempt
     let mut tx = state.pool.begin().await.map_err(|e| internal_error(e))?;
 
-    sqlx::query!("DELETE FROM T_Matches WHERE tournament_id = $1", tournament_id)
+    sqlx::query("DELETE FROM T_Matches WHERE tournament_id = $1")
+        .bind(tournament_id)
         .execute(&mut *tx)
         .await
         .map_err(|e| internal_error(e))?;
     
-    sqlx::query!("DELETE FROM Matchdays WHERE tournament_id = $1", tournament_id)
+    sqlx::query("DELETE FROM Matchdays WHERE tournament_id = $1")
+        .bind(tournament_id)
         .execute(&mut *tx)
         .await
         .map_err(|e| internal_error(e))?;
     
-    sqlx::query!("DELETE FROM League_Standings WHERE tournament_id = $1", tournament_id)
+    sqlx::query("DELETE FROM League_Standings WHERE tournament_id = $1")
+        .bind(tournament_id)
         .execute(&mut *tx)
         .await
         .map_err(|e| internal_error(e))?;
 
-    sqlx::query!("DELETE FROM Tournament_Participants WHERE tournament_id = $1", tournament_id)
+    sqlx::query("DELETE FROM Tournament_Participants WHERE tournament_id = $1")
+        .bind(tournament_id)
         .execute(&mut *tx)
         .await
         .map_err(|e| internal_error(e))?;
@@ -2111,7 +2272,8 @@ async fn get_league_standings(
         .await
         .map_err(|e| internal_error(e))?;
 
-    let row = sqlx::query!("SELECT rules_config FROM Tournaments WHERE id = $1", tournament_id)
+    let row: Option<serde_json::Value> = sqlx::query_scalar("SELECT rules_config FROM Tournaments WHERE id = $1")
+        .bind(tournament_id)
         .fetch_optional(&state.pool)
         .await
         .map_err(|e| internal_error(e))?;
@@ -2119,8 +2281,7 @@ async fn get_league_standings(
     let mut groups_count = 2;
     let mut advancing_per_group = 2;
     
-    if let Some(row) = row {
-        let config = row.rules_config;
+    if let Some(config) = row {
         groups_count = config.get("groups_count").and_then(|v| v.as_i64()).unwrap_or(2) as i32;
         advancing_per_group = config.get("advancing_per_group").and_then(|v| v.as_i64()).unwrap_or(2) as i32;
     }
@@ -2242,10 +2403,22 @@ async fn resolve_admin_dispute(
         return Err(forbidden("FORBIDDEN", "Only club officials can resolve disputes."));
     }
 
-    let dispute_row = sqlx::query!(
+    #[derive(FromRow)]
+    struct DisputeInfoRow {
+        id: Uuid,
+        match_record_id: Uuid,
+        raised_by: Uuid,
+        reason: String,
+        status: String,
+        counter_screenshot_url: Option<String>,
+        resolved_by: Option<Uuid>,
+        resolution_notes: Option<String>,
+    }
+
+    let dispute_row = sqlx::query_as::<_, DisputeInfoRow>(
         "SELECT id, match_record_id, raised_by, reason, status, counter_screenshot_url, resolved_by, resolution_notes FROM Match_Disputes WHERE id = $1",
-        dispute_id
     )
+    .bind(dispute_id)
     .fetch_optional(&state.pool)
     .await
     .map_err(|e| internal_error(e))?;
@@ -2361,11 +2534,18 @@ async fn claim_tournament_forfeit(
     Path((tournament_id, match_id)): Path<(Uuid, Uuid)>,
     Json(payload): Json<ClaimForfeitRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ApiErrorResponse>)> {
-    let t_match = sqlx::query!(
+    #[derive(FromRow)]
+    struct TMatchForfeitRow {
+        player_1_id: Option<Uuid>,
+        player_2_id: Option<Uuid>,
+        status: String,
+    }
+
+    let t_match = sqlx::query_as::<_, TMatchForfeitRow>(
         "SELECT player_1_id, player_2_id, status FROM T_Matches WHERE id = $1 AND tournament_id = $2",
-        match_id,
-        tournament_id
     )
+    .bind(match_id)
+    .bind(tournament_id)
     .fetch_optional(&state.pool)
     .await
     .map_err(|e| internal_error(e))?;
@@ -2387,7 +2567,8 @@ async fn claim_tournament_forfeit(
 
     // Authorization: caller must be one of the two players, or a club official
     let is_participant = auth.user_id == p1_id || auth.user_id == p2_id;
-    let club_id: Uuid = sqlx::query_scalar!("SELECT club_id FROM Tournaments WHERE id = $1", tournament_id)
+    let club_id: Uuid = sqlx::query_scalar("SELECT club_id FROM Tournaments WHERE id = $1")
+        .bind(tournament_id)
         .fetch_one(&state.pool).await.map_err(|e| internal_error(e))?;
     let is_official = db::is_club_official(
         &state.pool,
@@ -2549,13 +2730,13 @@ async fn reschedule_match(
     let is_official = db::is_club_official(&state.pool, club_id, auth.user_id).await.map_err(|e| internal_error(e))?;
     if !is_official { return Err(forbidden("FORBIDDEN", "Only officials can reschedule matches.")); }
 
-    let actual_match: Option<(Uuid, Option<Uuid>, Option<Uuid>, Option<Uuid>, i32, String)> = sqlx::query_as("SELECT tournament_id, matchday_id, player_1_id, player_2_id, reschedule_count, status FROM T_Matches WHERE id = $1")
+    let actual_match: Option<(Uuid, Option<Uuid>, Option<Uuid>, Option<Uuid>, i32, String)> = sqlx::query_as("SELECT tournament_id, matchday_id, player_1_id, player_2_id, reschedule_count::INT4 AS reschedule_count, status FROM T_Matches WHERE id = $1")
         .bind(match_id)
         .fetch_optional(&state.pool)
         .await
         .map_err(|e| internal_error(e))?;
         
-    let (actual_t_id, matchday_id, p1_id, p2_id, reschedule_count, status) = actual_match.ok_or_else(|| bad_request("NOT_FOUND", "Match not found"))?;
+    let (actual_t_id, matchday_id, _p1_id, _p2_id, reschedule_count, status) = actual_match.ok_or_else(|| bad_request("NOT_FOUND", "Match not found"))?;
     
     if status == "completed" {
         return Err(bad_request("ALREADY_COMPLETED", "Cannot reschedule a completed match"));
@@ -2599,33 +2780,6 @@ async fn reschedule_match(
         return Err(bad_request("LIMIT_REACHED", "Maximum reschedule limit reached for this match"));
     }
     
-    // ADD-3: Detect player schedule conflicts (same day in this tournament)
-    let conflict: Option<Uuid> = sqlx::query_scalar(
-        r#"
-        SELECT id FROM T_Matches 
-        WHERE tournament_id = $1 AND id != $2 
-        AND scheduled_at::DATE = $3 
-        AND (
-            ($4::UUID IS NOT NULL AND (player_1_id = $4 OR player_2_id = $4))
-            OR
-            ($5::UUID IS NOT NULL AND (player_1_id = $5 OR player_2_id = $5))
-        )
-        LIMIT 1
-        "#
-    )
-    .bind(tournament_id)
-    .bind(match_id)
-    .bind(target_date)
-    .bind(p1_id)
-    .bind(p2_id)
-    .fetch_optional(&state.pool)
-    .await
-    .map_err(|e| internal_error(e))?;
-    
-    if conflict.is_some() {
-        return Err(bad_request("SCHEDULE_CONFLICT", "One of the players already has a match scheduled on this day"));
-    }
-        
     db::reschedule_match(&state.pool, match_id, dt, payload.reason.as_deref()).await.map_err(|e| internal_error(e))?;
     
     // BUG-1: Auto-update matchday status
@@ -2654,35 +2808,65 @@ async fn export_matchday_fixtures(
     State(state): State<Arc<AppState>>,
     _auth: AuthenticatedUser,
     Path((tournament_id, matchday_id)): Path<(Uuid, Uuid)>,
-) -> Result<impl axum::response::IntoResponse, (StatusCode, Json<ApiErrorResponse>)> {
+) -> Result<axum::response::Response, (StatusCode, Json<ApiErrorResponse>)> {
     let matchday_matches = db::get_tournament_bracket(&state.pool, tournament_id, Some(matchday_id)).await.map_err(|e| internal_error(e))?;
     
     let md_number = matchday_matches.first().and_then(|m| m.matchday_number).unwrap_or(0);
     
     // Fetch tournament name
-    let tourney = sqlx::query!("SELECT name FROM Tournaments WHERE id = $1", tournament_id).fetch_one(&state.pool).await.map_err(|e| internal_error(e))?;
+    let tourney_name: String = sqlx::query_scalar("SELECT name FROM Tournaments WHERE id = $1")
+        .bind(tournament_id)
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|e| internal_error(e))?;
     
-    let pdf_bytes = crate::domain::pdf_export::generate_matchday_pdf(&tourney.name, md_number, &matchday_matches, false);
+    let pdf_bytes = crate::domain::pdf_export::generate_matchday_pdf(&tourney_name, md_number, &matchday_matches, false);
     
     use axum::http::header;
+    use axum::response::IntoResponse;
     let headers = [(header::CONTENT_TYPE, "application/pdf"), (header::CONTENT_DISPOSITION, "attachment; filename=\"fixtures.pdf\"")];
-    Ok((headers, pdf_bytes))
+    Ok((headers, pdf_bytes).into_response())
 }
 
 async fn export_matchday_results(
     State(state): State<Arc<AppState>>,
     _auth: AuthenticatedUser,
     Path((tournament_id, matchday_id)): Path<(Uuid, Uuid)>,
-) -> Result<impl axum::response::IntoResponse, (StatusCode, Json<ApiErrorResponse>)> {
+) -> Result<axum::response::Response, (StatusCode, Json<ApiErrorResponse>)> {
     let matchday_matches = db::get_tournament_bracket(&state.pool, tournament_id, Some(matchday_id)).await.map_err(|e| internal_error(e))?;
     
     let md_number = matchday_matches.first().and_then(|m| m.matchday_number).unwrap_or(0);
     
-    let tourney = sqlx::query!("SELECT name FROM Tournaments WHERE id = $1", tournament_id).fetch_one(&state.pool).await.map_err(|e| internal_error(e))?;
+    let tourney_name: String = sqlx::query_scalar("SELECT name FROM Tournaments WHERE id = $1")
+        .bind(tournament_id)
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|e| internal_error(e))?;
     
-    let pdf_bytes = crate::domain::pdf_export::generate_matchday_pdf(&tourney.name, md_number, &matchday_matches, true);
+    let pdf_bytes = crate::domain::pdf_export::generate_matchday_pdf(&tourney_name, md_number, &matchday_matches, true);
     
     use axum::http::header;
+    use axum::response::IntoResponse;
     let headers = [(header::CONTENT_TYPE, "application/pdf"), (header::CONTENT_DISPOSITION, "attachment; filename=\"results.pdf\"")];
-    Ok((headers, pdf_bytes))
+    Ok((headers, pdf_bytes).into_response())
 }
+
+#[derive(serde::Deserialize)]
+pub struct ExportPdfQuery {
+    #[serde(default)]
+    pub include_results: Option<bool>,
+}
+
+async fn export_matchday_pdf(
+    State(state): State<Arc<AppState>>,
+    auth: AuthenticatedUser,
+    Path((tournament_id, matchday_id)): Path<(Uuid, Uuid)>,
+    Query(query): Query<ExportPdfQuery>,
+) -> Result<axum::response::Response, (StatusCode, Json<ApiErrorResponse>)> {
+    if query.include_results.unwrap_or(false) {
+        export_matchday_results(State(state), auth, Path((tournament_id, matchday_id))).await
+    } else {
+        export_matchday_fixtures(State(state), auth, Path((tournament_id, matchday_id))).await
+    }
+}
+

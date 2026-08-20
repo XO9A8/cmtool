@@ -231,7 +231,7 @@ class _TournamentPlayerStandingsWidgetState
                 title: 'TOP 5 CLEAN SHEET LEADERS',
                 subtitle: 'Matches finished without conceding a goal',
                 icon: Icons.workspace_premium,
-                accentColor: AppColors.purple,
+                accentColor: AppColors.offWhite,
                 items: cleanSheetLeaders.take(5).toList(),
                 getPrimaryStat: (p) => '${(p['clean_sheets'] as num?)?.toInt() ?? 0} CLEAN SHEETS',
                 getSubStat: (p) {

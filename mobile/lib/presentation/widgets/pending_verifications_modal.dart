@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../providers/match_provider.dart';
 import '../theme/app_theme.dart';
+import 'dispute_dialog.dart';
 
 class PendingVerificationsModal extends ConsumerWidget {
   const PendingVerificationsModal({super.key});
@@ -267,80 +268,27 @@ class PendingVerificationsModal extends ConsumerWidget {
     }
   }
 
-  void _disputeMatch(BuildContext context, WidgetRef ref, String matchId, String playerName) {
-    final reasonCtrl = TextEditingController();
-
-    showDialog(
+  void _disputeMatch(BuildContext context, WidgetRef ref, String matchId, String playerName) async {
+    final result = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.lossRed),
-        ),
-        title: Text('FILE A DISPUTE', style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('You are disputing the result submitted by $playerName.', style: const TextStyle(color: Colors.white70, fontSize: 13)),
-            const SizedBox(height: 16),
-            TextField(
-              controller: reasonCtrl,
-              decoration: InputDecoration(
-                labelText: 'Reason for dispute',
-                labelStyle: const TextStyle(color: Colors.white54),
-                filled: true,
-                fillColor: Colors.white.withValues(alpha: 0.05),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              maxLines: 3,
-              style: const TextStyle(color: Colors.white),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('CANCEL', style: TextStyle(color: Colors.white54)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.lossRed),
-            onPressed: () async {
-              final reason = reasonCtrl.text.trim();
-              if (reason.isEmpty) return;
-              Navigator.pop(ctx);
-              try {
-                final client = ref.read(apiClientProvider);
-                await client.submitDispute(
-                  matchRecordId: matchId,
-                  reason: reason,
-                );
-                ref.invalidate(pendingMatchesProvider);
-                ref.invalidate(adminDisputesProvider);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Match with $playerName disputed. Case logged for admin review.'),
-                      backgroundColor: AppColors.lossRed,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Failed to submit dispute: $e'),
-                      backgroundColor: AppColors.lossRed,
-                    ),
-                  );
-                }
-              }
-            },
-            child: Text('SUBMIT DISPUTE', style: GoogleFonts.rajdhani(color: Colors.black, fontWeight: FontWeight.bold)),
-          ),
-        ],
+      useRootNavigator: true,
+      builder: (_) => DisputeDialog(
+        matchRecordId: matchId,
+        matchTitle: playerName,
       ),
     );
+
+    if (result == true) {
+      ref.invalidate(pendingMatchesProvider);
+      ref.invalidate(adminDisputesProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Match with $playerName disputed. Case logged for admin review.'),
+            backgroundColor: AppColors.lossRed,
+          ),
+        );
+      }
+    }
   }
 }

@@ -37,7 +37,7 @@ class _ForfeitClaimModalState extends ConsumerState<ForfeitClaimModal> {
     if (_forfeitingPlayerId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('⚠️ Please select which player is forfeiting.'),
+          content: Text('Please select which player is forfeiting.'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -58,7 +58,7 @@ class _ForfeitClaimModalState extends ConsumerState<ForfeitClaimModal> {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('✅ Forfeit victory successfully claimed (3-0 default).'),
+            content: Text('Forfeit victory successfully claimed (3-0 default).'),
             backgroundColor: AppColors.winGreen,
           ),
         );
@@ -69,7 +69,7 @@ class _ForfeitClaimModalState extends ConsumerState<ForfeitClaimModal> {
         setState(() => _submitting = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('❌ Failed to claim forfeit: $e'),
+            content: Text('Failed to claim forfeit: $e'),
             backgroundColor: AppColors.lossRed,
           ),
         );

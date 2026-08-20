@@ -167,23 +167,23 @@ class _TournamentScreenState extends ConsumerState<TournamentScreen> {
     final clubName = _selectedClubName ?? (clubs.isNotEmpty ? clubs.first['name']?.toString() : null) ?? 'YOUR CLUB';
 
     return Container(
-      height: 200,
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      height: 110,
+      margin: const EdgeInsets.fromLTRB(16, 6, 16, 0),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         gradient: LinearGradient(
           colors: [
-            AppColors.primary.withValues(alpha: 0.25),
-            AppColors.purple.withValues(alpha: 0.15),
+            AppColors.primary.withValues(alpha: 0.22),
+            AppColors.offWhite.withValues(alpha: 0.08),
             AppColors.surface,
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         child: Stack(
           children: [
             // Crosshatch grid
@@ -192,7 +192,7 @@ class _TournamentScreenState extends ConsumerState<TournamentScreen> {
             ),
             // Content
             Padding(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -210,24 +210,23 @@ class _TournamentScreenState extends ConsumerState<TournamentScreen> {
                             fit: BoxFit.scaleDown,
                             alignment: Alignment.centerLeft,
                             child: Text(
-                              'TOURNAMENT\nHUB',
+                              'TOURNAMENT HUB',
                               style: GoogleFonts.orbitron(
-                                fontSize: 28,
+                                fontSize: 18,
                                 fontWeight: FontWeight.w900,
                                 color: Colors.white,
-                                height: 1.1,
-                                letterSpacing: 1.5,
+                                letterSpacing: 1.2,
                               ),
                             ),
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 4),
                         Text(
                           clubName.toUpperCase(),
                           style: GoogleFonts.rajdhani(
                             color: AppColors.textMuted,
-                            fontSize: 13,
-                            letterSpacing: 2.0,
+                            fontSize: 12,
+                            letterSpacing: 1.5,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -239,7 +238,7 @@ class _TournamentScreenState extends ConsumerState<TournamentScreen> {
                     EsportsButton(
                       label: 'NEW TOURNAMENT',
                       icon: Icons.add,
-                      height: 44,
+                      height: 38,
                       onPressed: () => _showCreateSheet(context, _selectedClubId!),
                     ),
                 ],
@@ -247,12 +246,12 @@ class _TournamentScreenState extends ConsumerState<TournamentScreen> {
             ),
             // Trophy watermark
             Positioned(
-              right: -16,
-              bottom: -16,
+              right: -10,
+              bottom: -10,
               child: Icon(
                 Icons.emoji_events,
-                size: 140,
-                color: AppColors.primary.withValues(alpha: 0.06),
+                size: 80,
+                color: AppColors.primary.withValues(alpha: 0.05),
               ),
             ),
           ],
@@ -1321,7 +1320,7 @@ class _TournamentHeroCard extends StatelessWidget {
                       const SizedBox(width: 8),
                       GlowBadge(
                         label: '$count PLAYERS',
-                        color: AppColors.purple,
+                        color: AppColors.offWhite,
                         icon: Icons.group,
                       ),
                       const Spacer(),
@@ -1485,7 +1484,7 @@ class _TournamentScheduledCardState extends ConsumerState<_TournamentScheduledCa
             ),
             const SizedBox(height: 6),
             Text(
-              isKnockout ? '⚡ KNOCKOUT' : '↔ LEAGUE',
+              isKnockout ? 'KNOCKOUT' : 'LEAGUE',
               style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 12),
             ),
             Text(

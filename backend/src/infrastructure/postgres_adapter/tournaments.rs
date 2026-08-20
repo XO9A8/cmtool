@@ -87,9 +87,9 @@ pub async fn get_tournament_bracket(
             m.original_scheduled_at,
             m.is_rescheduled,
             m.reschedule_reason,
-            m.reschedule_count,
-            md.matchday_number::INT4 as "matchday_number: i32",
-            md.scheduled_date as "matchday_scheduled_date: chrono::NaiveDate"
+            m.reschedule_count::INT4 AS reschedule_count,
+            md.matchday_number::INT4 AS matchday_number,
+            md.scheduled_date AS matchday_scheduled_date
         FROM T_Matches m
         LEFT JOIN Users u1 ON m.player_1_id = u1.id
         LEFT JOIN Users u2 ON m.player_2_id = u2.id
@@ -304,6 +304,7 @@ pub async fn save_tournament_fixtures(
 // IMP-7: Auto-Advancement SQL Extract
 // ─────────────────────────────────────────────────────────────────────────────
 
+#[derive(FromRow)]
 pub struct AdvancementContext {
     pub t_match_id: Uuid,
     pub tournament_id: Uuid,
@@ -322,24 +323,23 @@ pub struct AdvancementContext {
 }
 
 pub async fn get_advancement_context(pool: &PgPool, match_id: Uuid) -> Result<Option<AdvancementContext>, sqlx::Error> {
-    sqlx::query_as!(
-        AdvancementContext,
+    sqlx::query_as::<_, AdvancementContext>(
         r#"
         SELECT
             m.id          AS t_match_id,
             m.tournament_id,
             m.player_1_id,
             m.player_2_id,
-            m.round_number,
-            m.match_number,
+            m.round_number::INT4 AS round_number,
+            m.match_number::INT4 AS match_number,
             m.group_name,
-            m.status      AS "match_status: String",
+            m.status      AS match_status,
             m.matchday_id,
             t.format_type,
-            mr.id         AS "mr_id?: Uuid",
-            mr.player_id  AS "mr_player_id?: Uuid",
-            mr.goals_for  AS "goals_for?: i32",
-            mr.goals_against AS "goals_against?: i32"
+            mr.id         AS mr_id,
+            mr.player_id  AS mr_player_id,
+            mr.goals_for::INT4  AS goals_for,
+            mr.goals_against::INT4 AS goals_against
         FROM T_Matches m
         LEFT JOIN Match_Records mr ON mr.t_match_id = m.id
             AND mr.deleted_at IS NULL
@@ -349,51 +349,52 @@ pub async fn get_advancement_context(pool: &PgPool, match_id: Uuid) -> Result<Op
         ORDER BY mr.created_at DESC NULLS LAST
         LIMIT 1
         "#,
-        match_id
     )
+    .bind(match_id)
     .fetch_optional(pool)
     .await
 }
 
 pub async fn get_match_scores(pool: &PgPool, match_id: Uuid) -> Result<Option<(Option<i32>, Option<i32>)>, sqlx::Error> {
-    let row = sqlx::query!(
-        "SELECT player_1_score, player_2_score FROM T_Matches WHERE id = $1",
-        match_id
+    let row: Option<(Option<i32>, Option<i32>)> = sqlx::query_as(
+        "SELECT player_1_score::INT4, player_2_score::INT4 FROM T_Matches WHERE id = $1",
     )
+    .bind(match_id)
     .fetch_optional(pool)
     .await?;
 
-    Ok(row.map(|r| (r.player_1_score.map(|s| s as i32), r.player_2_score.map(|s| s as i32))))
+    Ok(row)
 }
 
 pub async fn update_match_scores_completed(pool: &PgPool, match_id: Uuid, p1_goals: i32, p2_goals: i32) -> Result<(), sqlx::Error> {
-    sqlx::query!(
+    sqlx::query(
         "UPDATE T_Matches SET player_1_score = $1, player_2_score = $2, status = 'completed' WHERE id = $3",
-        p1_goals as i16, p2_goals as i16, match_id
     )
+    .bind(p1_goals as i16)
+    .bind(p2_goals as i16)
+    .bind(match_id)
     .execute(pool)
     .await?;
     Ok(())
 }
 
 pub async fn get_pending_matches_count(pool: &PgPool, tournament_id: Uuid) -> Result<i64, sqlx::Error> {
-    let count: Option<i64> = sqlx::query_scalar!(
+    let count: Option<i64> = sqlx::query_scalar(
         "SELECT COUNT(*) FROM T_Matches WHERE tournament_id = $1 AND status NOT IN ('completed', 'bye')",
-        tournament_id
     )
+    .bind(tournament_id)
     .fetch_one(pool)
     .await?;
     Ok(count.unwrap_or(0))
 }
 
 pub async fn get_max_group_round(pool: &PgPool, tournament_id: Uuid) -> Result<Option<i32>, sqlx::Error> {
-    let max = sqlx::query_scalar!(
-        "SELECT MAX(round_number) FROM T_Matches WHERE tournament_id = $1 AND group_name IS NOT NULL",
-        tournament_id
+    let max: Option<i32> = sqlx::query_scalar(
+        "SELECT MAX(round_number)::INT4 FROM T_Matches WHERE tournament_id = $1 AND group_name IS NOT NULL",
     )
+    .bind(tournament_id)
     .fetch_optional(pool)
     .await?
-    .flatten()
-    .map(|r| r as i32);
+    .flatten();
     Ok(max)
 }

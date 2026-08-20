@@ -58,9 +58,32 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     }
   }
 
+  Future<void> _submitGoogle() async {
+    setState(() {
+      _loading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final auth = ref.read(authStateProvider.notifier);
+      final client = ref.read(apiClientProvider);
+      await auth.signInWithGoogle(client);
+    } on DioException catch (e) {
+      if (!mounted) return;
+      final msg = e.response?.data?['error']?['message'] ?? 'Network Error ($e)';
+      setState(() => _errorMessage = msg);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _errorMessage = e.toString().replaceAll('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF090A0F),
       body: Stack(
         children: [
           // Background Gradient Animation
@@ -68,7 +91,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
             child: Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Color(0xFF090A0F), Color(0xFF13151F)],
+                  colors: [Color(0xFF090A0F), Color(0xFF0F111A), Color(0xFF090A0F)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -84,8 +107,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               height: 300,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFF00E5FF).withValues(alpha: 0.10),
-                boxShadow: const [BoxShadow(color: Color(0xFF00E5FF), blurRadius: 60)],
+                color: const Color(0xFF00E5FF).withValues(alpha: 0.08),
+                boxShadow: const [BoxShadow(color: Color(0xFF00E5FF), blurRadius: 80)],
               ),
             ).animate(onPlay: (c) => c.repeat(reverse: true)).scale(duration: 4.seconds, begin: const Offset(0.8, 0.8), end: const Offset(1.2, 1.2)),
           ),
@@ -97,19 +120,20 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               height: 400,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFFB000FF).withValues(alpha: 0.10),
-                boxShadow: const [BoxShadow(color: Color(0xFFB000FF), blurRadius: 60)],
+                color: const Color(0xFFFF6D00).withValues(alpha: 0.06),
+                boxShadow: const [BoxShadow(color: Color(0xFFFF6D00), blurRadius: 80)],
               ),
             ).animate(onPlay: (c) => c.repeat(reverse: true)).scale(duration: 5.seconds, begin: const Offset(0.9, 0.9), end: const Offset(1.1, 1.1)),
           ),
           
           // Main Content
-          Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
                   // Logo
                   Container(
                     width: 90,
@@ -117,7 +141,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: const LinearGradient(
-                        colors: [Color(0xFFB000FF), Color(0xFF00E5FF)],
+                        colors: [Color(0xFFE2E8F0), Color(0xFF00E5FF)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -225,14 +249,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                                 child: Ink(
                                   decoration: BoxDecoration(
                                     gradient: const LinearGradient(
-                                      colors: [Color(0xFFB000FF), Color(0xFF00E5FF)],
+                                      colors: [Color(0xFFFF6D00), Color(0xFFFF9E00)],
                                       begin: Alignment.centerLeft,
                                       end: Alignment.centerRight,
                                     ),
                                     borderRadius: BorderRadius.circular(16),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: const Color(0xFFB000FF).withValues(alpha: 0.4),
+                                        color: const Color(0xFFFF6D00).withValues(alpha: 0.4),
                                         blurRadius: 15,
                                         offset: const Offset(0, 4),
                                       )
@@ -259,6 +283,68 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                                 ),
                               ),
                             ).animate().fade(delay: 600.ms).slideY(begin: 0.2, end: 0),
+                            
+                            const SizedBox(height: 20),
+                            
+                            // OR Divider
+                            Row(
+                              children: [
+                                Expanded(child: Divider(color: Colors.white.withValues(alpha: 0.15), height: 1)),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                                  child: Text(
+                                    'OR',
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(alpha: 0.4),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 1.5,
+                                    ),
+                                  ),
+                                ),
+                                Expanded(child: Divider(color: Colors.white.withValues(alpha: 0.15), height: 1)),
+                              ],
+                            ).animate().fade(delay: 650.ms),
+
+                            const SizedBox(height: 20),
+
+                            // Google Sign-In Button
+                            SizedBox(
+                              width: double.infinity,
+                              height: 52,
+                              child: OutlinedButton(
+                                onPressed: _loading ? null : _submitGoogle,
+                                style: OutlinedButton.styleFrom(
+                                  backgroundColor: Colors.white.withValues(alpha: 0.04),
+                                  side: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Image.network(
+                                      'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/768px-Google_%22G%22_logo.svg.png',
+                                      height: 20,
+                                      width: 20,
+                                      errorBuilder: (_, __, ___) => const Icon(Icons.g_mobiledata, color: Colors.white, size: 24),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    const Text(
+                                      'CONTINUE WITH GOOGLE',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 1.2,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ).animate().fade(delay: 700.ms).slideY(begin: 0.2, end: 0),
                           ],
                         ),
                       ),
@@ -275,24 +361,32 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         _errorMessage = null;
                       });
                     },
-                    child: RichText(
-                      text: TextSpan(
-                        style: const TextStyle(fontSize: 14, color: Colors.white60, fontWeight: FontWeight.w500),
-                        children: [
-                          TextSpan(
-                            text: _isLogin
-                                ? "No access credentials? "
-                                : 'Credentials acquired? ',
-                          ),
-                          TextSpan(
-                            text: _isLogin ? 'Request Access' : 'Authenticate',
-                            style: const TextStyle(
-                              color: Color(0xFF00E5FF),
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.5,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                      ),
+                      child: RichText(
+                        text: TextSpan(
+                          style: const TextStyle(fontSize: 13, color: Colors.white70, fontWeight: FontWeight.w500),
+                          children: [
+                            TextSpan(
+                              text: _isLogin
+                                  ? "No access credentials?  "
+                                  : 'Credentials acquired?  ',
                             ),
-                          ),
-                        ],
+                            TextSpan(
+                              text: _isLogin ? 'Request Access' : 'Authenticate',
+                              style: const TextStyle(
+                                color: Color(0xFF00E5FF),
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ).animate().fade(delay: 800.ms),
@@ -300,10 +394,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
 
   InputDecoration _inputDecoration(String label, IconData icon) {
     return InputDecoration(

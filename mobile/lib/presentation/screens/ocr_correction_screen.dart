@@ -56,7 +56,7 @@ class _OcrCorrectionScreenState extends State<OcrCorrectionScreen> {
       if (widget.isKnockout && gf == ga) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('⚠️ Knockout matches cannot end in a draw. Please input the score after penalties or extra time.'),
+            content: Text('Knockout matches cannot end in a draw. Please input the score after penalties or extra time.'),
             backgroundColor: AppColors.lossRed,
             duration: Duration(seconds: 4),
           ),

@@ -168,10 +168,10 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> {
               height: 120,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.purple.withValues(alpha: 0.06),
+                color: AppColors.offWhite.withValues(alpha: 0.05),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.purple.withValues(alpha: 0.1),
+                    color: AppColors.offWhite.withValues(alpha: 0.08),
                     blurRadius: 40,
                     spreadRadius: 10,
                   ),
@@ -471,7 +471,7 @@ class _ClubCard extends StatelessWidget {
   Color get _roleColor {
     final role = (club['user_role'] ?? club['role'] ?? 'player').toString().toLowerCase();
     if (role == 'admin') return AppColors.primary;
-    if (role == 'organizer') return AppColors.purple;
+    if (role == 'organizer') return AppColors.offWhite;
     return AppColors.cyan;
   }
 
@@ -650,13 +650,13 @@ class _InviteCodeChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.purple.withValues(alpha: 0.08),
+        color: AppColors.offWhite.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.purple.withValues(alpha: 0.2)),
+        border: Border.all(color: AppColors.offWhite.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.vpn_key, size: 13, color: AppColors.purple),
+          const Icon(Icons.vpn_key, size: 13, color: AppColors.offWhite),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
@@ -664,7 +664,7 @@ class _InviteCodeChip extends StatelessWidget {
               style: GoogleFonts.rajdhani(
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
-                color: AppColors.purple,
+                color: AppColors.offWhite,
                 letterSpacing: 0.5,
               ),
               maxLines: 1,
@@ -673,7 +673,7 @@ class _InviteCodeChip extends StatelessWidget {
           ),
           GestureDetector(
             onTap: () => _copy(context),
-            child: const Icon(Icons.copy, size: 14, color: AppColors.purple),
+            child: const Icon(Icons.copy, size: 14, color: AppColors.offWhite),
           ),
         ],
       ),

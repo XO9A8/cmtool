@@ -230,7 +230,7 @@ class _GroupStandingsWidgetState extends ConsumerState<GroupStandingsWidget> {
       margin: const EdgeInsets.only(bottom: 16),
       child: GlassCard(
         padding: EdgeInsets.zero,
-        borderColor: AppColors.purple.withValues(alpha: 0.3),
+        borderColor: AppColors.offWhite.withValues(alpha: 0.25),
         child: Column(
           children: [
             // Group Card Header
@@ -238,11 +238,11 @@ class _GroupStandingsWidgetState extends ConsumerState<GroupStandingsWidget> {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
                 color: Colors.black.withValues(alpha: 0.35),
-                border: Border(bottom: BorderSide(color: AppColors.purple.withValues(alpha: 0.2))),
+                border: Border(bottom: BorderSide(color: AppColors.offWhite.withValues(alpha: 0.15))),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.shield_outlined, color: AppColors.purple, size: 18),
+                  const Icon(Icons.shield_outlined, color: AppColors.offWhite, size: 18),
                   const SizedBox(width: 8),
                   Text(
                     groupName,

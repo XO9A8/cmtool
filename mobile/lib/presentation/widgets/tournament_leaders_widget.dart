@@ -154,7 +154,7 @@ class TournamentLeadersWidget extends ConsumerWidget {
                   _buildLeaderCard(
                     title: 'MOST DOMINANT',
                     icon: Icons.workspace_premium,
-                    badgeColor: AppColors.purple,
+                    badgeColor: AppColors.offWhite,
                     playerName: topDominant['player_name']?.toString() ?? 'Player',
                     primaryStat: '${((domWon / (domPlayed > 0 ? domPlayed : 1)) * 100).toStringAsFixed(0)}% WIN RATE',
                     subStat: '$domWon Wins in $domPlayed Matches',

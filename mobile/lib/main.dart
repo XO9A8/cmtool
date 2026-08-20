@@ -16,13 +16,14 @@ import 'presentation/screens/clubs_screen.dart';
 import 'presentation/screens/settings_screen.dart';
 import 'presentation/screens/player_profile_screen.dart';
 import 'presentation/screens/admin_dispute_screen.dart';
+import 'presentation/screens/game_guide_screen.dart';
 import 'presentation/widgets/pending_verifications_modal.dart';
 import 'presentation/providers/match_provider.dart';
 import 'infrastructure/offline_sync_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   if (Platform.isAndroid) {
     try {
       await FlutterDisplayMode.setHighRefreshRate();
@@ -30,15 +31,18 @@ void main() async {
       debugPrint('Failed to set high refresh rate: $e');
     }
   }
-  
+
   if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
   }
-  
+
   await Supabase.initialize(
-    url: const String.fromEnvironment('SUPABASE_URL', defaultValue: 'https://ypsrkdefgbghvluuyynm.supabase.co'),
-    publishableKey: const String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlwc3JrZGVmZ2JnaHZsdXV5eW5tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NjQ4MzEsImV4cCI6MjEwMTM0MDgzMX0.3ojq4TJBGoIM_QwDSzvbJY1VX4LBkpJ3DyDYYcKdLKg'),
+    url: const String.fromEnvironment('SUPABASE_URL',
+        defaultValue: 'https://ypsrkdefgbghvluuyynm.supabase.co'),
+    publishableKey: const String.fromEnvironment('SUPABASE_ANON_KEY',
+        defaultValue:
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlwc3JrZGVmZ2JnaHZsdXV5eW5tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NjQ4MzEsImV4cCI6MjEwMTM0MDgzMX0.3ojq4TJBGoIM_QwDSzvbJY1VX4LBkpJ3DyDYYcKdLKg'),
   );
 
   runApp(const ProviderScope(child: EFootballApp()));
@@ -101,6 +105,7 @@ class _NavigationRootScreenState extends State<NavigationRootScreen> {
   final List<Widget> _screens = const [
     DashboardScreen(),
     TournamentScreen(),
+    GameGuideScreen(),
     ClubsScreen(),
     H2hScreen(),
   ];
@@ -130,11 +135,12 @@ class _NavigationRootScreenState extends State<NavigationRootScreen> {
                     ),
                   ],
                 ),
-                child: const Icon(Icons.sports_soccer, color: Colors.black, size: 20),
+                child: const Icon(Icons.sports_soccer,
+                    color: Colors.black, size: 20),
               ),
               const SizedBox(width: 10),
               Text(
-                'eFootball Hub',
+                'eFootball CM',
                 style: GoogleFonts.orbitron(
                   fontWeight: FontWeight.bold,
                   fontSize: 18,
@@ -147,7 +153,8 @@ class _NavigationRootScreenState extends State<NavigationRootScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.mark_email_unread_outlined, color: AppColors.cyan),
+            icon: const Icon(Icons.mark_email_unread_outlined,
+                color: AppColors.cyan),
             tooltip: 'Pending Approvals',
             onPressed: () {
               showDialog(
@@ -184,7 +191,8 @@ class _NavigationRootScreenState extends State<NavigationRootScreen> {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const PlayerProfileScreen()),
+                    MaterialPageRoute(
+                        builder: (_) => const PlayerProfileScreen()),
                   );
                 },
                 child: Padding(
@@ -199,7 +207,8 @@ class _NavigationRootScreenState extends State<NavigationRootScreen> {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: avatarData.gradient.first.withValues(alpha: 0.4),
+                          color:
+                              avatarData.gradient.first.withValues(alpha: 0.4),
                           blurRadius: 8,
                         ),
                       ],
@@ -229,7 +238,8 @@ class _NavigationRootScreenState extends State<NavigationRootScreen> {
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: AppColors.surface,
-          border: const Border(top: BorderSide(color: Colors.white10, width: 1)),
+          border:
+              const Border(top: BorderSide(color: Colors.white10, width: 1)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.5),
@@ -245,8 +255,10 @@ class _NavigationRootScreenState extends State<NavigationRootScreen> {
           elevation: 0,
           selectedItemColor: AppColors.primary,
           unselectedItemColor: AppColors.textMuted,
-          selectedLabelStyle: GoogleFonts.rajdhani(fontWeight: FontWeight.bold, fontSize: 12),
-          unselectedLabelStyle: GoogleFonts.rajdhani(fontWeight: FontWeight.w600, fontSize: 11),
+          selectedLabelStyle:
+              GoogleFonts.rajdhani(fontWeight: FontWeight.bold, fontSize: 12),
+          unselectedLabelStyle:
+              GoogleFonts.rajdhani(fontWeight: FontWeight.w600, fontSize: 11),
           type: BottomNavigationBarType.fixed,
           items: const [
             BottomNavigationBarItem(
@@ -258,6 +270,11 @@ class _NavigationRootScreenState extends State<NavigationRootScreen> {
               icon: Icon(Icons.emoji_events_outlined),
               activeIcon: Icon(Icons.emoji_events),
               label: 'Tournaments',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.menu_book_outlined),
+              activeIcon: Icon(Icons.menu_book),
+              label: 'Guide',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.shield_outlined),
@@ -275,4 +292,3 @@ class _NavigationRootScreenState extends State<NavigationRootScreen> {
     );
   }
 }
-

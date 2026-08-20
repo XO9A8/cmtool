@@ -15,6 +15,8 @@ import '../widgets/ocr_upload_modal.dart';
 import 'player_profile_screen.dart';
 import '../widgets/tournament_player_standings_widget.dart';
 import '../widgets/reschedule_dialog.dart';
+import '../widgets/dispute_dialog.dart';
+import '../utils/matchday_pdf_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Bracket lines painter (moved from tournament_screen.dart)
@@ -147,36 +149,8 @@ class _TournamentDetailScreenState
         ],
         body: Column(
           children: [
-            // NavigationBar
-            NavigationBar(
-              selectedIndex: _tabIndex,
-              onDestinationSelected: (i) => setState(() => _tabIndex = i),
-              backgroundColor: AppColors.surface,
-              indicatorColor: AppColors.primary.withValues(alpha: 0.2),
-              height: 64,
-              labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-              destinations: const [
-                NavigationDestination(
-                  icon: Icon(Icons.calendar_month_outlined,
-                      color: AppColors.textMuted),
-                  selectedIcon:
-                      Icon(Icons.calendar_month, color: AppColors.primary),
-                  label: 'FIXTURES',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.leaderboard_outlined,
-                      color: AppColors.textMuted),
-                  selectedIcon:
-                      Icon(Icons.leaderboard, color: AppColors.primary),
-                  label: 'STANDINGS',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.info_outline, color: AppColors.textMuted),
-                  selectedIcon: Icon(Icons.info, color: AppColors.primary),
-                  label: 'INFO',
-                ),
-              ],
-            ),
+            // Compact Segmented TabBar
+            _buildTabBar(),
             // Tab bodies
             Expanded(
               child: IndexedStack(
@@ -184,6 +158,7 @@ class _TournamentDetailScreenState
                 children: [
                   _FixturesTab(
                     tournamentId: widget.tournamentId,
+                    tournamentName: widget.tournamentName,
                     formatType: widget.formatType,
                     fixtureView: _fixtureView,
                     onToggleView: (v) => setState(() => _fixtureView = v),
@@ -213,18 +188,82 @@ class _TournamentDetailScreenState
     );
   }
 
+  Widget _buildTabBar() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+      height: 38,
+      decoration: BoxDecoration(
+        color: AppColors.surface.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      padding: const EdgeInsets.all(3),
+      child: Row(
+        children: [
+          _buildTabItem(0, Icons.calendar_month_outlined, 'FIXTURES'),
+          _buildTabItem(1, Icons.leaderboard_outlined, 'STANDINGS'),
+          _buildTabItem(2, Icons.info_outline, 'INFO'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabItem(int index, IconData icon, String label) {
+    final isSelected = _tabIndex == index;
+    return Expanded(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => setState(() => _tabIndex = index),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(7),
+            gradient: isSelected
+                ? const LinearGradient(
+                    colors: [AppColors.primary, Color(0xFFFF9E00)],
+                  )
+                : null,
+            color: isSelected ? null : Colors.transparent,
+          ),
+          alignment: Alignment.center,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 14,
+                color: isSelected ? Colors.black : AppColors.textMuted,
+              ),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: GoogleFonts.rajdhani(
+                  color: isSelected ? Colors.black : AppColors.textMuted,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                  fontSize: 12.5,
+                  letterSpacing: 0.6,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildSliverAppBar(bool innerBoxIsScrolled) {
     return SliverAppBar(
       pinned: true,
-      expandedHeight: 200,
+      expandedHeight: 110,
       backgroundColor: AppColors.background,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.white),
+        icon: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
         onPressed: () => Navigator.of(context).pop(),
       ),
       actions: [
         IconButton(
-          icon: const Icon(Icons.refresh, color: AppColors.cyan),
+          icon: const Icon(Icons.refresh, color: AppColors.cyan, size: 20),
           onPressed: _refresh,
           tooltip: 'Refresh',
         ),
@@ -237,7 +276,7 @@ class _TournamentDetailScreenState
                     widget.tournamentName,
                     style: GoogleFonts.orbitron(
                       color: Colors.white,
-                      fontSize: 14,
+                      fontSize: 13,
                       fontWeight: FontWeight.bold,
                     ),
                     maxLines: 1,
@@ -262,8 +301,8 @@ class _TournamentDetailScreenState
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppColors.primary.withValues(alpha: 0.3),
-            AppColors.purple.withValues(alpha: 0.2),
+            AppColors.primary.withValues(alpha: 0.22),
+            AppColors.offWhite.withValues(alpha: 0.06),
             AppColors.background,
           ],
           begin: Alignment.topLeft,
@@ -274,46 +313,50 @@ class _TournamentDetailScreenState
         children: [
           // Trophy watermark
           Positioned(
-            right: -20,
-            bottom: -20,
+            right: -8,
+            bottom: -8,
             child: Icon(
               Icons.emoji_events,
-              size: 160,
-              color: AppColors.primary.withValues(alpha: 0.07),
+              size: 80,
+              color: AppColors.primary.withValues(alpha: 0.05),
             ),
           ),
           // Content
-          Padding(
-            padding: const EdgeInsets.fromLTRB(72, 60, 80, 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Text(
-                  widget.tournamentName.toUpperCase(),
-                  style: GoogleFonts.orbitron(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.0,
-                    height: 1.1,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    GlowBadge(
-                      label: isKnockout ? 'KNOCKOUT' : 'LEAGUE',
-                      color: AppColors.cyan,
-                      icon: isKnockout ? Icons.account_tree : Icons.swap_horiz,
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(52, 4, 52, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    widget.tournamentName.toUpperCase(),
+                    style: GoogleFonts.orbitron(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.8,
+                      height: 1.15,
                     ),
-                    const SizedBox(width: 8),
-                    _StatusBadge(status: _currentStatus),
-                  ],
-                ),
-              ],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 5),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      GlowBadge(
+                        label: isKnockout ? 'KNOCKOUT' : 'LEAGUE',
+                        color: AppColors.cyan,
+                        icon: isKnockout ? Icons.account_tree : Icons.swap_horiz,
+                      ),
+                      const SizedBox(width: 8),
+                      _StatusBadge(status: _currentStatus),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -358,6 +401,7 @@ class _StatusBadge extends StatelessWidget {
 
 class _FixturesTab extends ConsumerStatefulWidget {
   final String tournamentId;
+  final String tournamentName;
   final String formatType;
   final int fixtureView;
   final ValueChanged<int> onToggleView;
@@ -365,6 +409,7 @@ class _FixturesTab extends ConsumerStatefulWidget {
 
   const _FixturesTab({
     required this.tournamentId,
+    required this.tournamentName,
     required this.formatType,
     required this.fixtureView,
     required this.onToggleView,
@@ -521,13 +566,17 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
           child: const Icon(Icons.update, color: Colors.amber, size: 16),
         ),
         const SizedBox(width: 8),
-        Text(
-          'RESCHEDULED MATCHES',
-          style: GoogleFonts.orbitron(
-            color: Colors.amber,
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.2,
+        Expanded(
+          child: Text(
+            'RESCHEDULED MATCHES',
+            style: GoogleFonts.orbitron(
+              color: Colors.amber,
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.2,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
         const SizedBox(width: 8),
@@ -568,13 +617,17 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
       children: [
         const Icon(Icons.sports_soccer, color: AppColors.cyan, size: 16),
         const SizedBox(width: 8),
-        Text(
-          title,
-          style: GoogleFonts.orbitron(
-            color: Colors.white,
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.2,
+        Expanded(
+          child: Text(
+            title,
+            style: GoogleFonts.orbitron(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.2,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
         const SizedBox(width: 8),
@@ -704,7 +757,7 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
             ],
           ),
         ),
-        if (selectedMd != null) ...[
+        if (selectedMd != null || isAllSelected) ...[
           const SizedBox(height: 12),
           GlassCard(
             padding: const EdgeInsets.all(12),
@@ -718,14 +771,14 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Scheduled: $dateLabel',
+                        isAllSelected ? 'All Matchdays' : 'Scheduled: $dateLabel',
                         style: GoogleFonts.rajdhani(
                             color: Colors.white,
                             fontSize: 16,
                             fontWeight: FontWeight.bold),
                       ),
                     ),
-                    if (widget.isAdmin)
+                    if (widget.isAdmin && !isAllSelected && selectedMd != null)
                       GestureDetector(
                         onTap: () => _showRescheduleDialog(selectedMd),
                         child: Container(
@@ -764,16 +817,24 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
                     Expanded(
                       child: _buildExportButton(
                         'EXPORT FIXTURES',
-                        Icons.picture_as_pdf,
-                        () => _exportMatchday(selectedMd, false),
+                        Icons.image_outlined,
+                        () => _exportMatchday(
+                            isAllSelected
+                                ? {'id': 'all', 'matchday_number': 'ALL'}
+                                : selectedMd,
+                            false),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: _buildExportButton(
                         'EXPORT RESULTS',
-                        Icons.picture_as_pdf,
-                        () => _exportMatchday(selectedMd, true),
+                        Icons.image_outlined,
+                        () => _exportMatchday(
+                            isAllSelected
+                                ? {'id': 'all', 'matchday_number': 'ALL'}
+                                : selectedMd,
+                            true),
                       ),
                     ),
                   ],
@@ -800,12 +861,12 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: Colors.white70, size: 14),
+            Icon(icon, color: AppColors.cyan, size: 15),
             const SizedBox(width: 6),
             Text(
               label,
               style: GoogleFonts.rajdhani(
-                color: Colors.white70,
+                color: Colors.white,
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
               ),
@@ -818,19 +879,39 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
 
   Future<void> _exportMatchday(dynamic matchday, bool includeResults) async {
     try {
-      final client = ref.read(apiClientProvider);
-      await client.exportMatchdayPdf(
-          widget.tournamentId, matchday['id'].toString(), includeResults);
+      final bracketAsync = ref.read(tournamentBracketProvider(widget.tournamentId));
+      List<dynamic> fixtures = (bracketAsync.value?['fixtures'] as List<dynamic>? ?? []);
+
+      if (fixtures.isEmpty) {
+        final client = ref.read(apiClientProvider);
+        final bracketData = await client.getTournamentBracket(widget.tournamentId);
+        fixtures = (bracketData['fixtures'] as List<dynamic>? ?? []);
+      }
+
+      await MatchdayPdfService.exportAndShare(
+        tournamentName: widget.tournamentName,
+        formatType: widget.formatType,
+        selectedMatchday: matchday,
+        allFixtures: fixtures,
+        includeResults: includeResults,
+      );
+
       if (mounted) {
+        final mdNum = matchday?['matchday_number'] ?? '1';
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('PDF Exported Successfully (Check app directory)')),
+          SnackBar(
+            content: Text('Matchday $mdNum ${includeResults ? "Results" : "Fixtures"} Graphic exported'),
+            backgroundColor: AppColors.winGreen,
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to export PDF: $e')),
+          SnackBar(
+            content: Text('Failed to export graphic: $e'),
+            backgroundColor: AppColors.lossRed,
+          ),
         );
       }
     }
@@ -1236,7 +1317,7 @@ class _MatchFixtureTile extends ConsumerWidget {
         children: [
           // Header
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 12, 8),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: Row(
               children: [
                 Expanded(
@@ -1250,78 +1331,22 @@ class _MatchFixtureTile extends ConsumerWidget {
                               : AppColors.textMuted),
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      letterSpacing: 1.4,
+                      letterSpacing: 1.2,
                     ),
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                if (isRescheduledSection) ...[
-                  GlowBadge(label: 'RESCHEDULED ($rescheduleCount/$maxReschedules)', color: Colors.amber),
-                  const SizedBox(width: 6),
-                ],
-                if (isCompleted) ...[
-                  const GlowBadge(
-                      label: 'COMPLETED', color: AppColors.winGreen),
-                  const SizedBox(width: 6),
-                ],
-                // If fixture is completed or has match record, show DISPUTE button; else show REPORT (OCR Upload) & FORFEIT
-                if (isCompleted || (fixture['match_record_id'] != null)) ...[
-                  _IconActionButton(
-                    icon: Icons.flag_outlined,
-                    label: 'DISPUTE',
-                    color: AppColors.lossRed,
-                    onTap: () {
-                      final recId =
-                          fixture['match_record_id']?.toString() ?? matchId;
-                      _showDisputeDialog(
-                          context, ref, recId, '$p1Name vs $p2Name');
-                    },
-                  ),
-                ] else ...[
-                  _IconActionButton(
-                    icon: Icons.upload_file,
-                    label: 'REPORT',
-                    color: AppColors.cyan,
-                    onTap: () => showDialog(
-                      context: context,
-                      builder: (_) => OcrUploadModal(
-                        tMatchId: matchId,
-                        defaultPlayerId: p1Id,
-                        defaultOpponentId: p2Id,
-                        defaultPlayerName: p1Name,
-                        defaultOpponentName: p2Name,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  if (isAdmin) ...[
-                    _IconActionButton(
-                      icon: Icons.edit_calendar,
-                      label: rescheduleCount >= maxReschedules ? 'LIMIT REACHED' : 'RESCHEDULE',
-                      color: rescheduleCount >= maxReschedules ? AppColors.textMuted : AppColors.cyan,
-                      onTap: rescheduleCount >= maxReschedules
-                          ? () {}
-                          : () => _showMatchRescheduleDialog(context, ref, matchId),
-                    ),
-                    const SizedBox(width: 6),
-                  ],
-                  _IconActionButton(
-                    icon: Icons.gavel,
-                    label: 'FORFEIT',
-                    color: AppColors.lossRed,
-                    onTap: () => showDialog(
-                      context: context,
-                      builder: (_) => ForfeitClaimModal(
-                        tournamentId: tournamentId,
-                        matchId: matchId,
-                        player1Id: p1Id,
-                        player2Id: p2Id,
-                        player1Name: p1Name,
-                        player2Name: p2Name,
-                      ),
-                    ),
-                  ),
-                ],
+                const SizedBox(width: 8),
+                if (isRescheduledSection)
+                  GlowBadge(
+                    label: 'RESCHEDULED ($rescheduleCount/$maxReschedules)',
+                    color: Colors.amber,
+                  )
+                else if (isCompleted)
+                  const GlowBadge(label: 'COMPLETED', color: AppColors.winGreen)
+                else
+                  const GlowBadge(label: 'SCHEDULED', color: AppColors.cyan),
               ],
             ),
           ),
@@ -1433,6 +1458,93 @@ class _MatchFixtureTile extends ConsumerWidget {
               p2Name,
             ),
           ],
+
+          // Action Buttons Bar (Bottom of card)
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.02),
+              borderRadius:
+                  const BorderRadius.vertical(bottom: Radius.circular(16)),
+              border: Border(
+                  top: BorderSide(color: Colors.white.withValues(alpha: 0.05))),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: isCompleted || (fixture['match_record_id'] != null)
+                ? Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      _IconActionButton(
+                        icon: Icons.flag_outlined,
+                        label: 'RAISE DISPUTE',
+                        color: AppColors.lossRed,
+                        onTap: () {
+                          final recId =
+                              fixture['match_record_id']?.toString() ?? matchId;
+                          _showDisputeDialog(
+                              context, ref, recId, '$p1Name vs $p2Name');
+                        },
+                      ),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: _IconActionButton(
+                          icon: Icons.upload_file,
+                          label: 'REPORT',
+                          color: AppColors.cyan,
+                          onTap: () => showDialog(
+                            context: context,
+                            builder: (_) => OcrUploadModal(
+                              tMatchId: matchId,
+                              defaultPlayerId: p1Id,
+                              defaultOpponentId: p2Id,
+                              defaultPlayerName: p1Name,
+                              defaultOpponentName: p2Name,
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (isAdmin) ...[
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _IconActionButton(
+                            icon: Icons.edit_calendar,
+                            label: rescheduleCount >= maxReschedules
+                                ? 'LIMIT'
+                                : 'RESCHEDULE',
+                            color: rescheduleCount >= maxReschedules
+                                ? AppColors.textMuted
+                                : Colors.amber,
+                            onTap: rescheduleCount >= maxReschedules
+                                ? () {}
+                                : () => _showMatchRescheduleDialog(
+                                    context, ref, matchId),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _IconActionButton(
+                          icon: Icons.gavel,
+                          label: 'FORFEIT',
+                          color: AppColors.lossRed,
+                          onTap: () => showDialog(
+                            context: context,
+                            builder: (_) => ForfeitClaimModal(
+                              tournamentId: tournamentId,
+                              matchId: matchId,
+                              player1Id: p1Id,
+                              player2Id: p2Id,
+                              player1Name: p1Name,
+                              player2Name: p2Name,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
         ],
       ),
     );
@@ -1480,33 +1592,39 @@ class _MatchFixtureTile extends ConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               // Player 1 prediction label
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 7,
-                    height: 7,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.6),
-                          blurRadius: 4,
+              Flexible(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.6),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Flexible(
+                      child: Text(
+                        '$p1Short: ${p1Pct.toStringAsFixed(0)}%',
+                        style: GoogleFonts.rajdhani(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
                         ),
-                      ],
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 5),
-                  Text(
-                    '$p1Short: ${p1Pct.toStringAsFixed(0)}%',
-                    style: GoogleFonts.rajdhani(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
 
               // Draw prediction label
@@ -1528,33 +1646,41 @@ class _MatchFixtureTile extends ConsumerWidget {
               ),
 
               // Player 2 prediction label
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '${p2Pct.toStringAsFixed(0)}% :$p2Short',
-                    style: GoogleFonts.rajdhani(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.cyan,
-                    ),
-                  ),
-                  const SizedBox(width: 5),
-                  Container(
-                    width: 7,
-                    height: 7,
-                    decoration: BoxDecoration(
-                      color: AppColors.cyan,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.cyan.withValues(alpha: 0.6),
-                          blurRadius: 4,
+              Flexible(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        '${p2Pct.toStringAsFixed(0)}% :$p2Short',
+                        style: GoogleFonts.rajdhani(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.cyan,
                         ),
-                      ],
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 5),
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        color: AppColors.cyan,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.cyan.withValues(alpha: 0.6),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -1707,88 +1833,29 @@ class _MatchFixtureTile extends ConsumerWidget {
   }
 
   void _showDisputeDialog(BuildContext context, WidgetRef ref,
-      String matchRecordId, String matchTitle) {
-    final reasonCtrl = TextEditingController();
-
-    showDialog(
+      String matchRecordId, String matchTitle) async {
+    final result = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.lossRed),
-        ),
-        title: Text('RAISE DISPUTE',
-            style: GoogleFonts.rajdhani(
-                color: Colors.white, fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Raise a formal dispute for match: $matchTitle.',
-                style: const TextStyle(color: Colors.white70, fontSize: 13)),
-            const SizedBox(height: 16),
-            TextField(
-              controller: reasonCtrl,
-              decoration: InputDecoration(
-                labelText: 'Reason for dispute',
-                labelStyle: const TextStyle(color: Colors.white54),
-                filled: true,
-                fillColor: Colors.white.withValues(alpha: 0.05),
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              maxLines: 3,
-              style: const TextStyle(color: Colors.white),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child:
-                const Text('CANCEL', style: TextStyle(color: Colors.white54)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.lossRed),
-            onPressed: () async {
-              final reason = reasonCtrl.text.trim();
-              if (reason.isEmpty) return;
-              Navigator.pop(ctx);
-              try {
-                final client = ref.read(apiClientProvider);
-                await client.submitDispute(
-                  matchRecordId: matchRecordId,
-                  reason: reason,
-                );
-                ref.invalidate(adminDisputesProvider);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                          'Dispute raised for $matchTitle. Logged for admin review.'),
-                      backgroundColor: AppColors.lossRed,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Failed to submit dispute: $e'),
-                      backgroundColor: AppColors.lossRed,
-                    ),
-                  );
-                }
-              }
-            },
-            child: Text('SUBMIT DISPUTE',
-                style: GoogleFonts.rajdhani(
-                    color: Colors.black, fontWeight: FontWeight.bold)),
-          ),
-        ],
+      useRootNavigator: true,
+      builder: (_) => DisputeDialog(
+        matchRecordId: matchRecordId,
+        matchTitle: matchTitle,
       ),
-    ).then((_) => reasonCtrl.dispose());
+    );
+
+    if (result == true) {
+      ref.invalidate(adminDisputesProvider);
+      ref.invalidate(tournamentBracketProvider(tournamentId));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Dispute raised for $matchTitle. Logged for admin review.'),
+            backgroundColor: AppColors.lossRed,
+          ),
+        );
+      }
+    }
   }
 }
 
@@ -1879,24 +1946,30 @@ class _IconActionButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withValues(alpha: 0.35)),
         ),
+        alignment: Alignment.center,
         child: Row(
           mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: color, size: 12),
-            const SizedBox(width: 3),
-            Text(
-              label,
-              style: GoogleFonts.rajdhani(
-                color: color,
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 0.3,
+            Icon(icon, color: color, size: 13),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                label,
+                style: GoogleFonts.rajdhani(
+                  color: color,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.4,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -2187,7 +2260,7 @@ class _StandingsTabState extends State<_StandingsTab> {
                   EsportsButton(
                     label: 'GO TO FIXTURES & BRACKET',
                     icon: Icons.calendar_month,
-                    gradient: const [AppColors.cyan, AppColors.purple],
+                    gradient: const [AppColors.cyan, AppColors.offWhite],
                     onPressed: widget.onGoToFixtures,
                   ),
                 ],
@@ -2631,7 +2704,7 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
 
           // Format & Rules Card
           GlassCard(
-            borderColor: AppColors.purple.withValues(alpha: 0.2),
+            borderColor: AppColors.offWhite.withValues(alpha: 0.2),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

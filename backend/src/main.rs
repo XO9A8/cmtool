@@ -1,3 +1,5 @@
+#![recursion_limit = "256"]
+
 //! # eFootball Club Management & Analytics Backend API Server
 //!
 //! Entry point initializing environment variables, tracing log subscribers,
@@ -53,22 +55,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         db_url = db_url.replace(":6543", ":5432");
     }
 
+    let max_conns: u32 = std::env::var("DATABASE_MAX_CONNECTIONS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(5);
+
     let pool = match sqlx::postgres::PgPoolOptions::new()
-        .acquire_timeout(std::time::Duration::from_secs(3))
+        .max_connections(max_conns)
+        .min_connections(1)
+        .acquire_timeout(std::time::Duration::from_secs(5))
+        .idle_timeout(std::time::Duration::from_secs(30))
+        .max_lifetime(std::time::Duration::from_secs(1800))
         .connect(&db_url)
         .await
     {
         Ok(p) => {
-            tracing::info!("✅ Connected to PostgreSQL successfully.");
-            // ⚠️ DO NOT run sqlx::migrate!() on startup with Supabase pooler!
-            // It uses pg_advisory_lock which hangs indefinitely in Transaction Mode.
-            // Migrations should be applied manually or via CI/CD.
+            tracing::info!("✅ Connected to PostgreSQL successfully (max_connections: {}).", max_conns);
+            // Run safe idempotent schema additions (IF NOT EXISTS) to ensure required columns exist
+            let _ = sqlx::query("ALTER TABLE public.league_standings ADD COLUMN IF NOT EXISTS processed_match_ids UUID[] DEFAULT '{}'::UUID[];").execute(&p).await;
+            let _ = sqlx::query("ALTER TABLE public.t_matches ADD COLUMN IF NOT EXISTS reschedule_count INT NOT NULL DEFAULT 0;").execute(&p).await;
             p
         }
         Err(e) => {
             tracing::warn!("⚠️ PostgreSQL connection failed: {}. Starting in offline mode.", e);
             sqlx::postgres::PgPoolOptions::new()
-                .acquire_timeout(std::time::Duration::from_secs(3))
+                .max_connections(max_conns)
+                .min_connections(1)
+                .acquire_timeout(std::time::Duration::from_secs(5))
+                .idle_timeout(std::time::Duration::from_secs(30))
+                .max_lifetime(std::time::Duration::from_secs(1800))
                 .connect_lazy(&db_url)?
         }
     };

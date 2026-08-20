@@ -2,11 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../core/theme/colors.dart';
 import '../../infrastructure/api_client.dart';
 import '../theme/app_theme.dart';
 import '../providers/match_provider.dart';
-import 'glass_card.dart';
 
 class RescheduleDialog extends ConsumerStatefulWidget {
   final String tournamentId;

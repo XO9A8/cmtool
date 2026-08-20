@@ -8,6 +8,8 @@ import '../theme/app_theme.dart';
 import '../providers/match_provider.dart';
 import '../../infrastructure/offline_sync_service.dart';
 import 'admin_dispute_screen.dart';
+import 'game_guide_screen.dart';
+import '../widgets/guide_onboarding_modal.dart';
 
 
 // Settings state providers
@@ -65,13 +67,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final ok = await client.healthCheck();
       if (mounted) {
         setState(() {
-          _serverStatus = ok ? '🟢 ONLINE (200 OK)' : '🔴 UNREACHABLE';
+          _serverStatus = ok ? 'ONLINE (200 OK)' : 'UNREACHABLE';
         });
       }
     } catch (_) {
       if (mounted) {
         setState(() {
-          _serverStatus = '🔴 OFFLINE';
+          _serverStatus = 'OFFLINE';
         });
       }
     } finally {
@@ -536,6 +538,36 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 );
               },
             ).animate().fade(delay: 400.ms),
+            const SizedBox(height: 28),
+
+            // Game Guide & Learning Hub
+            _buildSectionHeader('GAME GUIDE & LEARNING'),
+            const SizedBox(height: 12),
+            _buildActionTile(
+              icon: Icons.menu_book,
+              title: 'eFootball Knowledge Base',
+              subtitle: 'Tactics, skill moves, mechanics & formations',
+              color: AppColors.cyan,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const GameGuideScreen()),
+                );
+              },
+            ).animate().fade(delay: 420.ms),
+            const SizedBox(height: 10),
+            _buildActionTile(
+              icon: Icons.school_outlined,
+              title: 'Skill Assessment & Onboarding Tour',
+              subtitle: 'Personalize difficulty and view curated learning paths',
+              color: AppColors.primary,
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (_) => const GuideOnboardingModal(),
+                );
+              },
+            ).animate().fade(delay: 440.ms),
             const SizedBox(height: 28),
 
             // Server & Network Status

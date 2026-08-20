@@ -418,7 +418,7 @@ class _OverviewTabState extends ConsumerState<_OverviewTab> {
                   const SizedBox(height: 10),
                   Row(
                     children: [
-                      Expanded(child: StatPill(label: 'CREATED', value: _formatDate(createdAt), color: AppColors.purple)),
+                      Expanded(child: StatPill(label: 'CREATED', value: _formatDate(createdAt), color: AppColors.offWhite)),
                       const SizedBox(width: 10),
                       Expanded(child: StatPill(label: 'ROLE', value: myRole.toUpperCase(), color: _roleColor(myRole))),
                     ],
@@ -431,15 +431,15 @@ class _OverviewTabState extends ConsumerState<_OverviewTab> {
 
             // ── Invite Code ────────────────────────────────────────────
             GlassCard(
-              borderColor: AppColors.purple.withValues(alpha: 0.3),
+              borderColor: AppColors.offWhite.withValues(alpha: 0.25),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _sectionLabel('INVITE CODE', AppColors.purple),
+                  _sectionLabel('INVITE CODE', AppColors.offWhite),
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      const Icon(Icons.vpn_key, color: AppColors.purple, size: 20),
+                      const Icon(Icons.vpn_key, color: AppColors.offWhite, size: 20),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
@@ -454,10 +454,10 @@ class _OverviewTabState extends ConsumerState<_OverviewTab> {
                       ),
                       ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.purple.withValues(alpha: 0.2),
-                          foregroundColor: AppColors.purple,
+                          backgroundColor: AppColors.offWhite.withValues(alpha: 0.15),
+                          foregroundColor: AppColors.offWhite,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          side: BorderSide(color: AppColors.purple.withValues(alpha: 0.4)),
+                          side: BorderSide(color: AppColors.offWhite.withValues(alpha: 0.3)),
                           elevation: 0,
                         ),
                         onPressed: () => _copyCode(inviteCode),
@@ -556,7 +556,7 @@ class _RosterTabState extends ConsumerState<_RosterTab> {
         backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
-          side: BorderSide(color: AppColors.purple.withValues(alpha: 0.4)),
+          side: BorderSide(color: AppColors.offWhite.withValues(alpha: 0.3)),
         ),
         title: Text(
           'INVITE CODE',
@@ -573,12 +573,12 @@ class _RosterTabState extends ConsumerState<_RosterTab> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
               decoration: BoxDecoration(
-                color: AppColors.purple.withValues(alpha: 0.1),
+                color: AppColors.offWhite.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.purple.withValues(alpha: 0.4)),
+                border: Border.all(color: AppColors.offWhite.withValues(alpha: 0.3)),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.purple.withValues(alpha: 0.15),
+                    color: AppColors.offWhite.withValues(alpha: 0.1),
                     blurRadius: 20,
                     spreadRadius: 2,
                   ),
@@ -586,7 +586,7 @@ class _RosterTabState extends ConsumerState<_RosterTab> {
               ),
               child: Column(
                 children: [
-                  const Icon(Icons.vpn_key, color: AppColors.purple, size: 32),
+                  const Icon(Icons.vpn_key, color: AppColors.offWhite, size: 32),
                   const SizedBox(height: 12),
                   Text(
                     code,
@@ -606,7 +606,7 @@ class _RosterTabState extends ConsumerState<_RosterTab> {
               child: EsportsButton(
                 label: 'COPY CODE',
                 icon: Icons.copy,
-                gradient: const [AppColors.purple, Color(0xFFD500F9)],
+                gradient: const [AppColors.primary, Color(0xFFFF9E00)],
                 onPressed: () {
                   Clipboard.setData(ClipboardData(text: code));
                   Navigator.pop(ctx);
@@ -767,8 +767,8 @@ class _RosterTabState extends ConsumerState<_RosterTab> {
                       const Spacer(),
                       OutlinedButton.icon(
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.purple,
-                          side: BorderSide(color: AppColors.purple.withValues(alpha: 0.5)),
+                          foregroundColor: AppColors.offWhite,
+                          side: BorderSide(color: AppColors.offWhite.withValues(alpha: 0.4)),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         ),
@@ -1239,17 +1239,17 @@ class _LeaderboardTab extends ConsumerWidget {
       children: [
         // 2nd
         Expanded(
-          child: _podiumCard(context, ref, p2, 2, 80),
+          child: _podiumCard(context, ref, p2, 2, 102),
         ),
         const SizedBox(width: 8),
         // 1st
         Expanded(
-          child: _podiumCard(context, ref, p1, 1, 110),
+          child: _podiumCard(context, ref, p1, 1, 120),
         ),
         const SizedBox(width: 8),
         // 3rd
         Expanded(
-          child: _podiumCard(context, ref, p3, 3, 65),
+          child: _podiumCard(context, ref, p3, 3, 90),
         ),
       ],
     );
@@ -1259,7 +1259,6 @@ class _LeaderboardTab extends ConsumerWidget {
     final name = p['player_name'] ?? p['username'] ?? 'Player';
     final rating = p['skill_rating'] ?? 0;
     final rColor = _rankColor(rank);
-    final medalIcon = rank == 1 ? '🥇' : (rank == 2 ? '🥈' : '🥉');
 
     return GestureDetector(
       onTap: () => _showPlayerSheet(context, ref, p),
@@ -1282,28 +1281,34 @@ class _LeaderboardTab extends ConsumerWidget {
           ],
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.end,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(medalIcon, style: const TextStyle(fontSize: 22)),
-              const SizedBox(height: 4),
-              Text(
-                name.length > 8 ? '${name.substring(0, 8)}…' : name,
-                style: GoogleFonts.rajdhani(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+              Icon(Icons.workspace_premium, color: rColor, size: 22),
+              const SizedBox(height: 2),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  name.length > 10 ? '${name.substring(0, 10)}…' : name,
+                  style: GoogleFonts.rajdhani(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
                 ),
-                textAlign: TextAlign.center,
-                maxLines: 1,
               ),
-              Text(
-                '$rating',
-                style: GoogleFonts.rajdhani(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: rColor,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  '$rating',
+                  style: GoogleFonts.rajdhani(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: rColor,
+                  ),
                 ),
               ),
             ],
@@ -1545,7 +1550,7 @@ class _SeasonsTabState extends ConsumerState<_SeasonsTab> {
     });
 
     return seasonsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator(color: AppColors.purple)),
+      loading: () => const Center(child: CircularProgressIndicator(color: AppColors.offWhite)),
       error: (e, _) => _errorCard('Failed to load seasons: $e'),
       data: (seasons) {
         // Find active season
@@ -1557,7 +1562,7 @@ class _SeasonsTabState extends ConsumerState<_SeasonsTab> {
           children: [
             Row(
               children: [
-                _sectionLabel('SEASONS ARCHIVE', AppColors.purple),
+                _sectionLabel('SEASONS ARCHIVE', AppColors.offWhite),
                 const Spacer(),
                 if (isAdmin && activeSeason != null)
                   AnimatedContainer(
@@ -1657,7 +1662,7 @@ class _SeasonCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       borderColor: isActive ? AppColors.cyan.withValues(alpha: 0.6) : Colors.white.withValues(alpha: 0.08),
       gradientColors: isActive
-          ? [AppColors.cyan.withValues(alpha: 0.07), AppColors.purple.withValues(alpha: 0.04)]
+          ? [AppColors.cyan.withValues(alpha: 0.07), AppColors.offWhite.withValues(alpha: 0.03)]
           : null,
       child: Row(
         children: [
@@ -1748,7 +1753,7 @@ class _SeasonCard extends StatelessWidget {
 
 Color _roleColor(String role) {
   if (role == 'admin') return AppColors.primary;
-  if (role == 'president') return Colors.purpleAccent;
+  if (role == 'president') return AppColors.offWhite;
   if (role == 'organizer') return AppColors.cyan;
   if (role == 'captain') return Colors.amber;
   if (role == 'vice-captain') return Colors.orangeAccent;
