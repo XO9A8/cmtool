@@ -121,6 +121,7 @@ pub async fn reschedule_match(
     match_id: Uuid,
     new_scheduled_at: chrono::DateTime<chrono::Utc>,
     reason: Option<&str>,
+    new_matchday_id: Option<Uuid>,
 ) -> Result<(), sqlx::Error> {
     // We only set original_scheduled_at if it's currently NULL (i.e., first reschedule)
     sqlx::query(
@@ -132,6 +133,7 @@ pub async fn reschedule_match(
             is_rescheduled = true,
             reschedule_count = reschedule_count + 1,
             reschedule_reason = $2,
+            matchday_id = COALESCE($4, matchday_id),
             status = CASE WHEN status = 'scheduled' THEN 'rescheduled' ELSE status END,
             updated_at = NOW()
         WHERE id = $3
@@ -140,6 +142,7 @@ pub async fn reschedule_match(
     .bind(new_scheduled_at)
     .bind(reason)
     .bind(match_id)
+    .bind(new_matchday_id)
     .execute(pool)
     .await?;
     Ok(())

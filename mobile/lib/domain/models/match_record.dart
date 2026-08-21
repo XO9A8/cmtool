@@ -53,12 +53,16 @@ class MatchRecord {
   /// Optional tournament fixture ID (t_match_id).
   final String? tMatchId;
 
+  /// Optional club UUID — must be provided for matches to appear in the club's Resolved tab.
+  final String? clubId;
+
   const MatchRecord({
     required this.playerId,
     required this.opponentId,
     this.partnerId,
     this.opponentPartnerId,
     this.tMatchId,
+    this.clubId,
     required this.matchType,
     required this.goalsFor,
     required this.goalsAgainst,
@@ -85,6 +89,7 @@ class MatchRecord {
         if (partnerId != null && partnerId!.isNotEmpty) 'partner_id': partnerId,
         if (opponentPartnerId != null && opponentPartnerId!.isNotEmpty) 'opponent_partner_id': opponentPartnerId,
         if (tMatchId != null && tMatchId!.isNotEmpty) 't_match_id': tMatchId,
+        if (clubId != null && clubId!.isNotEmpty) 'club_id': clubId,
         'match_type': matchType,
         'goals_for': goalsFor,
         'goals_against': goalsAgainst,

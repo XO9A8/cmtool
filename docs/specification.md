@@ -6,7 +6,7 @@ The system is designed as a statically typed, ultra-low-cost monolith using Hexa
 
 ### V1 Core Technology Stack (Optimized for $0–$5/month)
 
-- **Mobile Client**: Flutter (Dart). Compiles to native ARM for iOS and Android. Handles state via Riverpod/BLoC. Includes offline SQLite storage (Drift/Hive) for queuing match uploads.
+- **Mobile Client**: Flutter (Dart). Compiles to native ARM for iOS and Android. Handles state via Riverpod/BLoC. Includes offline SQLite storage (`sqflite`) for queuing match uploads.
 - **OCR Engine**: On-device Google ML Kit. Shifts the heavy compute burden to the user's phone, completely eliminating cloud image processing costs.
 - **Backend API**: Rust using the Axum web framework. Provides massive concurrency with virtually zero memory overhead.
 - **Database & Auth**: Supabase (PostgreSQL, built-in Auth, S3-compatible Storage for match screenshot backups).
@@ -361,18 +361,54 @@ All API errors return a standard JSON envelope:
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
+| `GET` | `/health` | Server health check |
+| `GET` | `/version` | Get latest app version requirements |
 | `POST` | `/api/v1/auth/register` | User registration and profile creation. |
+| `POST` | `/api/v1/auth/login` | User login & JWT bearer token issue |
+| `POST` | `/api/v1/auth/sync` | Sync user state |
 | `POST` | `/api/v1/clubs` | Create a new club (user becomes owner). |
-| `POST` | `/api/v1/clubs/{id}/join` | Join a club via invite code. |
-| `POST` | `/api/v1/matches/ocr-submit` | Submit OCR extracted JSON payload + SHA-256 hash. Returns validated `Match_Record` & updated Elo. |
-| `POST` | `/api/v1/matches/{id}/confirm` | Dual-player flow: Opponent confirms match result to exit Pending state. |
-| `GET` | `/api/v1/tournaments/{id}/bracket` | Retrieves current bracket structure, fixtures, and standings. |
-| `POST` | `/api/v1/tournaments` | Create a new tournament. |
-
-| `GET` | `/api/v1/players/{id}/analytics` | Retrieves MPS breakdown, Form Rating (SMA), and Play Style tags. |
+| `POST` | `/api/v1/clubs/join` | Join a club via invite code. |
+| `GET` | `/api/v1/clubs/my` | Get current user's clubs |
+| `GET` | `/api/v1/clubs/{id}/members` | List members of a club |
+| `PUT` | `/api/v1/clubs/{id}/members/{player_id}/role` | Update club member role |
+| `DELETE` | `/api/v1/clubs/{id}/members/{player_id}` | Remove member from club |
+| `PUT` | `/api/v1/clubs/{id}` | Update club settings |
+| `GET` | `/api/v1/clubs/{id}/tournaments` | Get tournaments for a club |
+| `GET` | `/api/v1/clubs/{id}/activity` | Get recent club activity |
+| `GET` | `/api/v1/clubs/{id}/resolved-activity` | Get resolved club activity |
+| `POST` | `/api/v1/matches/ocr-submit` | Submit OCR extracted JSON payload + SHA-256 hash. |
+| `GET` | `/api/v1/matches/pending` | Get pending matches for user |
+| `POST` | `/api/v1/matches/{id}/confirm` | Dual-player flow: Opponent confirms match result |
+| `GET` | `/api/v1/matches/predict` | Predict match outcome probabilities |
 | `GET` | `/api/v1/leaderboards/{club_id}` | Retrieves club rankings (Elo, Form, Badges). |
-| `POST` | `/api/v1/disputes` | Raise a dispute against a pending or completed match. |
-| `POST` | `/api/v1/admin/feature-flags` | Toggle feature flags (e.g., AI Insights, Live Standings). |
+| `POST` | `/api/v1/tournaments` | Create a new tournament. |
+| `GET` | `/api/v1/tournaments/{id}/bracket` | Retrieves current bracket structure, fixtures. |
+| `DELETE` | `/api/v1/tournaments/{id}` | Delete a tournament |
+| `GET` | `/api/v1/tournaments/{id}/standings` | Retrieves league standings |
+| `GET` | `/api/v1/tournaments/{id}/player-stats` | Get stats for tournament players |
+| `POST` | `/api/v1/tournaments/{id}/start` | Start a tournament |
+| `POST` | `/api/v1/tournaments/{id}/status` | Update tournament status |
+| `GET` | `/api/v1/tournaments/{id}/matchdays` | List matchdays for a tournament |
+| `GET` | `/api/v1/tournaments/{id}/matchdays/{md_id}/matches` | List matches for a matchday |
+| `PUT` | `/api/v1/tournaments/{id}/matchdays/{md_id}/schedule` | Update matchday schedule |
+| `PUT` | `/api/v1/tournaments/{id}/matches/{match_id}/reschedule` | Reschedule a specific match |
+| `GET` | `/api/v1/tournaments/{id}/matchdays/{md_id}/export/fixtures` | Export matchday fixtures |
+| `GET` | `/api/v1/tournaments/{id}/matchdays/{md_id}/export/results` | Export matchday results |
+| `GET` | `/api/v1/tournaments/{id}/matchdays/{md_id}/export/pdf` | Export matchday PDF report |
+| `GET` | `/api/v1/tournaments/{id}/progress` | Get tournament progress |
+| `POST` | `/api/v1/tournaments/{id}/matches/{match_id}/claim-forfeit` | Claim forfeit for a match |
+| `GET` | `/api/v1/players/{id}/profile` | Get player profile |
+| `PUT` | `/api/v1/players/{id}/profile` | Update player profile |
+| `GET` | `/api/v1/players/{id}/matches` | Get player's match history |
+| `GET` | `/api/v1/players/{id}/scheduled-matches` | Get player's upcoming matches |
+| `GET` | `/api/v1/players/{id}/elo-history` | Get player's Elo history |
+| `GET` | `/api/v1/players/{id}/h2h/{opponent_id}` | Fetch Head-to-Head rivalry stats |
+| `GET` | `/api/v1/players/{id}/analytics` | Retrieves MPS breakdown, Form Rating, Play Style. |
+| `POST` | `/api/v1/disputes` | Raise a dispute against a match. |
+| `GET` | `/api/v1/admin/disputes` | List all disputes (Admin) |
+| `POST` | `/api/v1/admin/disputes/{id}/resolve` | Resolve dispute (Admin) |
+| `POST` | `/api/v1/seasons/snapshot` | Snapshot the current season |
+| `POST` | `/api/v1/admin/feature-flags` | Toggle feature flags (e.g., AI Insights). |
 
 ### Real-Time Updates (WebSockets / Supabase Realtime)
 - Flutter client subscribes to topic `tournament:{id}:live`.
@@ -380,7 +416,7 @@ All API errors return a standard JSON envelope:
 - Upon Axum bracket calculation or match submission, updates are broadcasted to all connected clients, refreshing tournament brackets instantly without polling.
 
 ### Offline Sync Protocol (Flutter Client)
-- Screenshots and OCR payloads generated while offline are cached locally in SQLite (Drift/Hive).
+- Screenshots and OCR payloads generated while offline are cached locally in SQLite (`sqflite`).
 - A Flutter background service (`workmanager`) syncs pending uploads automatically upon regaining internet access.
 
 ---

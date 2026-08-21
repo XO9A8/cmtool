@@ -43,7 +43,8 @@ use crate::{
 pub fn create_router(state: Arc<AppState>) -> Router {
     // Public endpoints (no auth required)
     let public = Router::new()
-        .route("/health", get(health_check));
+        .route("/health", get(health_check))
+        .route("/version", get(get_version));
 
     // Protected endpoints (require valid JWT via AuthenticatedUser extractor)
     let protected = Router::new()
@@ -857,6 +858,7 @@ async fn get_tournament_bracket(
                 "original_scheduled_at": m.original_scheduled_at,
                 "is_rescheduled": m.is_rescheduled,
                 "reschedule_reason": m.reschedule_reason,
+                "reschedule_count": m.reschedule_count,
             })
         })
         .collect();
@@ -1560,6 +1562,7 @@ async fn get_club_tournaments(
                 "format_type": t.format_type,
                 "status": t.status,
                 "participant_count": t.participant_count,
+                "club_id": t.club_id,
                 "created_at": t.created_at.to_rfc3339(),
             })
         })
@@ -2706,9 +2709,41 @@ async fn update_matchday_schedule(
     if !is_official { return Err(forbidden("FORBIDDEN", "Only officials can reschedule matchdays.")); }
 
     let new_date = payload.scheduled_date.as_ref().and_then(|d| chrono::NaiveDate::parse_from_str(&d, "%Y-%m-%d").ok());
+
+    // Validate against tournament boundaries
+    let tourney: Option<(Option<chrono::NaiveDate>, Option<chrono::NaiveDate>)> = 
+        sqlx::query_as("SELECT start_date, end_date FROM Tournaments WHERE id = $1")
+        .bind(tournament_id)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|e| internal_error(e))?;
+        
+    if let Some((t_start, t_end)) = tourney {
+        if let Some(target_date) = new_date {
+            if let Some(start) = t_start {
+                if target_date < start {
+                    return Err(bad_request("INVALID_DATE", "Cannot schedule matchday before tournament starts"));
+                }
+            }
+            if let Some(end) = t_end {
+                if target_date > end {
+                    return Err(bad_request("INVALID_DATE", "Cannot schedule matchday after tournament ends"));
+                }
+            }
+        }
+    }
+
+    let old_date: Option<chrono::NaiveDate> = sqlx::query_scalar("SELECT scheduled_date FROM Matchdays WHERE id = $1")
+        .bind(matchday_id)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|e| internal_error(e))?
+        .flatten();
+    let old_value_str = old_date.map(|d| d.to_string());
+
     db::update_matchday_date(&state.pool, matchday_id, new_date).await.map_err(|e| internal_error(e))?;
     
-    db::insert_schedule_audit(&state.pool, "matchday", matchday_id, "date_changed", None, payload.scheduled_date.as_deref(), None, auth.user_id)
+    db::insert_schedule_audit(&state.pool, "matchday", matchday_id, "date_changed", old_value_str.as_deref(), payload.scheduled_date.as_deref(), None, auth.user_id)
         .await.map_err(|e| internal_error(e))?;
 
     Ok(Json(serde_json::json!({ "success": true })))
@@ -2718,6 +2753,7 @@ async fn update_matchday_schedule(
 pub struct RescheduleMatchRequest {
     pub scheduled_at: String,
     pub reason: Option<String>,
+    pub matchday_id: Option<Uuid>,
 }
 
 async fn reschedule_match(
@@ -2773,16 +2809,31 @@ async fn reschedule_match(
         }
     }
     
-    // ADD-2: Validate reschedule limit using denormalized count
-    let max_reschedules = rules_config.get("max_reschedules").and_then(|v| v.as_i64()).unwrap_or(3) as i32;
+    // 50% allowance: Calculate default max reschedules as 50% of total matchdays
+    let total_matchdays: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM Matchdays WHERE tournament_id = $1")
+        .bind(tournament_id)
+        .fetch_one(&state.pool)
+        .await
+        .unwrap_or(0);
+        
+    let default_allowance = if total_matchdays > 0 {
+        ((total_matchdays as f64) * 0.5).ceil() as i32
+    } else {
+        3
+    };
+
+    let max_reschedules = rules_config.get("max_reschedules")
+        .and_then(|v| v.as_i64())
+        .map(|v| v as i32)
+        .unwrap_or(default_allowance.max(1));
         
     if reschedule_count >= max_reschedules {
         return Err(bad_request("LIMIT_REACHED", "Maximum reschedule limit reached for this match"));
     }
     
-    db::reschedule_match(&state.pool, match_id, dt, payload.reason.as_deref()).await.map_err(|e| internal_error(e))?;
+    db::reschedule_match(&state.pool, match_id, dt, payload.reason.as_deref(), payload.matchday_id).await.map_err(|e| internal_error(e))?;
     
-    // BUG-1: Auto-update matchday status
+    // Auto-update matchday status
     if let Some(md_id) = matchday_id {
         let _ = db::update_matchday_status(&state.pool, md_id).await;
     }
@@ -2869,4 +2920,43 @@ async fn export_matchday_pdf(
         export_matchday_fixtures(State(state), auth, Path((tournament_id, matchday_id))).await
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// App Version
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[derive(Serialize)]
+pub struct AppVersionInfo {
+    pub version: String,
+    pub build_number: u32,
+    pub download_url: String,
+    pub release_notes: String,
+    pub force_update: bool,
+}
+
+async fn get_version() -> (StatusCode, Json<AppVersionInfo>) {
+    let version = std::env::var("APP_LATEST_VERSION").unwrap_or_else(|_| "0.1.0".to_string());
+    let build_number = std::env::var("APP_LATEST_BUILD")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(1);
+    let download_url = std::env::var("APP_DOWNLOAD_URL").unwrap_or_else(|_| "https://drive.google.com/drive/folders/1wRlIh9fDp0S2uN46zcmbIoNWktXl4Un5".to_string());
+    let release_notes = std::env::var("APP_RELEASE_NOTES").unwrap_or_else(|_| "Performance improvements and bug fixes.".to_string());
+    let force_update = std::env::var("APP_FORCE_UPDATE")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(false);
+
+    (
+        StatusCode::OK,
+        Json(AppVersionInfo {
+            version,
+            build_number,
+            download_url,
+            release_notes,
+            force_update,
+        }),
+    )
+}
+
 

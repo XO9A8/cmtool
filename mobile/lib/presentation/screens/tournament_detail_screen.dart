@@ -95,6 +95,8 @@ class TournamentDetailScreen extends ConsumerStatefulWidget {
   final String formatType;
   final String status;
   final bool isAdmin;
+  /// Club UUID for associating OCR match submissions to the correct club.
+  final String? clubId;
 
   const TournamentDetailScreen({
     super.key,
@@ -104,6 +106,7 @@ class TournamentDetailScreen extends ConsumerStatefulWidget {
     required this.status,
     this.isAdmin =
         true, // Default to true if not passed for now, though better to explicitly pass
+    this.clubId,
   });
 
   @override
@@ -163,6 +166,7 @@ class _TournamentDetailScreenState
                     fixtureView: _fixtureView,
                     onToggleView: (v) => setState(() => _fixtureView = v),
                     isAdmin: widget.isAdmin,
+                    clubId: widget.clubId,
                   ),
                   _StandingsTab(
                     tournamentId: widget.tournamentId,
@@ -406,6 +410,7 @@ class _FixturesTab extends ConsumerStatefulWidget {
   final int fixtureView;
   final ValueChanged<int> onToggleView;
   final bool isAdmin;
+  final String? clubId;
 
   const _FixturesTab({
     required this.tournamentId,
@@ -414,6 +419,7 @@ class _FixturesTab extends ConsumerStatefulWidget {
     required this.fixtureView,
     required this.onToggleView,
     required this.isAdmin,
+    this.clubId,
   });
 
   @override
@@ -471,6 +477,13 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
       return isResched || status == 'rescheduled';
     }).toList();
 
+    final filteredRescheduledFixtures = rescheduledFixtures.where((f) {
+      if (_selectedMatchdayId != null && _selectedMatchdayId != 'all') {
+        return f['matchday_id']?.toString() == _selectedMatchdayId;
+      }
+      return true;
+    }).toList();
+
     final regularFixtures = fixtures.where((f) {
       final isResched = f['is_rescheduled'] == true;
       final status = (f['status'] ?? '').toString().toLowerCase();
@@ -485,6 +498,12 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
     }).toList();
 
     final isTreeView = isKnockout && widget.fixtureView == 1;
+    final totalRoundsCount = matchdays.isNotEmpty
+        ? matchdays.length
+        : fixtures.fold<int>(0, (max, f) {
+            final r = (f['round_number'] as num?)?.toInt() ?? 0;
+            return r > max ? r : max;
+          });
 
     return CustomScrollView(
       primary: false,
@@ -501,20 +520,21 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
                 _buildMatchdaySelector(matchdays),
                 const SizedBox(height: 20),
               ],
-              if (rescheduledFixtures.isNotEmpty && !isTreeView) ...[
-                _buildRescheduledSectionHeader(rescheduledFixtures.length),
+              if (filteredRescheduledFixtures.isNotEmpty && !isTreeView) ...[
+                _buildRescheduledSectionHeader(filteredRescheduledFixtures.length),
                 const SizedBox(height: 12),
-                ...rescheduledFixtures.asMap().entries.map((entry) {
+                ...filteredRescheduledFixtures.asMap().entries.map((entry) {
                   final idx = entry.key;
                   final rf = entry.value;
                   return _MatchFixtureTile(
                     fixture: rf,
                     tournamentId: widget.tournamentId,
                     delay: idx * 60,
-                    totalRounds: 0,
+                    totalRounds: totalRoundsCount,
                     formatType: widget.formatType,
                     isAdmin: widget.isAdmin,
                     isRescheduledSection: true,
+                    clubId: widget.clubId,
                   )
                       .animate()
                       .fade(duration: 300.ms)
@@ -888,7 +908,9 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
         fixtures = (bracketData['fixtures'] as List<dynamic>? ?? []);
       }
 
-      await MatchdayPdfService.exportAndShare(
+      // exportAndShareForDate groups all matchdays that share the same calendar
+      // date as [matchday] and produces one image per matchday in a single share.
+      final count = await MatchdayPdfService.exportAndShareForDate(
         tournamentName: widget.tournamentName,
         formatType: widget.formatType,
         selectedMatchday: matchday,
@@ -897,10 +919,12 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
       );
 
       if (mounted) {
-        final mdNum = matchday?['matchday_number'] ?? '1';
+        final label = count > 1
+            ? '$count matchdays exported for ${matchday?['scheduled_date'] ?? 'this date'}'
+            : 'Matchday ${matchday?['matchday_number'] ?? '1'} ${includeResults ? "Results" : "Fixtures"} Graphic exported';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Matchday $mdNum ${includeResults ? "Results" : "Fixtures"} Graphic exported'),
+            content: Text(label),
             backgroundColor: AppColors.winGreen,
           ),
         );
@@ -999,6 +1023,7 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
             totalRounds: totalRounds,
             formatType: widget.formatType,
             isAdmin: widget.isAdmin,
+            clubId: widget.clubId,
           )
               .animate()
               .fade(
@@ -1088,7 +1113,7 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
             width: nodeWidth,
             height: nodeHeight,
             child: _BracketVersusPill(
-                fixture: match, tournamentId: widget.tournamentId),
+                fixture: match, tournamentId: widget.tournamentId, clubId: widget.clubId),
           ),
         );
       }
@@ -1197,6 +1222,7 @@ class _MatchFixtureTile extends ConsumerWidget {
   final String formatType;
   final bool isAdmin;
   final bool isRescheduledSection;
+  final String? clubId;
 
   const _MatchFixtureTile({
     required this.fixture,
@@ -1206,6 +1232,7 @@ class _MatchFixtureTile extends ConsumerWidget {
     required this.formatType,
     required this.isAdmin,
     this.isRescheduledSection = false,
+    this.clubId,
   });
 
   String _getRoundLabel(int r, int totalRounds) {
@@ -1249,6 +1276,7 @@ class _MatchFixtureTile extends ConsumerWidget {
       builder: (_) => RescheduleDialog(
         tournamentId: tournamentId,
         matchId: matchId,
+        matchdayId: fixture['matchday_id']?.toString(),
         currentDate: currentDt,
         isMatchday: false,
       ),
@@ -1304,7 +1332,9 @@ class _MatchFixtureTile extends ConsumerWidget {
         fixture['original_scheduled_at'] ?? fixture['matchday_scheduled_date'];
     final reason = fixture['reschedule_reason']?.toString();
     final rescheduleCount = (fixture['reschedule_count'] as num?)?.toInt() ?? 0;
-    const maxReschedules = 3;
+    // 50% allowance: calculated as 50% of total matchdays/rounds (minimum 1), or overridden by tournament rules
+    final maxReschedules = (fixture['max_reschedules'] as num?)?.toInt() ??
+        (totalRounds > 0 ? (totalRounds * 0.5).ceil() : 3);
 
     return GlassCard(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1501,6 +1531,7 @@ class _MatchFixtureTile extends ConsumerWidget {
                               defaultOpponentId: p2Id,
                               defaultPlayerName: p1Name,
                               defaultOpponentName: p2Name,
+                              clubId: clubId,
                             ),
                           ),
                         ),
@@ -1986,8 +2017,9 @@ class _IconActionButton extends StatelessWidget {
 class _BracketVersusPill extends ConsumerWidget {
   final dynamic fixture;
   final String tournamentId;
+  final String? clubId;
 
-  const _BracketVersusPill({required this.fixture, required this.tournamentId});
+  const _BracketVersusPill({required this.fixture, required this.tournamentId, this.clubId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -2026,6 +2058,7 @@ class _BracketVersusPill extends ConsumerWidget {
           defaultPlayerName: p1Name,
           defaultOpponentName: p2Name,
           isKnockout: true,
+          clubId: clubId,
         ),
       ),
       child: Container(

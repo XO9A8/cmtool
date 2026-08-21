@@ -20,6 +20,8 @@ class OcrUploadModal extends ConsumerStatefulWidget {
   final String? defaultPlayerName;
   final String? defaultOpponentName;
   final bool isKnockout;
+  /// Club UUID — required for matches to show in the club's Resolved tab.
+  final String? clubId;
 
   const OcrUploadModal({
     super.key,
@@ -29,6 +31,7 @@ class OcrUploadModal extends ConsumerStatefulWidget {
     this.defaultPlayerName,
     this.defaultOpponentName,
     this.isKnockout = false,
+    this.clubId,
   });
 
   @override
@@ -279,6 +282,7 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
       partnerId:         _is2v2Mode ? _partnerIdCtrl.text.trim() : null,
       opponentPartnerId: _is2v2Mode ? _opponentPartnerIdCtrl.text.trim() : null,
       tMatchId:          widget.tMatchId,
+      clubId:            widget.clubId,
       matchType:         _selectedMatchType,
       goalsFor:          goalsFor,
       goalsAgainst:      goalsAgainst,

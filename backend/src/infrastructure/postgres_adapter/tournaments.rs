@@ -150,13 +150,14 @@ pub async fn create_tournament(
 
 /// Tournament summary row.
 #[allow(dead_code)]
-#[derive(FromRow)]
+#[derive(FromRow, Serialize)]
 pub struct TournamentRow {
     pub id: Uuid,
     pub name: String,
     pub format_type: String,
     pub status: String,
     pub participant_count: i64,
+    pub club_id: Uuid,
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
@@ -169,7 +170,7 @@ pub async fn get_club_tournaments(
 ) -> Result<Vec<TournamentRow>, sqlx::Error> {
     let rows = sqlx::query_as::<_, TournamentRow>(
         r#"
-        SELECT t.id, t.name, t.format_type, t.status,
+        SELECT t.id, t.name, t.format_type, t.status, t.club_id,
                COALESCE(
                    (SELECT COUNT(DISTINCT ls.player_id) FROM League_Standings ls WHERE ls.tournament_id = t.id),
                    (SELECT COUNT(DISTINCT tm_p.player_id)

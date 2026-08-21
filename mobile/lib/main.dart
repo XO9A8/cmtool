@@ -20,6 +20,8 @@ import 'presentation/screens/game_guide_screen.dart';
 import 'presentation/widgets/pending_verifications_modal.dart';
 import 'presentation/providers/match_provider.dart';
 import 'infrastructure/offline_sync_service.dart';
+import 'infrastructure/update_service.dart';
+import 'presentation/widgets/update_dialog.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -69,8 +71,49 @@ class AppRoot extends ConsumerStatefulWidget {
   ConsumerState<AppRoot> createState() => _AppRootState();
 }
 
-class _AppRootState extends ConsumerState<AppRoot> {
+class _AppRootState extends ConsumerState<AppRoot> with WidgetsBindingObserver {
   bool _syncStarted = false;
+  bool _isCheckingUpdate = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && ref.read(authStateProvider) != null) {
+      _checkForUpdates();
+    }
+  }
+
+  Future<void> _checkForUpdates() async {
+    if (_isCheckingUpdate) return;
+    _isCheckingUpdate = true;
+    
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final updateService = UpdateService(apiClient);
+      final updateInfo = await updateService.checkForUpdates();
+      
+      if (updateInfo.updateAvailable && updateInfo.serverVersion != null && mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: !updateInfo.serverVersion!.forceUpdate,
+          builder: (_) => UpdateDialog(versionInfo: updateInfo.serverVersion!),
+        );
+      }
+    } finally {
+      _isCheckingUpdate = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,8 +126,9 @@ class _AppRootState extends ConsumerState<AppRoot> {
 
     if (!_syncStarted) {
       _syncStarted = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
         ref.read(offlineSyncProvider).startAutoSync(ref);
+        await _checkForUpdates();
       });
     }
 

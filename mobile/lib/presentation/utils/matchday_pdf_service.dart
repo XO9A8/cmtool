@@ -115,36 +115,77 @@ class MatchdayPdfService {
     }
 
     // ── Filter fixtures ──────────────────────────────────────────────────────
+    // 1. Strict matchday_id inclusion: matches originally assigned to this matchday.
+    // 2. Cross-matchday reschedule inclusion: matches from OTHER matchdays that were
+    //    genuinely rescheduled (is_rescheduled == true) into this matchday's date.
+    // 3. Un-rescheduled matches from other matchdays (even if co-scheduled on the same date)
+    //    are NEVER included here — they belong to their own matchday graphic.
     final List<Map<String, dynamic>> targetMatches = [];
     for (final raw in allFixtures) {
       if (raw is! Map) continue;
       final f = Map<String, dynamic>.from(raw);
       final fMdId = f['matchday_id']?.toString();
-      final isResched = f['is_rescheduled'] == true ||
+      final isGenuinelyRescheduled = f['is_rescheduled'] == true ||
           (f['status'] ?? '').toString().toLowerCase() == 'rescheduled';
-      final schedStr = f['scheduled_at']?.toString();
 
-      DateTime? fDate;
+      final schedStr = f['scheduled_at']?.toString();
+      DateTime? fSchedDate;
       if (schedStr != null && schedStr.isNotEmpty) {
-        try { fDate = DateTime.parse(schedStr).toLocal(); } catch (_) {}
+        try { fSchedDate = DateTime.parse(schedStr).toLocal(); } catch (_) {}
       }
 
       if (isAll) {
         targetMatches.add(f);
-      } else if (targetDate != null) {
-        final isDateMatch = fDate != null && _isSameDay(fDate, targetDate);
-        final isAssignedToThisMd = fMdId == selectedMdId;
-        if (isDateMatch || isAssignedToThisMd) {
-          if (isDateMatch && fMdId != selectedMdId && fMdId != null) {
-            f['rescheduled_into_this_date'] = true;
-          }
-          if (isAssignedToThisMd && isResched && fDate != null && !_isSameDay(fDate, targetDate)) {
-            f['rescheduled_out_of_this_date'] = true;
-          }
-          targetMatches.add(f);
-        }
       } else {
-        if (fMdId == selectedMdId) targetMatches.add(f);
+        if (fMdId == selectedMdId) {
+          // Home matchday match (including any moved to a future date)
+          targetMatches.add(f);
+        } else if (isGenuinelyRescheduled &&
+                   targetDate != null &&
+                   fSchedDate != null &&
+                   _isSameDay(fSchedDate, targetDate)) {
+          // Check if this match's own matchday is already on the target date.
+          // If so, it will be naturally included when selectedMdId == fMdId.
+          // We shouldn't duplicate it into this matchday too.
+          bool currentMdIsOnTargetDate = false;
+          final currentMdDateStr = f['matchday_scheduled_date']?.toString();
+          if (currentMdDateStr != null && currentMdDateStr.isNotEmpty) {
+            try {
+              final d = DateTime.parse(currentMdDateStr);
+              if (_isSameDay(d, targetDate)) {
+                currentMdIsOnTargetDate = true;
+              }
+            } catch (_) {}
+          }
+
+          if (!currentMdIsOnTargetDate) {
+            // It's an orphan arriving from a DIFFERENT date.
+            // Assign it to the FIRST matchday of targetDate to avoid duplication.
+            int? minMdNum;
+            String? minMdId;
+            for (final fix in allFixtures) {
+              if (fix is Map) {
+                final mdDateStr = fix['matchday_scheduled_date']?.toString();
+                if (mdDateStr != null && mdDateStr.isNotEmpty) {
+                  try {
+                    final d = DateTime.parse(mdDateStr);
+                    if (_isSameDay(d, targetDate)) {
+                      final mdNum = (fix['matchday_number'] as num?)?.toInt();
+                      if (mdNum != null && (minMdNum == null || mdNum < minMdNum)) {
+                        minMdNum = mdNum;
+                        minMdId = fix['matchday_id']?.toString();
+                      }
+                    }
+                  } catch (_) {}
+                }
+              }
+            }
+            if (minMdId == null || selectedMdId == minMdId) {
+              f['rescheduled_into_this_matchday'] = true;
+              targetMatches.add(f);
+            }
+          }
+        }
       }
     }
 
@@ -168,7 +209,7 @@ class MatchdayPdfService {
     final reschedCount = targetMatches.where((m) =>
         m['is_rescheduled'] == true ||
         (m['status'] ?? '').toString().toLowerCase() == 'rescheduled' ||
-        m['rescheduled_into_this_date'] == true).length;
+        m['rescheduled_into_this_matchday'] == true).length;
 
     int totalGoals = 0;
     if (includeResults) {
@@ -259,7 +300,7 @@ class MatchdayPdfService {
     return pdf.save();
   }
 
-  /// Converts PDF to PNG(s) and shares via share sheet
+  /// Converts PDF to PNG(s) and shares via share sheet (single matchday).
   static Future<void> exportAndShare({
     required String tournamentName,
     required String formatType,
@@ -310,6 +351,132 @@ class MatchdayPdfService {
         files: [XFile(file.path, mimeType: 'application/pdf', name: fileName)],
       ));
     }
+  }
+
+  /// Exports one image per matchday for every matchday that shares the same
+  /// calendar date as [selectedMatchday]. This is the primary export entry-point
+  /// for the in-app "Export Fixtures" button.
+  ///
+  /// Behaviour:
+  /// - Groups [allFixtures] by matchday_id using the `matchday_scheduled_date`
+  ///   field embedded in each fixture by the bracket API.
+  /// - For each matchday on the target date, generates an independent PDF page
+  ///   and rasters it to a PNG.
+  /// - All PNGs are shared together in a single share-sheet call.
+  /// - A match shown as RESCHEDULED means its `is_rescheduled` DB flag is true
+  ///   (i.e. it was individually rescheduled to a different time/date). The match
+  ///   stays in its original matchday; its new `scheduled_at` time is displayed.
+  static Future<int> exportAndShareForDate({
+    required String tournamentName,
+    required String formatType,
+    required dynamic selectedMatchday,
+    required List<dynamic> allFixtures,
+    required bool includeResults,
+    String? clubName,
+  }) async {
+    // Resolve target date from the selected matchday.
+    final targetDateStr = selectedMatchday?['scheduled_date']?.toString();
+    DateTime? targetDate;
+    if (targetDateStr != null && targetDateStr.isNotEmpty) {
+      try { targetDate = DateTime.parse(targetDateStr); } catch (_) {}
+    }
+
+    // Group all fixtures by matchday_id; include only matchdays whose
+    // matchday_scheduled_date matches the target date.
+    final Map<String, List<Map<String, dynamic>>> byMatchday = {};
+    final Map<String, int> matchdayNumbers = {};
+    final Map<String, String> matchdayDates = {};
+
+    for (final raw in allFixtures) {
+      if (raw is! Map) continue;
+      final f = Map<String, dynamic>.from(raw);
+      final fMdId = f['matchday_id']?.toString();
+      if (fMdId == null) continue;
+
+      // matchday_scheduled_date is a NaiveDate string ("YYYY-MM-DD") from the
+      // bracket API (tournaments.rs get_tournament_bracket query).
+      final mdDateStr = f['matchday_scheduled_date']?.toString();
+      DateTime? mdDate;
+      if (mdDateStr != null && mdDateStr.isNotEmpty) {
+        try { mdDate = DateTime.parse(mdDateStr); } catch (_) {}
+      }
+
+      final bool onTargetDate = targetDate == null ||
+          (mdDate != null && _isSameDay(mdDate, targetDate));
+
+      if (onTargetDate) {
+        byMatchday.putIfAbsent(fMdId, () => []).add(f);
+        matchdayNumbers[fMdId] = (f['matchday_number'] as num?)?.toInt() ?? 0;
+        matchdayDates[fMdId] = mdDateStr ?? targetDateStr ?? '';
+      }
+    }
+
+    // Fallback: if no grouped fixtures found (e.g. date field missing), export
+    // the single selected matchday the old way.
+    if (byMatchday.isEmpty) {
+      await exportAndShare(
+        tournamentName: tournamentName,
+        formatType: formatType,
+        selectedMatchday: selectedMatchday,
+        allFixtures: allFixtures,
+        includeResults: includeResults,
+        clubName: clubName,
+      );
+      return 1;
+    }
+
+    // Sort matchdays by ascending matchday_number so images are ordered MD1 → MD2 → …
+    final sortedMdIds = byMatchday.keys.toList()
+      ..sort((a, b) => (matchdayNumbers[a] ?? 0).compareTo(matchdayNumbers[b] ?? 0));
+
+    final cleanTourney = tournamentName.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+    final typeStr = includeResults ? 'results' : 'fixtures';
+    final tempDir = await getTemporaryDirectory();
+    final List<XFile> allPngFiles = [];
+
+    for (final mdId in sortedMdIds) {
+      final mdNum = matchdayNumbers[mdId] ?? 0;
+
+      // Build a synthetic matchday descriptor for generateMatchdayPdf.
+      final syntheticMd = <String, dynamic>{
+        'id': mdId,
+        'matchday_number': mdNum,
+        'scheduled_date': matchdayDates[mdId] ?? targetDateStr ?? '',
+      };
+
+      final pdfBytes = await generateMatchdayPdf(
+        tournamentName: tournamentName,
+        formatType: formatType,
+        selectedMatchday: syntheticMd,
+        allFixtures: allFixtures,
+        includeResults: includeResults,
+        clubName: clubName,
+      );
+
+      int pageIndex = 1;
+      await for (final page in Printing.raster(pdfBytes, dpi: 200)) {
+        final pngBytes = await page.toPng();
+        final pageSuffix = pageIndex > 1 ? '_page_$pageIndex' : '';
+        final fileName = '${cleanTourney}_matchday_${mdNum}_$typeStr$pageSuffix.png';
+        final file = File('${tempDir.path}/$fileName');
+        await file.writeAsBytes(pngBytes);
+        allPngFiles.add(XFile(file.path, mimeType: 'image/png', name: fileName));
+        pageIndex++;
+      }
+    }
+
+    if (allPngFiles.isNotEmpty) {
+      final dateLabel = targetDate != null
+          ? '${_pad(targetDate.day)} ${_monthName(targetDate.month)} ${targetDate.year}'
+          : '';
+      await SharePlus.instance.share(ShareParams(
+        text: '$tournamentName — $dateLabel ${includeResults ? "Results" : "Fixtures"} '
+              '(${sortedMdIds.length} matchday${sortedMdIds.length > 1 ? "s" : ""})',
+        files: allPngFiles,
+      ));
+    }
+
+    return sortedMdIds.length;
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -427,7 +594,7 @@ class MatchdayPdfService {
                                 ),
                               ),
                               pw.Text(
-                                '23:59 UTC',
+                                '12:59 PM BST',
                                 style: const pw.TextStyle(
                                   color: _paper,
                                   fontSize: 7,
@@ -618,11 +785,11 @@ class MatchdayPdfService {
     final roundNum  = (m['round_number'] as num?)?.toInt() ?? 1;
     final groupName = m['group_name']?.toString();
     final status    = (m['status'] ?? 'scheduled').toString().toLowerCase();
-    final isCompleted  = status == 'completed';
+    final isCompleted   = status == 'completed';
+    final isReschedInto = m['rescheduled_into_this_matchday'] == true;
     final isRescheduled = m['is_rescheduled'] == true ||
         status == 'rescheduled' ||
-        m['rescheduled_into_this_date'] == true;
-    final isRescheduledOut = m['rescheduled_out_of_this_date'] == true;
+        isReschedInto;
 
     final p1Score  = includeResults ? m['player_1_score'] : null;
     final p2Score  = includeResults ? m['player_2_score'] : null;
@@ -632,20 +799,40 @@ class MatchdayPdfService {
     final p2Wins   = includeResults && isCompleted && winnerId != null && winnerId == p2Id;
 
     final schedStr = m['scheduled_at']?.toString();
-    String timeStr = 'TIME TBD';
+    String timeStr = '6:00 PM';
     if (schedStr != null && schedStr.isNotEmpty) {
       try {
         final dt = DateTime.parse(schedStr).toLocal();
         final h  = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
         final ap = dt.hour >= 12 ? 'PM' : 'AM';
-        timeStr  = '$h:${_pad(dt.minute)} $ap';
+        
+        final mdDateStr = m['matchday_scheduled_date']?.toString();
+        DateTime? mdDate;
+        if (mdDateStr != null && mdDateStr.isNotEmpty) {
+          try { mdDate = DateTime.parse(mdDateStr); } catch (_) {}
+        }
+        
+        // If it's a match rescheduled into today's matchday, show its kickoff time today.
+        // If it's in its original matchday but moved to a different future date, show the target date.
+        if (isRescheduled && !isReschedInto && mdDate != null && !_isSameDay(dt, mdDate)) {
+          timeStr = '${_pad(dt.day)} ${_monthName(dt.month).toUpperCase()} · $h:${_pad(dt.minute)} $ap';
+        } else {
+          timeStr = '$h:${_pad(dt.minute)} $ap';
+        }
       } catch (_) {}
     }
 
     final reason = m['reschedule_reason']?.toString();
 
     String stageLabel;
-    if (groupName != null && groupName.isNotEmpty) {
+    final origMdNum = m['matchday_number'];
+    if (isReschedInto && origMdNum != null) {
+      if (groupName != null && groupName.isNotEmpty) {
+        stageLabel = 'MD $origMdNum · GRP $groupName · RD $roundNum';
+      } else {
+        stageLabel = 'MD $origMdNum · RD $roundNum';
+      }
+    } else if (groupName != null && groupName.isNotEmpty) {
       stageLabel = 'GRP $groupName  ·  RD $roundNum';
     } else {
       stageLabel = _getRoundTitle(roundNum, formatType);
@@ -704,9 +891,7 @@ class MatchdayPdfService {
                 ),
 
                 // Right: status / time
-                if (isRescheduledOut)
-                  _buildTag('MOVED OUT', _amber, _paper)
-                else if (isRescheduled)
+                if (isRescheduled)
                   pw.Row(
                     children: [
                       _buildTag('RESCHEDULED', _amber, _navy),

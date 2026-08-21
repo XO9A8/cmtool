@@ -14,6 +14,7 @@ class ApiClient {
   final Function()? onUnauthorized;
 
   String get baseUrl => _dio.options.baseUrl;
+  Dio get dio => _dio;
 
   /// Helper to get a valid, non-expired access token from Supabase or local storage.
   Future<String?> _getValidToken() async {
@@ -589,12 +590,13 @@ class ApiClient {
     return response.data as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> rescheduleMatch(String tournamentId, String matchId, DateTime scheduledAt, String? reason) async {
+  Future<Map<String, dynamic>> rescheduleMatch(String tournamentId, String matchId, DateTime scheduledAt, String? reason, [String? matchdayId]) async {
     final response = await _dio.put(
       '/api/v1/tournaments/$tournamentId/matches/$matchId/reschedule',
       data: {
         'scheduled_at': scheduledAt.toUtc().toIso8601String(),
         if (reason != null) 'reason': reason,
+        if (matchdayId != null) 'matchday_id': matchdayId,
       },
     );
     return response.data as Map<String, dynamic>;

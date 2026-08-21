@@ -57,14 +57,17 @@ The Rust API server follows **Hexagonal Architecture (Ports & Adapters)** to dec
 backend/src/
  ├── api/                   # Primary Adapters (HTTP Transport)
  │    ├── routes.rs         # Axum route handlers & REST HTTP endpoints
- │    └── auth_middleware.rs# JWT & Bearer token verification
+ │    ├── auth_middleware.rs# JWT & Bearer token verification
+ │    └── jwks.rs           # JWKS key fetching & caching
  ├── domain/                # Core Business Logic (Pure Domain Math)
  │    ├── elo.rs            # Elo rating formulas (1v1 & 2v2)
  │    ├── mps.rs            # Match Performance Score algorithm
  │    ├── play_style.rs     # Play style classifier engine
- │    └── disputes.rs       # Dispute domain state machine
+ │    ├── disputes.rs       # Dispute domain state machine
+ │    ├── tournament.rs     # Tournament bracket/league logic
+ │    └── ai_insights.rs    # Gemini AI integrations
  └── infrastructure/        # Secondary Adapters (Persistence & External)
-      └── postgres_adapter.rs # SQLx PostgreSQL database queries
+      └── postgres_adapter/ # SQLx PostgreSQL database queries
 ```
 
 ---
