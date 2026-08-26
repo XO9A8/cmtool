@@ -55,7 +55,7 @@ class _GuideOnboardingModalState extends ConsumerState<GuideOnboardingModal> {
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: AppColors.cyan),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.school_outlined,
                       color: AppColors.cyan,
                       size: 22,
@@ -87,7 +87,7 @@ class _GuideOnboardingModalState extends ConsumerState<GuideOnboardingModal> {
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close, color: AppColors.textMuted),
+                    icon: Icon(Icons.close, color: AppColors.textMuted),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],

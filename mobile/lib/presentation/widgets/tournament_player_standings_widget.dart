@@ -169,7 +169,7 @@ class _TournamentPlayerStandingsWidgetState
                 title: 'TOP 5 GOAL SCORERS',
                 subtitle: 'Most goals scored in tournament',
                 icon: Icons.sports_soccer,
-                accentColor: Colors.amber,
+                accentColor: AppColors.amber,
                 items: topScorers.take(5).toList(),
                 getPrimaryStat: (p) => '${(p['goals_for'] as num?)?.toInt() ?? 0} GOALS',
                 getSubStat: (p) {
@@ -381,12 +381,12 @@ class _TournamentPlayerStandingsWidgetState
                   Container(
                     width: 34,
                     height: 34,
-                    decoration: const BoxDecoration(
-                      color: Colors.amber,
+                    decoration: BoxDecoration(
+                      color: AppColors.amber,
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.amberAccent,
+                          color: AppColors.amber,
                           blurRadius: 8,
                           spreadRadius: 1,
                         ),
@@ -464,13 +464,13 @@ class _TournamentPlayerStandingsWidgetState
 
           // Ranks #2 through #5 List
           if (items.length > 1) ...[
-            const Divider(color: AppColors.surfaceLight, height: 1),
+            Divider(color: AppColors.surfaceLight, height: 1),
             ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               padding: const EdgeInsets.symmetric(vertical: 4),
               itemCount: items.length - 1,
-              separatorBuilder: (_, __) => const Divider(
+              separatorBuilder: (_, __) => Divider(
                 color: AppColors.surfaceLight,
                 height: 1,
                 indent: 16,
@@ -482,9 +482,9 @@ class _TournamentPlayerStandingsWidgetState
 
                 Color rankColor;
                 if (rank == 2) {
-                  rankColor = const Color(0xFFC0C0C0); // Silver
+                  rankColor = const Color(0xFFD9D4C8); // Silver
                 } else if (rank == 3) {
-                  rankColor = const Color(0xFFCD7F32); // Bronze
+                  rankColor = const Color(0xFFB45309); // Bronze
                 } else {
                   rankColor = AppColors.textMuted;
                 }
@@ -564,7 +564,7 @@ class _TournamentPlayerStandingsWidgetState
       ),
       child: Column(
         children: [
-          const Icon(Icons.stars, color: Colors.amber, size: 48),
+          Icon(Icons.stars, color: AppColors.amber, size: 48),
           const SizedBox(height: 12),
           Text(
             'NO PLAYER STATS YET',
@@ -599,7 +599,7 @@ class _TournamentPlayerStandingsWidgetState
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline, color: AppColors.lossRed),
+          Icon(Icons.error_outline, color: AppColors.lossRed),
           const SizedBox(width: 12),
           Expanded(
             child: Text(

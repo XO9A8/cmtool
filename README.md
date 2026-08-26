@@ -130,9 +130,48 @@ cargo test
 
 - **Database**: PostgreSQL 16 hosted on **Supabase** in `ap-southeast-1` (Singapore).
 - **API Server**: Deployed on **Railway** (`cmtool-backend-asia`) inside an ultra-lean multi-stage Docker container footprint (< 50MB).
-- **CI/CD Build**: Multi-stage Rust build with `SQLX_OFFLINE=true` compile caching.
+  - **Live URL**: `https://cmtool-backend-asia-production.up.railway.app`
+  - **Health Check**: `https://cmtool-backend-asia-production.up.railway.app/health`
+  - **Version Check**: `https://cmtool-backend-asia-production.up.railway.app/version`
+- **CI/CD & Deployment**: Multi-stage Rust build with `SQLX_OFFLINE=true` compile caching.
+
+### Deploying Backend to Railway
+To deploy backend updates using the Railway CLI:
+```bash
+cd backend
+railway up
+```
+
+### Syncing Railway Environment Variables
+Set and sync environment variables for the Railway production service (`cmtool-backend-asia`):
+```bash
+cd backend
+railway variable set -s cmtool-backend-asia \
+  "DATABASE_URL=postgresql://postgres.<project_ref>:<password>@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres" \
+  "JWT_SECRET=<SUPABASE_JWT_SECRET>" \
+  "SUPABASE_URL=https://ypsrkdefgbghvluuyynm.supabase.co" \
+  "SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  "APP_LATEST_VERSION=0.2.1" \
+  "APP_LATEST_BUILD=6" \
+  "APP_DOWNLOAD_URL=https://drive.google.com/drive/folders/1wRlIh9fDp0S2uN46zcmbIoNWktXl4Un5" \
+  "APP_RELEASE_NOTES=Initial release via Google Drive!" \
+  "APP_FORCE_UPDATE=false" \
+  "ENABLE_AI_INSIGHTS=true" \
+  "RUST_LOG=cmtool_backend=info,tower_http=info"
+```
+
+### Building Flutter Production APK
+Build the release APKs with production environment variables:
+```bash
+cd mobile
+flutter build apk --split-per-abi \
+  --dart-define=SUPABASE_URL="https://ypsrkdefgbghvluuyynm.supabase.co" \
+  --dart-define=SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlwc3JrZGVmZ2JnaHZsdXV5eW5tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NjQ4MzEsImV4cCI6MjEwMTM0MDgzMX0.3ojq4TJBGoIM_QwDSzvbJY1VX4LBkpJ3DyDYYcKdLKg" \
+  --dart-define=BACKEND_URL="https://cmtool-backend-asia-production.up.railway.app"
+```
 
 ---
 
 ## 📄 License
 This project is open source and available under the [MIT License](LICENSE).
+

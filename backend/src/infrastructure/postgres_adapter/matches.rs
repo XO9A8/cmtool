@@ -43,11 +43,12 @@ pub struct SaveMatchTransactionInput {
     pub crosses: u32,
     pub tackles: u32,
     pub saves: u32,
-    pub screenshot_hash: String,
+    pub screenshot_hash: Option<String>,
     pub elo_result: EloResult,
     pub mps_result: Option<MpsResult>,
     pub form_rating: f64,
     pub verification_status: String,
+    pub submitted_by_id: Option<Uuid>,
 }
 
 /// Executes an atomic PostgreSQL database transaction that:
@@ -68,8 +69,8 @@ pub async fn save_match_transaction(
         INSERT INTO Match_Records (
             id, club_id, player_id, opponent_id, t_match_id, match_type, result, goals_for, goals_against,
             possession, passes_completed, passes_attempted, shots_on_target, shots_total,
-            interceptions, fouls, offsides, corners, free_kicks, crosses, tackles, saves, screenshot_hash, verification_status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
+            interceptions, fouls, offsides, corners, free_kicks, crosses, tackles, saves, screenshot_hash, verification_status, submitted_by_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
         "#,
     )
     .bind(match_id)
@@ -96,6 +97,7 @@ pub async fn save_match_transaction(
     .bind(input.saves as i32)
     .bind(&input.screenshot_hash)
     .bind(&input.verification_status)
+    .bind(input.submitted_by_id)
     .execute(&mut *tx)
     .await?;
     // 2. Upsert player profile form rating + play style ONLY (Elo applied on confirmation)
@@ -221,6 +223,7 @@ pub async fn confirm_match(
     pool: &PgPool,
     match_id: Uuid,
     user_id: Uuid,
+    is_admin: bool,
 ) -> Result<(), sqlx::Error> {
     let result = sqlx::query(
         r#"
@@ -228,12 +231,12 @@ pub async fn confirm_match(
         SET verification_status = 'approved', updated_at = NOW(), verified_by_id = $2
         WHERE id = $1 AND verification_status = 'pending'
           AND (
+            $3 = true
             -- Direct opponent can always confirm
-            (player_id != $2 AND opponent_id = $2)
+            OR (player_id != $2 AND opponent_id = $2)
             -- Club official: if club_id is set on the match, check that club
             OR (
-              player_id != $2 -- Prevent self-confirm by official
-              AND club_id IS NOT NULL
+              club_id IS NOT NULL
               AND EXISTS (
                 SELECT 1 FROM Club_Memberships cm
                 WHERE cm.club_id = Match_Records.club_id
@@ -246,6 +249,7 @@ pub async fn confirm_match(
     )
     .bind(match_id)
     .bind(user_id)
+    .bind(is_admin)
     .execute(pool)
     .await?;
 
@@ -256,6 +260,21 @@ pub async fn confirm_match(
     apply_match_stats(pool, match_id).await?;
 
     Ok(())
+}
+
+/// Checks if a T_Match already has an approved Match_Records row.
+pub async fn check_match_already_confirmed(
+    pool: &PgPool,
+    t_match_id: Uuid,
+) -> Result<Option<Uuid>, sqlx::Error> {
+    let row = sqlx::query(
+        "SELECT id FROM Match_Records WHERE t_match_id = $1 AND verification_status = 'approved' LIMIT 1",
+    )
+    .bind(t_match_id)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(row.map(|r| r.try_get("id").unwrap_or_default()))
 }
 
 /// Fetches all pending matches requiring approval by the user (as opponent) or as a club official.
@@ -363,3 +382,50 @@ pub async fn get_pending_matches_db(
 }
 
 
+
+/// Dismisses a pending match record without affecting the overall match state.
+pub async fn dismiss_match_record(
+    pool: &PgPool,
+    match_record_id: Uuid,
+    user_id: Uuid,
+    is_admin: bool,
+) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await?;
+
+    // Check if the record exists and is pending
+    let record = sqlx::query!(
+        r#"
+        SELECT player_id, opponent_id, verification_status 
+        FROM Match_Records 
+        WHERE id = $1 AND deleted_at IS NULL
+        "#,
+        match_record_id
+    )
+    .fetch_optional(&mut *tx)
+    .await?;
+
+    let record = match record {
+        Some(r) => r,
+        None => return Err(sqlx::Error::RowNotFound),
+    };
+
+    if record.verification_status != "pending" {
+        return Err(sqlx::Error::RowNotFound); // Or a custom error, but RowNotFound is handled gracefully as conflict
+    }
+
+    // Must be opponent or admin to dismiss
+    if !is_admin && record.opponent_id != user_id && record.player_id != user_id {
+        return Err(sqlx::Error::RowNotFound); // Unauthorized
+    }
+
+    // Set verification_status to 'rejected'
+    sqlx::query!(
+        "UPDATE Match_Records SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1",
+        match_record_id
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+    Ok(())
+}

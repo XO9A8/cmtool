@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
+import '../theme/app_theme.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../providers/match_provider.dart';
 
@@ -83,15 +84,15 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF090A0F),
+      backgroundColor: AppColors.navy,
       body: Stack(
         children: [
           // Background Gradient Animation
           Positioned.fill(
             child: Container(
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Color(0xFF090A0F), Color(0xFF0F111A), Color(0xFF090A0F)],
+                  colors: [AppColors.navy, AppColors.surface, AppColors.navy],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -107,8 +108,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               height: 300,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFF00E5FF).withValues(alpha: 0.08),
-                boxShadow: const [BoxShadow(color: Color(0xFF00E5FF), blurRadius: 80)],
+                color: AppColors.gold.withValues(alpha: 0.08),
+                boxShadow: [BoxShadow(color: AppColors.gold, blurRadius: 80)],
               ),
             ).animate(onPlay: (c) => c.repeat(reverse: true)).scale(duration: 4.seconds, begin: const Offset(0.8, 0.8), end: const Offset(1.2, 1.2)),
           ),
@@ -120,8 +121,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               height: 400,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFFFF6D00).withValues(alpha: 0.06),
-                boxShadow: const [BoxShadow(color: Color(0xFFFF6D00), blurRadius: 80)],
+                color: AppColors.primary.withValues(alpha: 0.06),
+                boxShadow: [BoxShadow(color: AppColors.primary, blurRadius: 80)],
               ),
             ).animate(onPlay: (c) => c.repeat(reverse: true)).scale(duration: 5.seconds, begin: const Offset(0.9, 0.9), end: const Offset(1.1, 1.1)),
           ),
@@ -140,14 +141,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     height: 90,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFE2E8F0), Color(0xFF00E5FF)],
+                      gradient: LinearGradient(
+                        colors: [AppColors.paper, AppColors.gold],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF00E5FF).withValues(alpha: 0.5),
+                          color: AppColors.gold.withValues(alpha: 0.5),
                           blurRadius: 25,
                           offset: const Offset(0, 5),
                         ),
@@ -171,8 +172,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   const SizedBox(height: 8),
                   Text(
                     _isLogin ? 'INITIATE SESSION' : 'REGISTER NEW PLAYER',
-                    style: const TextStyle(
-                      color: Color(0xFF00E5FF),
+                    style: TextStyle(
+                      color: AppColors.gold,
                       fontSize: 12,
                       letterSpacing: 2,
                       fontWeight: FontWeight.w600,
@@ -212,18 +213,18 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                               Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: Colors.redAccent.withValues(alpha: 0.15),
+                                  color: AppColors.lossRed.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.redAccent.withValues(alpha: 0.5)),
+                                  border: Border.all(color: AppColors.lossRed.withValues(alpha: 0.5)),
                                 ),
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.error_outline, color: Colors.redAccent, size: 18),
+                                    Icon(Icons.error_outline, color: AppColors.lossRed, size: 18),
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: Text(
                                         _errorMessage!,
-                                        style: const TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.w600),
+                                        style: TextStyle(color: AppColors.lossRed, fontSize: 13, fontWeight: FontWeight.w600),
                                       ),
                                     ),
                                   ],
@@ -248,15 +249,15 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                                 ),
                                 child: Ink(
                                   decoration: BoxDecoration(
-                                    gradient: const LinearGradient(
-                                      colors: [Color(0xFFFF6D00), Color(0xFFFF9E00)],
+                                    gradient: LinearGradient(
+                                      colors: [AppColors.primary, AppColors.gold],
                                       begin: Alignment.centerLeft,
                                       end: Alignment.centerRight,
                                     ),
                                     borderRadius: BorderRadius.circular(16),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: const Color(0xFFFF6D00).withValues(alpha: 0.4),
+                                        color: AppColors.primary.withValues(alpha: 0.4),
                                         blurRadius: 15,
                                         offset: const Offset(0, 4),
                                       )
@@ -379,8 +380,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                             ),
                             TextSpan(
                               text: _isLogin ? 'Request Access' : 'Authenticate',
-                              style: const TextStyle(
-                                color: Color(0xFF00E5FF),
+                              style: TextStyle(
+                                color: AppColors.gold,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: 0.5,
                               ),
@@ -404,7 +405,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     return InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(color: Colors.white60, fontWeight: FontWeight.w500),
-      prefixIcon: Icon(icon, color: const Color(0xFF00E5FF), size: 22),
+      prefixIcon: Icon(icon, color: AppColors.gold, size: 22),
       filled: true,
       fillColor: Colors.white.withValues(alpha: 0.05),
       enabledBorder: OutlineInputBorder(
@@ -417,7 +418,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Color(0xFF00E5FF), width: 1.5),
+        borderSide: BorderSide(color: AppColors.gold, width: 1.5),
       ),
     );
   }

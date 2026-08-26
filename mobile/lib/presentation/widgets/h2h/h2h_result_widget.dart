@@ -41,15 +41,15 @@ class H2hResultWidget extends ConsumerWidget {
     final asyncH2h = ref.watch(h2hProvider(params));
 
     return asyncH2h.when(
-      loading: () => const Center(
+      loading: () => Center(
         child: Padding(
-          padding: EdgeInsets.all(48),
+          padding: const EdgeInsets.all(48),
           child: CircularProgressIndicator(color: AppColors.primary),
         ),
       ),
       error: (e, _) => GlassCard(
         child: Text('Failed to load H2H: $e',
-            style: const TextStyle(color: Colors.redAccent)),
+            style: TextStyle(color: AppColors.lossRed)),
       ),
       data: (data) {
         final isDirectScope = params.scope == 'direct';
@@ -248,7 +248,7 @@ class H2hResultWidget extends ConsumerWidget {
     required int p2DirectGoals,
   }) {
     return GlassCard(
-      gradientColors: const [Color(0xFF191C2B), Color(0xFF0F111A)],
+      gradientColors: [AppColors.surfaceLight, AppColors.surface],
       borderColor: AppColors.primary.withValues(alpha: 0.45),
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
       child: Column(
@@ -350,14 +350,14 @@ class H2hResultWidget extends ConsumerWidget {
                                     horizontal: 7, vertical: 2),
                                 decoration: BoxDecoration(
                                   color:
-                                      Colors.amber.withValues(alpha: 0.15),
+                                      AppColors.amber.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
                                   '$directDraws D',
                                   style: GoogleFonts.rajdhani(
                                       fontSize: 10,
-                                      color: Colors.amber,
+                                      color: AppColors.amber,
                                       fontWeight: FontWeight.bold),
                                 ),
                               ),
@@ -465,7 +465,7 @@ class H2hResultWidget extends ConsumerWidget {
                     label: 'DRAWS',
                     value: '$directDraws',
                     icon: Icons.handshake_outlined,
-                    color: Colors.amber,
+                    color: AppColors.amber,
                   ),
                 ],
               ),
@@ -712,7 +712,7 @@ class H2hResultWidget extends ConsumerWidget {
     };
 
     return GlassCard(
-      gradientColors: const [Color(0xFF161924), Color(0xFF0F111A)],
+      gradientColors: [AppColors.surfaceLight, AppColors.surface],
       borderColor: AppColors.primary.withValues(alpha: 0.25),
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
       child: Column(
@@ -720,7 +720,7 @@ class H2hResultWidget extends ConsumerWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.bar_chart_rounded,
+              Icon(Icons.bar_chart_rounded,
                   color: AppColors.primary, size: 15),
               const SizedBox(width: 6),
               Text(
@@ -854,7 +854,7 @@ class H2hResultWidget extends ConsumerWidget {
     };
 
     return GlassCard(
-      gradientColors: const [Color(0xFF161924), Color(0xFF0F111A)],
+      gradientColors: [AppColors.surfaceLight, AppColors.surface],
       borderColor: AppColors.cyan.withValues(alpha: 0.3),
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
       child: Column(
@@ -865,7 +865,7 @@ class H2hResultWidget extends ConsumerWidget {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.radar, color: AppColors.cyan, size: 15),
+                  Icon(Icons.radar, color: AppColors.cyan, size: 15),
                   const SizedBox(width: 6),
                   Text(
                     isOverall
@@ -930,7 +930,7 @@ class H2hResultWidget extends ConsumerWidget {
     ];
 
     return GlassCard(
-      gradientColors: const [Color(0xFF13151F), Color(0xFF0D0F18)],
+      gradientColors: [AppColors.surface, AppColors.surface],
       borderColor: Colors.white.withValues(alpha: 0.08),
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
       child: Column(
@@ -939,7 +939,7 @@ class H2hResultWidget extends ConsumerWidget {
           // Header
           Row(
             children: [
-              const Icon(Icons.compare_arrows,
+              Icon(Icons.compare_arrows,
                   color: AppColors.offWhite, size: 14),
               const SizedBox(width: 6),
               Text(
@@ -970,7 +970,7 @@ class H2hResultWidget extends ConsumerWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const Expanded(
+              Expanded(
                 flex: 3,
                 child: Center(
                   child: Text(
@@ -1243,7 +1243,7 @@ class H2hResultWidget extends ConsumerWidget {
     };
 
     return GlassCard(
-      gradientColors: const [Color(0xFF141724), Color(0xFF0D0F18)],
+      gradientColors: [AppColors.surfaceLight, AppColors.surface],
       borderColor: AppColors.offWhite.withValues(alpha: 0.25),
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
       child: Column(
@@ -1251,7 +1251,7 @@ class H2hResultWidget extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.psychology,
+              Icon(Icons.psychology,
                   size: 14, color: AppColors.offWhite),
               const SizedBox(width: 6),
               Text(
@@ -1278,7 +1278,7 @@ class H2hResultWidget extends ConsumerWidget {
               _buildProbPill(p1Short, '${p1Win.toStringAsFixed(1)}%',
                   AppColors.primary),
               _buildProbPill(
-                  'Draw', '${draw.toStringAsFixed(1)}%', Colors.amber),
+                  'Draw', '${draw.toStringAsFixed(1)}%', AppColors.amber),
               _buildProbPill(
                   p2Short, '${p2Win.toStringAsFixed(1)}%', AppColors.cyan),
             ],
@@ -1338,7 +1338,7 @@ class H2hResultWidget extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         GlassCard(
-          gradientColors: const [Color(0xFF191C2B), Color(0xFF0F111A)],
+          gradientColors: [AppColors.surfaceLight, AppColors.surface],
           borderColor: AppColors.cyan.withValues(alpha: 0.3),
           padding: const EdgeInsets.all(20),
           child: Column(
@@ -1359,14 +1359,14 @@ class H2hResultWidget extends ConsumerWidget {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.amber.withValues(alpha: 0.15),
+                      color: AppColors.amber.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
                       '0 CLASHES',
                       style: GoogleFonts.rajdhani(
                           fontSize: 10,
-                          color: Colors.amber,
+                          color: AppColors.amber,
                           fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -1473,7 +1473,7 @@ class H2hResultWidget extends ConsumerWidget {
       children: [
         Row(
           children: [
-            const Icon(Icons.history, color: AppColors.cyan, size: 15),
+            Icon(Icons.history, color: AppColors.cyan, size: 15),
             const SizedBox(width: 6),
             Text(
               'RECENT ENCOUNTERS (${matches.length})',

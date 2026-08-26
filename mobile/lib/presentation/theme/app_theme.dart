@@ -2,29 +2,128 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-class AppColors {
-  static const Color background = Color(0xFF090A0F);
-  static const Color surface = Color(0xFF12141F);
-  static const Color surfaceLight = Color(0xFF1C1F2E);
-  static const Color primary = Color(0xFFFF6D00); // Electric Orange
-  static const Color cyan = Color(0xFF00E5FF);    // Cyber Neon Cyan
-  static const Color offWhite = Color(0xFFE2E8F0); // Sleek Off-White / Platinum Accent
-  static const Color purple = offWhite;           // Legacy alias mapped to offWhite
-  static const Color winGreen = Color(0xFF00E676);
-  static const Color lossRed = Color(0xFFFF1744);
-  static const Color textMuted = Color(0xFFA5ACBC); // Lightened for better contrast
+class AppThemeExtension extends ThemeExtension<AppThemeExtension> {
+  final Color navy;
+  final Color surface;
+  final Color surfaceLight;
+  final Color primary;
+  final Color cyan;
+  final Color gold;
+  final Color offWhite;
+  final Color paper;
+  final Color paperDark;
+  final Color winGreen;
+  final Color lossRed;
+  final Color amber;
+  final Color background;
+  final Color textMuted;
+
+  const AppThemeExtension({
+    required this.navy,
+    required this.surface,
+    required this.surfaceLight,
+    required this.primary,
+    required this.cyan,
+    required this.gold,
+    required this.offWhite,
+    required this.paper,
+    required this.paperDark,
+    required this.winGreen,
+    required this.lossRed,
+    required this.amber,
+    required this.background,
+    required this.textMuted,
+  });
+
+  factory AppThemeExtension.premium() {
+    return const AppThemeExtension(
+      navy: Color(0xFF0A1628),
+      surface: Color(0xFF0F1B33),
+      surfaceLight: Color(0xFF162040),
+      primary: Color(0xFFD90429), // Scarlet
+      cyan: Color(0xFFC9A84C), // Gold accent
+      gold: Color(0xFFC9A84C),
+      offWhite: Color(0xFFF5F3EE),
+      paper: Color(0xFFF5F3EE),
+      paperDark: Color(0xFFD9D4C8),
+      winGreen: Color(0xFF1B7A3E),
+      lossRed: Color(0xFFFF1744),
+      amber: Color(0xFFB45309),
+      background: Color(0xFF0A1628),
+      textMuted: Color(0xFF888888),
+    );
+  }
+
+  factory AppThemeExtension.legacy() {
+    return const AppThemeExtension(
+      navy: Color(0xFF090A0F),
+      surface: Color(0xFF12141F),
+      surfaceLight: Color(0xFF1C1F2E),
+      primary: Color(0xFFFF6D00), // Orange
+      cyan: Color(0xFF00E5FF), // Cyan
+      gold: Color(0xFF00E5FF),
+      offWhite: Color(0xFFF5F3EE),
+      paper: Color(0xFFF5F3EE),
+      paperDark: Color(0xFFD9D4C8),
+      winGreen: Color(0xFF1B7A3E),
+      lossRed: Color(0xFFFF1744),
+      amber: Color(0xFFB45309),
+      background: Color(0xFF090A0F),
+      textMuted: Color(0xFFA5ACBC),
+    );
+  }
+
+  @override
+  ThemeExtension<AppThemeExtension> copyWith() {
+    return this;
+  }
+
+  @override
+  ThemeExtension<AppThemeExtension> lerp(ThemeExtension<AppThemeExtension>? other, double t) {
+    if (other is! AppThemeExtension) return this;
+    return AppThemeExtension(
+      navy: Color.lerp(navy, other.navy, t)!,
+      surface: Color.lerp(surface, other.surface, t)!,
+      surfaceLight: Color.lerp(surfaceLight, other.surfaceLight, t)!,
+      primary: Color.lerp(primary, other.primary, t)!,
+      cyan: Color.lerp(cyan, other.cyan, t)!,
+      gold: Color.lerp(gold, other.gold, t)!,
+      offWhite: Color.lerp(offWhite, other.offWhite, t)!,
+      paper: Color.lerp(paper, other.paper, t)!,
+      paperDark: Color.lerp(paperDark, other.paperDark, t)!,
+      winGreen: Color.lerp(winGreen, other.winGreen, t)!,
+      lossRed: Color.lerp(lossRed, other.lossRed, t)!,
+      amber: Color.lerp(amber, other.amber, t)!,
+      background: Color.lerp(background, other.background, t)!,
+      textMuted: Color.lerp(textMuted, other.textMuted, t)!,
+    );
+  }
+}
+
+extension ThemeColorsExt on BuildContext {
+  AppThemeExtension get themeColors => Theme.of(this).extension<AppThemeExtension>() ?? AppThemeExtension.premium();
 }
 
 class AppTheme {
-  static ThemeData get darkTheme {
+  static ThemeData get premiumTheme {
+    final colors = AppThemeExtension.premium();
+    return _buildTheme(colors);
+  }
+
+  static ThemeData get legacyTheme {
+    final colors = AppThemeExtension.legacy();
+    return _buildTheme(colors);
+  }
+
+  static ThemeData _buildTheme(AppThemeExtension colors) {
     return ThemeData.dark().copyWith(
-      scaffoldBackgroundColor: AppColors.background,
-      colorScheme: const ColorScheme.dark(
-        primary: AppColors.primary,
-        secondary: AppColors.cyan,
-        surface: AppColors.surface,
-        onPrimary: Colors.black,
-        onSecondary: Colors.black,
+      scaffoldBackgroundColor: colors.navy,
+      colorScheme: ColorScheme.dark(
+        primary: colors.primary,
+        secondary: colors.gold,
+        surface: colors.surface,
+        onPrimary: Colors.white,
+        onSecondary: colors.navy,
       ),
       textTheme: GoogleFonts.rajdhaniTextTheme(ThemeData.dark().textTheme).apply(
         bodyColor: Colors.white,
@@ -37,15 +136,54 @@ class AppTheme {
         iconTheme: IconThemeData(color: Colors.white),
       ),
       cardTheme: CardThemeData(
-        color: AppColors.surface,
+        color: colors.surface,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: const BorderSide(color: Colors.white10),
         ),
       ),
+      listTileTheme: ListTileThemeData(
+        tileColor: Colors.transparent,
+        selectedTileColor: colors.surfaceLight,
+        iconColor: Colors.white,
+        textColor: Colors.white,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: colors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Colors.white10),
+        ),
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: colors.navy,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+      ),
+      extensions: [colors],
     );
   }
+
+  static AppThemeExtension currentColors = AppThemeExtension.premium();
+}
+
+class AppColors {
+  static Color get navy => AppTheme.currentColors.navy;
+  static Color get surface => AppTheme.currentColors.surface;
+  static Color get surfaceLight => AppTheme.currentColors.surfaceLight;
+  static Color get primary => AppTheme.currentColors.primary;
+  static Color get cyan => AppTheme.currentColors.cyan;
+  static Color get gold => AppTheme.currentColors.gold;
+  static Color get offWhite => AppTheme.currentColors.offWhite;
+  static Color get paper => AppTheme.currentColors.paper;
+  static Color get paperDark => AppTheme.currentColors.paperDark;
+  static Color get winGreen => AppTheme.currentColors.winGreen;
+  static Color get lossRed => AppTheme.currentColors.lossRed;
+  static Color get amber => AppTheme.currentColors.amber;
+  static Color get background => AppTheme.currentColors.background;
+  static Color get textMuted => AppTheme.currentColors.textMuted;
 }
 
 /// A sleek modern Glassmorphic container with optional neon border and blur
@@ -71,14 +209,15 @@ class GlassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.themeColors;
     Widget container = Container(
       margin: margin,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(borderRadius),
         gradient: LinearGradient(
           colors: gradientColors ?? [
-            Colors.white.withValues(alpha: 0.06),
-            Colors.white.withValues(alpha: 0.02),
+            colors.gold.withValues(alpha: 0.15),
+            colors.gold.withValues(alpha: 0.05),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -139,13 +278,14 @@ class EsportsButton extends StatelessWidget {
     this.onPressed,
     this.isLoading = false,
     this.gradient,
-    this.textColor = Colors.black,
+    this.textColor = Colors.white,
     this.height = 48,
   });
 
   @override
   Widget build(BuildContext context) {
-    final effectiveGradient = gradient ?? const [Color(0xFFFF6D00), Color(0xFFFF9E00)];
+    final colors = context.themeColors;
+    final effectiveGradient = gradient ?? [colors.primary, colors.gold];
 
     return SizedBox(
       height: height,
@@ -206,27 +346,28 @@ class EsportsButton extends StatelessWidget {
 /// Glowing tag for status, playstyle, roles, ratings
 class GlowBadge extends StatelessWidget {
   final String label;
-  final Color color;
+  final Color? color;
   final IconData? icon;
 
   const GlowBadge({
     super.key,
     required this.label,
-    this.color = AppColors.cyan,
+    this.color,
     this.icon,
   });
 
   @override
   Widget build(BuildContext context) {
+    final effectiveColor = color ?? context.themeColors.gold;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
+        color: effectiveColor.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.5), width: 1),
+        border: Border.all(color: effectiveColor.withValues(alpha: 0.5), width: 1),
         boxShadow: [
           BoxShadow(
-            color: color.withValues(alpha: 0.1),
+            color: effectiveColor.withValues(alpha: 0.1),
             blurRadius: 4,
             spreadRadius: 0,
           ),
@@ -236,7 +377,7 @@ class GlowBadge extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 12, color: color),
+            Icon(icon, size: 12, color: effectiveColor),
             const SizedBox(width: 4),
           ],
           Text(
@@ -244,7 +385,7 @@ class GlowBadge extends StatelessWidget {
             style: GoogleFonts.rajdhani(
               fontSize: 11,
               fontWeight: FontWeight.bold,
-              color: color,
+              color: effectiveColor,
               letterSpacing: 0.8,
             ),
           ),
@@ -258,29 +399,30 @@ class GlowBadge extends StatelessWidget {
 class StatPill extends StatelessWidget {
   final String label;
   final String value;
-  final Color color;
+  final Color? color;
 
   const StatPill({
     super.key,
     required this.label,
     required this.value,
-    this.color = AppColors.cyan,
+    this.color,
   });
 
   @override
   Widget build(BuildContext context) {
+    final effectiveColor = color ?? context.themeColors.gold;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.black26,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
+        border: Border.all(color: effectiveColor.withValues(alpha: 0.2)),
       ),
       child: Column(
         children: [
           Text(
             label,
-            style: const TextStyle(fontSize: 10, color: AppColors.textMuted, fontWeight: FontWeight.w600),
+            style: TextStyle(fontSize: 10, color: context.themeColors.textMuted, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 2),
           Text(
@@ -288,7 +430,7 @@ class StatPill extends StatelessWidget {
             style: GoogleFonts.rajdhani(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: color,
+              color: effectiveColor,
             ),
           ),
         ],

@@ -48,9 +48,9 @@ class _GameGuideScreenState extends ConsumerState<GameGuideScreen> {
           SliverToBoxAdapter(
             child: Container(
               padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Color(0xFF0D0E16), Color(0xFF090A0F)],
+                  colors: [AppColors.surface, AppColors.navy],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
@@ -75,13 +75,13 @@ class _GameGuideScreenState extends ConsumerState<GameGuideScreen> {
                           ),
                           const SizedBox(height: 4),
                           ShaderMask(
-                            shaderCallback: (bounds) => const LinearGradient(
+                            shaderCallback: (bounds) => LinearGradient(
                               colors: [
                                 AppColors.primary,
                                 Colors.white,
                                 AppColors.cyan,
                               ],
-                              stops: [0.0, 0.5, 1.0],
+                              stops: const [0.0, 0.5, 1.0],
                             ).createShader(bounds),
                             child: Text(
                               'GAME GUIDE',
@@ -98,7 +98,7 @@ class _GameGuideScreenState extends ConsumerState<GameGuideScreen> {
                       Row(
                         children: [
                           IconButton(
-                            icon: const Icon(
+                            icon: Icon(
                               Icons.school_outlined,
                               color: AppColors.cyan,
                               size: 22,
@@ -158,7 +158,7 @@ class _GameGuideScreenState extends ConsumerState<GameGuideScreen> {
                       value: progressRatio,
                       minHeight: 6,
                       backgroundColor: Colors.white10,
-                      valueColor: const AlwaysStoppedAnimation<Color>(
+                      valueColor: AlwaysStoppedAnimation<Color>(
                         AppColors.cyan,
                       ),
                     ),
@@ -189,14 +189,14 @@ class _GameGuideScreenState extends ConsumerState<GameGuideScreen> {
                           color: AppColors.textMuted,
                           fontSize: 14,
                         ),
-                        prefixIcon: const Icon(
+                        prefixIcon: Icon(
                           Icons.search,
                           color: AppColors.cyan,
                           size: 20,
                         ),
                         suffixIcon: _searchController.text.isNotEmpty
                             ? IconButton(
-                                icon: const Icon(
+                                icon: Icon(
                                   Icons.clear,
                                   color: AppColors.textMuted,
                                   size: 18,
@@ -361,7 +361,7 @@ class _GameGuideScreenState extends ConsumerState<GameGuideScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.search_off,
                       size: 48,
                       color: AppColors.textMuted,
@@ -578,7 +578,7 @@ class _GameGuideScreenState extends ConsumerState<GameGuideScreen> {
                 // Footer row
                 Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.schedule,
                       size: 13,
                       color: AppColors.textMuted,
@@ -596,7 +596,7 @@ class _GameGuideScreenState extends ConsumerState<GameGuideScreen> {
                     if (isRead)
                       Row(
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.check_circle,
                             size: 14,
                             color: AppColors.winGreen,
@@ -625,7 +625,7 @@ class _GameGuideScreenState extends ConsumerState<GameGuideScreen> {
                             ),
                           ),
                           const SizedBox(width: 4),
-                          const Icon(
+                          Icon(
                             Icons.arrow_forward_ios,
                             size: 10,
                             color: AppColors.cyan,

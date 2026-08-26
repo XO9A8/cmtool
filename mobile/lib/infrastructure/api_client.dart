@@ -308,6 +308,11 @@ class ApiClient {
   }
 
   /// Confirms a pending match result as the opponent.
+  /// Dismisses a pending match request without affecting the overall match state.
+  Future<void> dismissPendingMatch(String matchRecordId) async {
+    await _dio.post('/api/v1/matches/records/$matchRecordId/dismiss');
+  }
+
   Future<Map<String, dynamic>> confirmMatch(String matchId) async {
     final response = await _dio.post('/api/v1/matches/$matchId/confirm');
     return response.data as Map<String, dynamic>;
@@ -433,6 +438,8 @@ class ApiClient {
     Map<String, dynamic>? rulesConfig,
     DateTime? startDate,
     DateTime? endDate,
+    int? matchdayGapDays,
+    bool? allowMultiMatchPerMatchday,
   }) async {
     final response = await _dio.post('/api/v1/tournaments', data: {
       'club_id': clubId,
@@ -441,6 +448,24 @@ class ApiClient {
       if (rulesConfig != null) 'rules_config': rulesConfig,
       if (startDate != null) 'start_date': startDate.toIso8601String().split('T').first,
       if (endDate != null) 'end_date': endDate.toIso8601String().split('T').first,
+      if (matchdayGapDays != null) 'matchday_gap_days': matchdayGapDays,
+      if (allowMultiMatchPerMatchday != null) 'allow_multi_match_per_matchday': allowMultiMatchPerMatchday,
+    });
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// Updates tournament settings post-creation.
+  Future<Map<String, dynamic>> updateTournamentSettings(
+    String tournamentId, {
+    int? matchdayGapDays,
+    DateTime? endDate,
+    bool clearEndDate = false,
+    bool? allowMultiMatchPerMatchday,
+  }) async {
+    final response = await _dio.patch('/api/v1/tournaments/$tournamentId/settings', data: {
+      if (matchdayGapDays != null) 'matchday_gap_days': matchdayGapDays,
+      if (clearEndDate) 'end_date': 'null' else if (endDate != null) 'end_date': endDate.toIso8601String().split('T').first,
+      if (allowMultiMatchPerMatchday != null) 'allow_multi_match_per_matchday': allowMultiMatchPerMatchday,
     });
     return response.data as Map<String, dynamic>;
   }

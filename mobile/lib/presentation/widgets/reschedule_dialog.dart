@@ -58,7 +58,7 @@ class _RescheduleDialogState extends ConsumerState<RescheduleDialog> {
       builder: (context, child) {
         return Theme(
           data: ThemeData.dark().copyWith(
-            colorScheme: const ColorScheme.dark(
+            colorScheme: ColorScheme.dark(
               primary: AppColors.primary,
               onPrimary: Colors.black,
               surface: AppColors.surface,
@@ -85,7 +85,7 @@ class _RescheduleDialogState extends ConsumerState<RescheduleDialog> {
       builder: (context, child) {
         return Theme(
           data: ThemeData.dark().copyWith(
-            colorScheme: const ColorScheme.dark(
+            colorScheme: ColorScheme.dark(
               primary: AppColors.primary,
               onPrimary: Colors.black,
               surface: AppColors.surface,
@@ -224,7 +224,7 @@ class _RescheduleDialogState extends ConsumerState<RescheduleDialog> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.calendar_today, color: AppColors.primary, size: 20),
+                      Icon(Icons.calendar_today, color: AppColors.primary, size: 20),
                       const SizedBox(width: 12),
                       Text(
                         _selectedDate != null 
@@ -240,8 +240,8 @@ class _RescheduleDialogState extends ConsumerState<RescheduleDialog> {
               Text('Target Matchday', style: GoogleFonts.rajdhani(color: AppColors.textMuted)),
               const SizedBox(height: 8),
               if (matchdaysAsync != null && matchdaysAsync.isLoading)
-                const Center(child: Padding(
-                  padding: EdgeInsets.all(12.0),
+                Center(child: Padding(
+                  padding: const EdgeInsets.all(12.0),
                   child: CircularProgressIndicator(color: AppColors.primary),
                 ))
               else if (matchdays.isEmpty)
@@ -259,7 +259,7 @@ class _RescheduleDialogState extends ConsumerState<RescheduleDialog> {
                       value: effectiveMatchdayId,
                       dropdownColor: AppColors.surface,
                       isExpanded: true,
-                      icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.primary),
+                      icon: Icon(Icons.keyboard_arrow_down, color: AppColors.primary),
                       items: matchdays.map((md) {
                         final mdId = md['id'].toString();
                         final mdNum = md['matchday_number']?.toString() ?? '';
@@ -308,7 +308,7 @@ class _RescheduleDialogState extends ConsumerState<RescheduleDialog> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.access_time, color: AppColors.primary, size: 20),
+                      Icon(Icons.access_time, color: AppColors.primary, size: 20),
                       const SizedBox(width: 12),
                       Text(
                         _selectedTime != null 

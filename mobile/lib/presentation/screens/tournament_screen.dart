@@ -56,7 +56,7 @@ class _TournamentScreenState extends ConsumerState<TournamentScreen> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: clubsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+        loading: () => Center(child: CircularProgressIndicator(color: AppColors.primary)),
         error: (e, _) => _buildError(e.toString()),
         data: (data) {
           final clubs = (data['clubs'] as List<dynamic>? ?? []);
@@ -203,7 +203,7 @@ class _TournamentScreenState extends ConsumerState<TournamentScreen> {
                       children: [
                         // Shimmer gradient title
                         ShaderMask(
-                          shaderCallback: (bounds) => const LinearGradient(
+                          shaderCallback: (bounds) => LinearGradient(
                             colors: [AppColors.primary, AppColors.cyan],
                           ).createShader(bounds),
                           child: FittedBox(
@@ -299,6 +299,8 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
   bool _hasThirdPlaceMatch = true; // 3rd place playoff
   String _seedingType = 'elo'; // 'elo' or 'random'
   bool _singleFinalMatch = true; // Single match for Final even if earlier rounds are 2 legs
+  int _matchdayGapDays = 7;
+  bool _allowMultiMatchPerMatchday = false;
   final Set<String> _selectedPlayerIds = {};
   bool _initializedMembers = false;
   bool _isLoading = false;
@@ -341,6 +343,8 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
         formatType: _formatType,
         startDate: _startDate,
         endDate: _endDate,
+        matchdayGapDays: _matchdayGapDays,
+        allowMultiMatchPerMatchday: _allowMultiMatchPerMatchday,
         rulesConfig: {
           'legs': _legs,
           'groups_count': _groupsCount,
@@ -420,7 +424,7 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
                         color: AppColors.primary.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.emoji_events, color: AppColors.primary, size: 20),
+                      child: Icon(Icons.emoji_events, color: AppColors.primary, size: 20),
                     ),
                     const SizedBox(width: 12),
                     Text(
@@ -456,7 +460,7 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                      borderSide: BorderSide(color: AppColors.primary, width: 1.5),
                     ),
                   ),
                 ),
@@ -811,6 +815,103 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
                   const SizedBox(height: 18),
                 ],
 
+                // Scheduling Settings
+                Text(
+                  'SCHEDULING SETTINGS',
+                  style: GoogleFonts.rajdhani(
+                    color: AppColors.textMuted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'DAYS BETWEEN MATCHDAYS',
+                          style: GoogleFonts.rajdhani(
+                            color: AppColors.textMuted,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                        Text(
+                          'Gap between generated matchdays',
+                          style: GoogleFonts.rajdhani(
+                            color: AppColors.textMuted.withValues(alpha: 0.7),
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.remove, color: Colors.white70, size: 20),
+                          onPressed: () {
+                            setState(() {
+                              if (_matchdayGapDays > 0) _matchdayGapDays--;
+                            });
+                          },
+                        ),
+                        Text(
+                          '$_matchdayGapDays',
+                          style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.add, color: Colors.white70, size: 20),
+                          onPressed: () {
+                            setState(() {
+                              _matchdayGapDays++;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'ALLOW MULTI-MATCH PER DAY',
+                            style: GoogleFonts.rajdhani(
+                              color: AppColors.textMuted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 1.5,
+                            ),
+                          ),
+                          Text(
+                            'Players can play >1 match per matchday',
+                            style: GoogleFonts.rajdhani(
+                              color: AppColors.textMuted.withValues(alpha: 0.7),
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch.adaptive(
+                      value: _allowMultiMatchPerMatchday,
+                      activeThumbColor: AppColors.primary,
+                      onChanged: (val) => setState(() => _allowMultiMatchPerMatchday = val),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+
                 // Participants selection section
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -852,7 +953,7 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
                 const SizedBox(height: 6),
 
                 membersAsync.when(
-                  loading: () => const Center(child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2))),
+                  loading: () => Center(child: Padding(padding: const EdgeInsets.all(12), child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2))),
                   error: (e, _) => Text('Failed to load members: $e', style: GoogleFonts.rajdhani(color: AppColors.lossRed, fontSize: 13)),
                   data: (d) {
                     final members = (d['members'] as List<dynamic>? ?? []);
@@ -951,7 +1052,7 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
           lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
           builder: (context, child) => Theme(
             data: ThemeData.dark().copyWith(
-              colorScheme: const ColorScheme.dark(
+              colorScheme: ColorScheme.dark(
                 primary: AppColors.primary,
                 onPrimary: Colors.black,
                 surface: AppColors.surface,
@@ -979,7 +1080,7 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
             const SizedBox(height: 4),
             Row(
               children: [
-                const Icon(Icons.calendar_today, color: AppColors.primary, size: 14),
+                Icon(Icons.calendar_today, color: AppColors.primary, size: 14),
                 const SizedBox(width: 8),
                 Text(
                   date != null ? '${date.day}/${date.month}/${date.year}' : 'Not set',
@@ -1251,7 +1352,10 @@ class _TournamentHeroCard extends StatelessWidget {
             tournamentName: name,
             formatType: format,
             status: 'active',
-            clubId: tournament['club_id']?.toString(),
+                          clubId: tournament['club_id']?.toString(),
+              endDate: tournament['end_date'] != null ? DateTime.parse(tournament['end_date'].toString()) : null,
+              matchdayGapDays: tournament['matchday_gap_days'] as int? ?? 7,
+              allowMultiMatchPerMatchday: tournament['allow_multi_match_per_matchday'] as bool? ?? false,
           ),
         ),
       ),
@@ -1291,10 +1395,10 @@ class _TournamentHeroCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row(
+                  Row(
                     children: [
                       _PulseDot(color: AppColors.winGreen),
-                      SizedBox(width: 6),
+                      const SizedBox(width: 6),
                       GlowBadge(label: 'LIVE', color: AppColors.winGreen),
                     ],
                   ),
@@ -1328,7 +1432,7 @@ class _TournamentHeroCard extends StatelessWidget {
                       EsportsButton(
                         label: 'ENTER →',
                         height: 36,
-                        gradient: const [AppColors.winGreen, AppColors.cyan],
+                        gradient: [AppColors.winGreen, AppColors.cyan],
                         onPressed: () => Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -1337,7 +1441,10 @@ class _TournamentHeroCard extends StatelessWidget {
                               tournamentName: name,
                               formatType: format,
                               status: 'active',
-                              clubId: tournament['club_id']?.toString(),
+                                            clubId: tournament['club_id']?.toString(),
+              endDate: tournament['end_date'] != null ? DateTime.parse(tournament['end_date'].toString()) : null,
+              matchdayGapDays: tournament['matchday_gap_days'] as int? ?? 7,
+              allowMultiMatchPerMatchday: tournament['allow_multi_match_per_matchday'] as bool? ?? false,
                             ),
                           ),
                         ),
@@ -1465,7 +1572,7 @@ class _TournamentScheduledCardState extends ConsumerState<_TournamentScheduledCa
           children: [
             Row(
               children: [
-                const Icon(Icons.emoji_events, color: AppColors.cyan, size: 18),
+                Icon(Icons.emoji_events, color: AppColors.cyan, size: 18),
                 const SizedBox(width: 6),
                 GlowBadge(
                   label: isDraft ? 'DRAFT' : 'SCHEDULED',
@@ -1503,7 +1610,7 @@ class _TournamentScheduledCardState extends ConsumerState<_TournamentScheduledCa
                   icon: Icons.play_arrow,
                   height: 36,
                   isLoading: _isStarting,
-                  gradient: const [AppColors.cyan, AppColors.winGreen],
+                  gradient: [AppColors.cyan, AppColors.winGreen],
                   textColor: Colors.black,
                   onPressed: () => _showStartDialog(context),
                 ),
@@ -1542,7 +1649,10 @@ class _TournamentCompletedRow extends StatelessWidget {
             tournamentName: name,
             formatType: format,
             status: 'completed',
-            clubId: tournament['club_id']?.toString(),
+                          clubId: tournament['club_id']?.toString(),
+              endDate: tournament['end_date'] != null ? DateTime.parse(tournament['end_date'].toString()) : null,
+              matchdayGapDays: tournament['matchday_gap_days'] as int? ?? 7,
+              allowMultiMatchPerMatchday: tournament['allow_multi_match_per_matchday'] as bool? ?? false,
           ),
         ),
       ),
@@ -1550,7 +1660,7 @@ class _TournamentCompletedRow extends StatelessWidget {
         height: 40,
         child: Row(
           children: [
-            Icon(Icons.emoji_events, color: Colors.amber.shade600, size: 20),
+            Icon(Icons.emoji_events, color: AppColors.amber, size: 20),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -1570,7 +1680,7 @@ class _TournamentCompletedRow extends StatelessWidget {
               style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 11),
             ),
             const SizedBox(width: 8),
-            const GlowBadge(label: 'ARCHIVED', color: AppColors.textMuted),
+            GlowBadge(label: 'ARCHIVED', color: AppColors.textMuted),
           ],
         ),
       ),

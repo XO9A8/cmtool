@@ -92,7 +92,7 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
                 child: Row(
                   children: [
-                    const Icon(Icons.shield, size: 16, color: AppColors.primary),
+                    Icon(Icons.shield, size: 16, color: AppColors.primary),
                     const SizedBox(width: 8),
                     Text(
                       'MY CLUBS',
@@ -132,9 +132,9 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> {
         children: [
           // Background gradient
           Container(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [Color(0xFF1A0A00), Color(0xFF0D0D1A), AppColors.background],
+                colors: [const Color(0xFF1A0A00), const Color(0xFF0D0D1A), AppColors.background],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
               ),
@@ -192,8 +192,8 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> {
                     height: 64,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(16),
-                      gradient: const LinearGradient(
-                        colors: [AppColors.primary, Color(0xFFFF9E00)],
+                      gradient: LinearGradient(
+                        colors: [AppColors.primary, const Color(0xFFFF9E00)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -217,8 +217,8 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         ShaderMask(
-                          shaderCallback: (b) => const LinearGradient(
-                            colors: [AppColors.primary, Color(0xFFFF9E00)],
+                          shaderCallback: (b) => LinearGradient(
+                            colors: [AppColors.primary, const Color(0xFFFF9E00)],
                           ).createShader(b),
                           child: Text(
                             'CLUB HUB',
@@ -278,10 +278,10 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> {
             decoration: InputDecoration(
               hintText: 'Search clubs...',
               hintStyle: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 15),
-              prefixIcon: const Icon(Icons.search, color: AppColors.textMuted, size: 20),
+              prefixIcon: Icon(Icons.search, color: AppColors.textMuted, size: 20),
               suffixIcon: _searchQuery.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(Icons.clear, color: AppColors.textMuted, size: 18),
+                      icon: Icon(Icons.clear, color: AppColors.textMuted, size: 18),
                       onPressed: () {
                         _searchCtrl.clear();
                       },
@@ -314,7 +314,7 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> {
           borderColor: AppColors.lossRed.withValues(alpha: 0.4),
           child: Row(
             children: [
-              const Icon(Icons.error_outline, color: AppColors.lossRed),
+              Icon(Icons.error_outline, color: AppColors.lossRed),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -349,7 +349,7 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.search_off, size: 48, color: AppColors.textMuted),
+                  Icon(Icons.search_off, size: 48, color: AppColors.textMuted),
                   const SizedBox(height: 12),
                   Text(
                     'No clubs match "$_searchQuery"',
@@ -397,7 +397,7 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.shield_outlined, size: 80, color: AppColors.textMuted)
+            Icon(Icons.shield_outlined, size: 80, color: AppColors.textMuted)
                 .animate(onPlay: (c) => c.repeat(reverse: true))
                 .scaleXY(end: 1.08, duration: 1600.ms, curve: Curves.easeInOut),
             const SizedBox(height: 24),
@@ -656,7 +656,7 @@ class _InviteCodeChip extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.vpn_key, size: 13, color: AppColors.offWhite),
+          Icon(Icons.vpn_key, size: 13, color: AppColors.offWhite),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
@@ -673,7 +673,7 @@ class _InviteCodeChip extends StatelessWidget {
           ),
           GestureDetector(
             onTap: () => _copy(context),
-            child: const Icon(Icons.copy, size: 14, color: AppColors.offWhite),
+            child: Icon(Icons.copy, size: 14, color: AppColors.offWhite),
           ),
         ],
       ),
@@ -803,7 +803,7 @@ class _AddClubSheetState extends ConsumerState<_AddClubSheet>
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.primary),
+          borderSide: BorderSide(color: AppColors.primary),
         ),
       );
 
@@ -861,8 +861,8 @@ class _AddClubSheetState extends ConsumerState<_AddClubSheet>
                   controller: _tc,
                   indicator: BoxDecoration(
                     borderRadius: BorderRadius.circular(10),
-                    gradient: const LinearGradient(
-                      colors: [AppColors.primary, Color(0xFFFF9E00)],
+                    gradient: LinearGradient(
+                      colors: [AppColors.primary, const Color(0xFFFF9E00)],
                     ),
                   ),
                   indicatorSize: TabBarIndicatorSize.tab,
@@ -940,7 +940,7 @@ class _AddClubSheetState extends ConsumerState<_AddClubSheet>
                               label: 'JOIN CLUB',
                               icon: Icons.group_add,
                               isLoading: _joining,
-                              gradient: const [AppColors.cyan, Color(0xFF00B0FF)],
+                              gradient: [AppColors.cyan, const Color(0xFF00B0FF)],
                               onPressed: _joining ? null : _join,
                             ),
                           ),

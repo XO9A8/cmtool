@@ -69,7 +69,7 @@ class MpsRadarChart extends StatelessWidget {
             normalizedResilience,
             normalizedForm,
           ],
-          labels: const [
+          labels: [
             'ATTACK',
             'PASSING',
             'POSSESSION',
@@ -258,7 +258,7 @@ class H2hDualRadarChart extends StatelessWidget {
     final p2Form = ((p2Stats['form'] as num?)?.toDouble() ?? 50.0) / 100.0;
 
     return GlassCard(
-      gradientColors: const [Color(0xFF191C2B), Color(0xFF0F111A)],
+      gradientColors: [AppColors.surfaceLight, AppColors.surface],
       borderColor: AppColors.cyan.withValues(alpha: 0.35),
       padding: const EdgeInsets.all(18),
       child: Column(
@@ -266,7 +266,7 @@ class H2hDualRadarChart extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.radar, color: AppColors.cyan, size: 16),
+              Icon(Icons.radar, color: AppColors.cyan, size: 16),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
@@ -322,7 +322,7 @@ class H2hDualRadarChart extends StatelessWidget {
               painter: DualRadarChartPainter(
                 p1Values: [p1Poss, p1Pass, p1Shot, p1Def, p1Form],
                 p2Values: [p2Poss, p2Pass, p2Shot, p2Def, p2Form],
-                labels: const ['Possession', 'Passing', 'Shooting', 'Defending', 'Form'],
+                labels: ['Possession', 'Passing', 'Shooting', 'Defending', 'Form'],
                 p1Color: AppColors.primary,
                 p2Color: AppColors.cyan,
               ),

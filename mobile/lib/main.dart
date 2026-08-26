@@ -22,6 +22,7 @@ import 'presentation/providers/match_provider.dart';
 import 'infrastructure/offline_sync_service.dart';
 import 'infrastructure/update_service.dart';
 import 'presentation/widgets/update_dialog.dart';
+import 'presentation/providers/theme_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -50,15 +51,16 @@ void main() async {
   runApp(const ProviderScope(child: EFootballApp()));
 }
 
-class EFootballApp extends StatelessWidget {
+class EFootballApp extends ConsumerWidget {
   const EFootballApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isPremium = ref.watch(themeProvider);
     return MaterialApp(
       title: 'eFootball Club Manager',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
+      theme: isPremium ? AppTheme.premiumTheme : AppTheme.legacyTheme,
       home: const AppRoot(),
     );
   }
@@ -169,7 +171,7 @@ class _NavigationRootScreenState extends State<NavigationRootScreen> {
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: const LinearGradient(
+                  gradient: LinearGradient(
                     colors: [AppColors.primary, AppColors.cyan],
                   ),
                   boxShadow: [
@@ -197,7 +199,7 @@ class _NavigationRootScreenState extends State<NavigationRootScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.mark_email_unread_outlined,
+            icon: Icon(Icons.mark_email_unread_outlined,
                 color: AppColors.cyan),
             tooltip: 'Pending Approvals',
             onPressed: () {
@@ -208,7 +210,7 @@ class _NavigationRootScreenState extends State<NavigationRootScreen> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.gavel_outlined, color: AppColors.primary),
+            icon: Icon(Icons.gavel_outlined, color: AppColors.primary),
             tooltip: 'Admin Disputes',
             onPressed: () {
               Navigator.push(

@@ -329,6 +329,29 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
           displayMsg = 'Invalid Opponent. Please select the correct opponent for this tournament match.';
         } else if (errorMsg.contains('INVALID_KNOCKOUT_DRAW')) {
           displayMsg = 'Knockout matches cannot end in a draw. Please resolve via extra time/penalties.';
+        } else if (errorMsg.toLowerCase().contains('already been confirmed')) {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              backgroundColor: AppColors.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: AppColors.lossRed.withValues(alpha: 0.5)),
+              ),
+              title: Text('MATCH ALREADY CONFIRMED', style: GoogleFonts.orbitron(color: AppColors.lossRed, fontWeight: FontWeight.bold, fontSize: 18)),
+              content: Text(
+                'This match result has already been confirmed.\n\nYou must dispute the previous result first to bring it back to pending state before submitting new data.',
+                style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 15),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: Text('UNDERSTOOD', style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          );
+          return;
         }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -351,25 +374,25 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.check_circle, color: AppColors.cyan, size: 64).animate().scale(delay: 200.ms, curve: Curves.elasticOut),
+              Icon(Icons.check_circle, color: AppColors.cyan, size: 64).animate().scale(delay: 200.ms, curve: Curves.elasticOut),
               const SizedBox(height: 16),
               Text('MATCH RECORDED!', style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 24, letterSpacing: 1.5)),
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.amber.withValues(alpha: 0.15),
+                  color: AppColors.amber.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+                  border: Border.all(color: AppColors.amber.withValues(alpha: 0.4)),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.hourglass_top, color: Colors.amber, size: 20),
+                    Icon(Icons.hourglass_top, color: AppColors.amber, size: 20),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         'Status: Pending confirmation by opponent or club official (President/Captain)',
-                        style: GoogleFonts.rajdhani(fontSize: 13, color: Colors.amber, fontWeight: FontWeight.bold),
+                        style: GoogleFonts.rajdhani(fontSize: 13, color: AppColors.amber, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],
@@ -476,7 +499,7 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
                 child: EsportsButton(
                   label: 'VERIFY & SUBMIT MATCH',
                   icon: Icons.upload_file,
-                  gradient: const [AppColors.cyan, Color(0xFF00B0FF)],
+                  gradient: [AppColors.cyan, const Color(0xFF00B0FF)],
                   isLoading: isSubmitting,
                   onPressed: _submitMatchData,
                 ),
@@ -528,9 +551,9 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
                 decoration: BoxDecoration(color: AppColors.lossRed.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
                 child: Row(
                   children: [
-                    const Icon(Icons.error_outline, color: AppColors.lossRed, size: 20),
+                    Icon(Icons.error_outline, color: AppColors.lossRed, size: 20),
                     const SizedBox(width: 8),
-                    Expanded(child: Text(_errorMessage!, style: const TextStyle(color: AppColors.lossRed, fontSize: 13, fontWeight: FontWeight.bold))),
+                    Expanded(child: Text(_errorMessage!, style: TextStyle(color: AppColors.lossRed, fontSize: 13, fontWeight: FontWeight.bold))),
                   ],
                 ),
               ).animate().shake(),
@@ -544,7 +567,7 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const CircularProgressIndicator(color: AppColors.cyan).animate().scale(),
+            CircularProgressIndicator(color: AppColors.cyan).animate().scale(),
             const SizedBox(height: 24),
             Text(
               'ANALYZING IMAGE...',
@@ -603,7 +626,7 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.swap_horiz, color: AppColors.cyan, size: 16),
+                                Icon(Icons.swap_horiz, color: AppColors.cyan, size: 16),
                                 const SizedBox(width: 4),
                                 Text('SWAP SIDES', style: GoogleFonts.rajdhani(color: AppColors.cyan, fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 1.0)),
                               ],
@@ -651,7 +674,7 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
                                 children: [
                                   Text('VS', style: GoogleFonts.rajdhani(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 14)),
                                   const SizedBox(width: 4),
-                                  const Icon(Icons.swap_horiz, color: AppColors.primary, size: 14),
+                                  Icon(Icons.swap_horiz, color: AppColors.primary, size: 14),
                                 ],
                               ),
                             ),
@@ -679,15 +702,15 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
                     // eFootball Style Stats Board
                     Container(
                       decoration: BoxDecoration(
-                        color: const Color(0xFF000080), // Deep blue background like eFootball
+                        color: AppColors.navy, // Deep blue background like eFootball
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.yellow, width: 2),
+                        border: Border.all(color: AppColors.gold, width: 2),
                       ),
                       child: Column(
                         children: [
                           // Header (Scores)
                           Container(
-                            color: Colors.yellow,
+                            color: AppColors.gold,
                             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -723,7 +746,7 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
                             ),
                           ),
                           Container(
-                            color: Colors.yellow,
+                            color: AppColors.gold,
                             width: double.infinity,
                             padding: const EdgeInsets.only(bottom: 6),
                             child: Row(
@@ -743,9 +766,9 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        const Icon(Icons.swap_horiz, color: Colors.yellow, size: 13),
+                                        Icon(Icons.swap_horiz, color: AppColors.gold, size: 13),
                                         const SizedBox(width: 3),
-                                        Text('SWAP SIDES', style: GoogleFonts.rajdhani(color: Colors.yellow, fontWeight: FontWeight.bold, fontSize: 10)),
+                                        Text('SWAP SIDES', style: GoogleFonts.rajdhani(color: AppColors.gold, fontWeight: FontWeight.bold, fontSize: 10)),
                                       ],
                                     ),
                                   ),
@@ -779,9 +802,9 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
                         decoration: BoxDecoration(color: AppColors.lossRed.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
                         child: Row(
                           children: [
-                            const Icon(Icons.error_outline, color: AppColors.lossRed, size: 20),
+                            Icon(Icons.error_outline, color: AppColors.lossRed, size: 20),
                             const SizedBox(width: 8),
-                            Expanded(child: Text(_errorMessage!, style: const TextStyle(color: AppColors.lossRed, fontSize: 13, fontWeight: FontWeight.bold))),
+                            Expanded(child: Text(_errorMessage!, style: TextStyle(color: AppColors.lossRed, fontSize: 13, fontWeight: FontWeight.bold))),
                           ],
                         ),
                       ).animate().shake(),
@@ -812,7 +835,7 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
       if (goalsH > shotsH || goalsA > shotsA) hasWarning = true;
     }
 
-    final textColor = hasWarning ? Colors.amber : Colors.white;
+    final textColor = hasWarning ? AppColors.amber : Colors.white;
     final leftAssumed = _assumedFields.contains('${statId}Home');
     final rightAssumed = _assumedFields.contains('${statId}Away');
 
@@ -834,7 +857,7 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
               style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
               decoration: InputDecoration(
                 filled: true, 
-                fillColor: leftAssumed ? Colors.amber.shade200 : Colors.white, 
+                fillColor: leftAssumed ? AppColors.amber : Colors.white, 
                 isDense: true, 
                 contentPadding: const EdgeInsets.symmetric(vertical: 4),
               ),
@@ -852,7 +875,7 @@ class _OcrUploadModalState extends ConsumerState<OcrUploadModal> {
               style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
               decoration: InputDecoration(
                 filled: true, 
-                fillColor: rightAssumed ? Colors.amber.shade200 : Colors.white, 
+                fillColor: rightAssumed ? AppColors.amber : Colors.white, 
                 isDense: true, 
                 contentPadding: const EdgeInsets.symmetric(vertical: 4),
               ),

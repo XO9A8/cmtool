@@ -213,7 +213,7 @@ class _PlayerPickerBottomSheetState extends State<PlayerPickerBottomSheet> {
                                                       horizontal: 6,
                                                       vertical: 1),
                                               decoration: BoxDecoration(
-                                                color: Colors.amber
+                                                color: AppColors.amber
                                                     .withValues(alpha: 0.15),
                                                 borderRadius:
                                                     BorderRadius.circular(4),
@@ -223,7 +223,7 @@ class _PlayerPickerBottomSheetState extends State<PlayerPickerBottomSheet> {
                                                 style: GoogleFonts.rajdhani(
                                                   fontSize: 9,
                                                   fontWeight: FontWeight.bold,
-                                                  color: Colors.amber,
+                                                  color: AppColors.amber,
                                                 ),
                                               ),
                                             ),
@@ -233,7 +233,7 @@ class _PlayerPickerBottomSheetState extends State<PlayerPickerBottomSheet> {
                                       const SizedBox(height: 2),
                                       Text(
                                         playStyle,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                             fontSize: 11,
                                             color: AppColors.textMuted),
                                       ),

@@ -47,8 +47,8 @@ class HeroArena extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         gradient: LinearGradient(
           colors: [
-            const Color(0xFF161824).withValues(alpha: 0.95),
-            const Color(0xFF0C0E17).withValues(alpha: 0.95),
+            AppColors.surfaceLight.withValues(alpha: 0.95),
+            AppColors.navy.withValues(alpha: 0.95),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -134,7 +134,7 @@ class HeroArena extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.casino_outlined,
+                        Icon(Icons.casino_outlined,
                             size: 14, color: AppColors.cyan),
                         const SizedBox(width: 4),
                         Text(
@@ -249,7 +249,7 @@ class HeroArena extends StatelessWidget {
                 label: isAnalyzing ? 'UPDATE ANALYSIS' : 'ANALYZE RIVALRY',
                 icon: Icons.flash_on,
                 gradient: isReadyToDuel
-                    ? const [AppColors.primary, AppColors.cyan]
+                    ? [AppColors.primary, AppColors.cyan]
                     : [Colors.white24, Colors.white12],
                 textColor: isReadyToDuel ? Colors.black : Colors.white38,
                 onPressed: isReadyToDuel ? onAnalyze : null,
@@ -399,7 +399,7 @@ class HeroArena extends StatelessWidget {
                 Text(
                   playStyle,
                   style:
-                      const TextStyle(fontSize: 10, color: AppColors.textMuted),
+                      TextStyle(fontSize: 10, color: AppColors.textMuted),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),

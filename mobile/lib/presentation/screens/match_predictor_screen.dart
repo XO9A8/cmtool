@@ -40,7 +40,7 @@ class _MatchPredictorScreenState extends ConsumerState<MatchPredictorScreen> {
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
+          Text(
             'Powered by Skill Rating & H2H Ratios',
             style: TextStyle(color: AppColors.textMuted, fontSize: 12),
           ),
@@ -108,7 +108,7 @@ class _MatchPredictorScreenState extends ConsumerState<MatchPredictorScreen> {
               ),
             ),
             error: (err, _) => GlassCard(
-              child: Text('Prediction API error: ${ApiClient.formatErrorMessage(err)}', style: const TextStyle(color: Colors.redAccent)),
+              child: Text('Prediction API error: ${ApiClient.formatErrorMessage(err)}', style: TextStyle(color: AppColors.lossRed)),
             ),
             data: (res) {
               final double p1Raw = ((res['player_1_win_prob'] ?? res['player_1_win_probability'] ?? res['p1_win_probability'] ?? 0.39) as num).toDouble();
@@ -120,7 +120,7 @@ class _MatchPredictorScreenState extends ConsumerState<MatchPredictorScreen> {
               final double p2Win = (p2Raw * 100).clamp(1.0, 98.0);
 
               return GlassCard(
-                gradientColors: const [Color(0xFF191C2B), Color(0xFF0F111A)],
+                gradientColors: [AppColors.surfaceLight, AppColors.surface],
                 borderColor: AppColors.primary.withValues(alpha: 0.5),
                 padding: const EdgeInsets.all(24),
                 child: Column(
@@ -159,7 +159,7 @@ class _MatchPredictorScreenState extends ConsumerState<MatchPredictorScreen> {
                               style: GoogleFonts.rajdhani(
                                 fontSize: 24,
                                 fontWeight: FontWeight.w800,
-                                color: Colors.amber,
+                                color: AppColors.amber,
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -195,7 +195,7 @@ class _MatchPredictorScreenState extends ConsumerState<MatchPredictorScreen> {
                             ),
                             Expanded(
                               flex: (draw * 10).toInt(),
-                              child: Container(color: Colors.amber.withValues(alpha: 0.8)),
+                              child: Container(color: AppColors.amber.withValues(alpha: 0.8)),
                             ),
                             Expanded(
                               flex: (p2Win * 10).toInt(),

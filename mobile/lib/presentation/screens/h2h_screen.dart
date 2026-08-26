@@ -192,14 +192,14 @@ class _H2hScreenState extends ConsumerState<H2hScreen>
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: clubsAsync.when(
-        loading: () => const Center(
+        loading: () => Center(
           child: CircularProgressIndicator(color: AppColors.primary),
         ),
         error: (e, _) => Center(
           child: GlassCard(
             margin: const EdgeInsets.all(24),
             child: Text('Error loading clubs: $e',
-                style: const TextStyle(color: Colors.redAccent)),
+                style: TextStyle(color: AppColors.lossRed)),
           ),
         ),
         data: (data) {
@@ -266,7 +266,7 @@ class _H2hScreenState extends ConsumerState<H2hScreen>
                     padding:
                         const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
+                      gradient: LinearGradient(
                         colors: [AppColors.primary, AppColors.cyan],
                       ),
                       borderRadius: BorderRadius.circular(6),
@@ -298,7 +298,7 @@ class _H2hScreenState extends ConsumerState<H2hScreen>
                 ],
               ),
               const SizedBox(height: 2),
-              const Text(
+              Text(
                 'Head-to-Head Matrix & Tactical Clash Analytics',
                 style: TextStyle(color: AppColors.textMuted, fontSize: 11),
                 maxLines: 1,
@@ -311,7 +311,7 @@ class _H2hScreenState extends ConsumerState<H2hScreen>
           const SizedBox(width: 8),
           TextButton.icon(
             onPressed: _clearSelection,
-            icon: const Icon(Icons.refresh, size: 13, color: AppColors.cyan),
+            icon: Icon(Icons.refresh, size: 13, color: AppColors.cyan),
             label: Text(
               'RESET',
               style: GoogleFonts.rajdhani(
@@ -342,7 +342,7 @@ class _H2hScreenState extends ConsumerState<H2hScreen>
       children: [
         Row(
           children: [
-            const Icon(Icons.shield_outlined,
+            Icon(Icons.shield_outlined,
                 size: 13, color: AppColors.cyan),
             const SizedBox(width: 5),
             Text(
@@ -415,26 +415,26 @@ class _H2hScreenState extends ConsumerState<H2hScreen>
     final membersAsync = ref.watch(clubMembersProvider(clubId));
 
     return membersAsync.when(
-      loading: () => const Center(
+      loading: () => Center(
         child: Padding(
-          padding: EdgeInsets.all(40),
+          padding: const EdgeInsets.all(40),
           child: CircularProgressIndicator(color: AppColors.primary),
         ),
       ),
       error: (e, _) => GlassCard(
         child: Text('Error loading members: $e',
-            style: const TextStyle(color: Colors.redAccent)),
+            style: TextStyle(color: AppColors.lossRed)),
       ),
       data: (data) {
         final members = data['members'] as List<dynamic>? ?? [];
         if (members.length < 2) {
-          return const GlassCard(
-            padding: EdgeInsets.all(20),
+          return GlassCard(
+            padding: const EdgeInsets.all(20),
             child: Row(
               children: [
                 Icon(Icons.group_add_outlined,
                     color: AppColors.textMuted, size: 28),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     'At least 2 club members are required to compare head-to-head stats.',
@@ -1126,7 +1126,7 @@ class _H2hScreenState extends ConsumerState<H2hScreen>
                     const SizedBox(height: 3),
                     Text(
                       desc,
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 10,
                           color: AppColors.textMuted,
                           height: 1.3),
@@ -1153,7 +1153,7 @@ class _H2hScreenState extends ConsumerState<H2hScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.shield_outlined,
+            Icon(Icons.shield_outlined,
                 color: AppColors.textMuted, size: 40),
             const SizedBox(height: 12),
             Text(
@@ -1165,7 +1165,7 @@ class _H2hScreenState extends ConsumerState<H2hScreen>
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Join or create a club to start tracking head-to-head rivalries.',
               textAlign: TextAlign.center,
               style:

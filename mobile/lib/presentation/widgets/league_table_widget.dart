@@ -22,7 +22,7 @@ class LeagueTableWidget extends ConsumerWidget {
       error: (e, _) => Center(
         child: Padding(
           padding: const EdgeInsets.all(20),
-          child: Text('Failed to load standings: $e', style: const TextStyle(color: Colors.redAccent)),
+          child: Text('Failed to load standings: $e', style: TextStyle(color: AppColors.lossRed)),
         ),
       ),
       data: (data) {
@@ -132,8 +132,8 @@ class LeagueTableWidget extends ConsumerWidget {
     Color posColor = Colors.white70;
     Color? leftBorderColor;
     if (position == 1) {
-      posColor = Colors.amber;
-      leftBorderColor = Colors.amber;
+      posColor = AppColors.amber;
+      leftBorderColor = AppColors.amber;
     } else if (isTop) {
       posColor = AppColors.winGreen;
       leftBorderColor = AppColors.winGreen;
@@ -247,7 +247,7 @@ class LeagueTableWidget extends ConsumerWidget {
   }
 
   Widget _buildSkeleton() {
-    return const SizedBox(
+    return SizedBox(
       height: 250,
       child: GlassCard(
         padding: EdgeInsets.zero,
@@ -261,7 +261,7 @@ class LeagueTableWidget extends ConsumerWidget {
       padding: const EdgeInsets.all(32),
       child: Column(
         children: [
-          const Icon(Icons.leaderboard_outlined, color: AppColors.textMuted, size: 48),
+          Icon(Icons.leaderboard_outlined, color: AppColors.textMuted, size: 48),
           const SizedBox(height: 12),
           Text('No standings data yet', style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
           Text('Start a league tournament to see standings here', style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 13)),

@@ -49,7 +49,7 @@ class UpdateDialog extends StatelessWidget {
                   color: AppColors.cyan.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.system_update_rounded, color: AppColors.cyan, size: 48),
+                child: Icon(Icons.system_update_rounded, color: AppColors.cyan, size: 48),
               ),
               const SizedBox(height: 20),
               

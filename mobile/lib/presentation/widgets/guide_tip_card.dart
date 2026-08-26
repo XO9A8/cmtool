@@ -99,8 +99,8 @@ class GuideTipCard extends ConsumerWidget {
                       onTap: () {
                         ref.read(dismissedTipsProvider.notifier).dismissTip(tip.id);
                       },
-                      child: const Padding(
-                        padding: EdgeInsets.all(4.0),
+                      child: Padding(
+                        padding: const EdgeInsets.all(4.0),
                         child: Icon(
                           Icons.close,
                           size: 16,
@@ -175,7 +175,7 @@ class GuideTipCard extends ConsumerWidget {
                               ),
                             ),
                             const SizedBox(width: 4),
-                            const Icon(
+                            Icon(
                               Icons.arrow_forward,
                               size: 14,
                               color: AppColors.cyan,

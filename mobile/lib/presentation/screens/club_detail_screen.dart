@@ -117,9 +117,9 @@ class _ClubDetailScreenState extends ConsumerState<ClubDetailScreen> {
       children: [
         // Gradient background
         Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF1A0A00), Color(0xFF0D0D1A), AppColors.background],
+              colors: [const Color(0xFF1A0A00), const Color(0xFF0D0D1A), AppColors.background],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
@@ -158,8 +158,8 @@ class _ClubDetailScreenState extends ConsumerState<ClubDetailScreen> {
                   height: 72,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(18),
-                    gradient: const LinearGradient(
-                      colors: [AppColors.primary, Color(0xFFFF9E00)],
+                    gradient: LinearGradient(
+                      colors: [AppColors.primary, const Color(0xFFFF9E00)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -180,8 +180,8 @@ class _ClubDetailScreenState extends ConsumerState<ClubDetailScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       ShaderMask(
-                        shaderCallback: (b) => const LinearGradient(
-                          colors: [AppColors.primary, Color(0xFFFF9E00)],
+                        shaderCallback: (b) => LinearGradient(
+                          colors: [AppColors.primary, const Color(0xFFFF9E00)],
                         ).createShader(b),
                         child: Text(
                           widget.clubName.toUpperCase(),
@@ -196,7 +196,7 @@ class _ClubDetailScreenState extends ConsumerState<ClubDetailScreen> {
                         ),
                       ).animate().fadeIn(duration: 400.ms).slideX(begin: -0.15),
                       const SizedBox(height: 4),
-                      const GlowBadge(label: 'CLUB', color: AppColors.primary),
+                      GlowBadge(label: 'CLUB', color: AppColors.primary),
                     ],
                   ),
                 ),
@@ -272,17 +272,14 @@ class _ClubDetailScreenState extends ConsumerState<ClubDetailScreen> {
   // ─────────────────────────────────────────────────────────────────────────
 
   Widget _buildBody() {
-    return IndexedStack(
-      index: _selectedIndex,
-      children: [
-        _OverviewTab(clubId: widget.clubId),
-        _RosterTab(clubId: widget.clubId),
-        _LeaderboardTab(clubId: widget.clubId),
-        _ActivityTab(clubId: widget.clubId),
-        const SizedBox.shrink(),
-        _ResolvedTab(clubId: widget.clubId),
-      ],
-    );
+    switch (_selectedIndex) {
+      case 0: return _OverviewTab(clubId: widget.clubId);
+      case 1: return _RosterTab(clubId: widget.clubId);
+      case 2: return _LeaderboardTab(clubId: widget.clubId);
+      case 3: return _ActivityTab(clubId: widget.clubId);
+      case 4: return _ResolvedTab(clubId: widget.clubId);
+      default: return const SizedBox.shrink();
+    }
   }
 }
 
@@ -358,7 +355,7 @@ class _OverviewTabState extends ConsumerState<_OverviewTab> {
     final leaderboardAsync = ref.watch(leaderboardProvider(widget.clubId));
 
     return membersAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      loading: () => Center(child: CircularProgressIndicator(color: AppColors.primary)),
       error: (e, _) => _errorCard('Failed to load: $e'),
       data: (data) {
         final members = data['members'] as List<dynamic>? ?? [];
@@ -410,7 +407,7 @@ class _OverviewTabState extends ConsumerState<_OverviewTab> {
                         child: StatPill(
                           label: 'TOP PLAYER',
                           value: topPlayer.length > 10 ? '${topPlayer.substring(0, 10)}…' : topPlayer,
-                          color: Colors.amber,
+                          color: AppColors.amber,
                         ),
                       ),
                     ],
@@ -439,7 +436,7 @@ class _OverviewTabState extends ConsumerState<_OverviewTab> {
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      const Icon(Icons.vpn_key, color: AppColors.offWhite, size: 20),
+                      Icon(Icons.vpn_key, color: AppColors.offWhite, size: 20),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
@@ -482,7 +479,7 @@ class _OverviewTabState extends ConsumerState<_OverviewTab> {
                       children: [
                         _sectionLabel('EDIT CLUB', AppColors.cyan),
                         const SizedBox(width: 8),
-                        const GlowBadge(label: 'ADMIN ONLY', color: AppColors.primary, icon: Icons.star),
+                        GlowBadge(label: 'ADMIN ONLY', color: AppColors.primary, icon: Icons.star),
                       ],
                     ),
                     const SizedBox(height: 14),
@@ -497,7 +494,7 @@ class _OverviewTabState extends ConsumerState<_OverviewTab> {
                         icon: Icons.save,
                         isLoading: _saving,
                         onPressed: _saving ? null : _save,
-                        gradient: const [AppColors.cyan, Color(0xFF00B0FF)],
+                        gradient: [AppColors.cyan, const Color(0xFF00B0FF)],
                         textColor: Colors.black,
                       ),
                     ),
@@ -529,7 +526,7 @@ class _OverviewTabState extends ConsumerState<_OverviewTab> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.cyan),
+          borderSide: BorderSide(color: AppColors.cyan),
         ),
       ),
     );
@@ -586,7 +583,7 @@ class _RosterTabState extends ConsumerState<_RosterTab> {
               ),
               child: Column(
                 children: [
-                  const Icon(Icons.vpn_key, color: AppColors.offWhite, size: 32),
+                  Icon(Icons.vpn_key, color: AppColors.offWhite, size: 32),
                   const SizedBox(height: 12),
                   Text(
                     code,
@@ -606,7 +603,7 @@ class _RosterTabState extends ConsumerState<_RosterTab> {
               child: EsportsButton(
                 label: 'COPY CODE',
                 icon: Icons.copy,
-                gradient: const [AppColors.primary, Color(0xFFFF9E00)],
+                gradient: [AppColors.primary, const Color(0xFFFF9E00)],
                 onPressed: () {
                   Clipboard.setData(ClipboardData(text: code));
                   Navigator.pop(ctx);
@@ -746,7 +743,7 @@ class _RosterTabState extends ConsumerState<_RosterTab> {
     final membersAsync = ref.watch(clubMembersProvider(widget.clubId));
 
     return membersAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      loading: () => Center(child: CircularProgressIndicator(color: AppColors.primary)),
       error: (e, _) => _errorCard('Failed to load roster: $e'),
       data: (data) {
         final members = data['members'] as List<dynamic>? ?? [];
@@ -895,7 +892,7 @@ class _RosterTabState extends ConsumerState<_RosterTab> {
                                 value: 'profile',
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.person, color: AppColors.cyan, size: 16),
+                                    Icon(Icons.person, color: AppColors.cyan, size: 16),
                                     const SizedBox(width: 8),
                                     Text('View Profile', style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 14)),
                                   ],
@@ -905,7 +902,7 @@ class _RosterTabState extends ConsumerState<_RosterTab> {
                                 value: 'role',
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.manage_accounts, color: AppColors.cyan, size: 16),
+                                    Icon(Icons.manage_accounts, color: AppColors.cyan, size: 16),
                                     const SizedBox(width: 8),
                                     Text('Change Role', style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 14)),
                                   ],
@@ -915,7 +912,7 @@ class _RosterTabState extends ConsumerState<_RosterTab> {
                                 value: 'remove',
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.person_remove, color: AppColors.lossRed, size: 16),
+                                    Icon(Icons.person_remove, color: AppColors.lossRed, size: 16),
                                     const SizedBox(width: 8),
                                     Text('Remove Member', style: GoogleFonts.rajdhani(color: AppColors.lossRed, fontSize: 14)),
                                   ],
@@ -950,9 +947,9 @@ class _LeaderboardTab extends ConsumerWidget {
   final String clubId;
   const _LeaderboardTab({required this.clubId});
 
-  static const _gold = Color(0xFFFFD700);
-  static const _silver = Color(0xFFC0C0C0);
-  static const _bronze = Color(0xFFCD7F32);
+  static final _gold = AppColors.gold;
+  static const _silver = Color(0xFFD9D4C8);
+  static const _bronze = Color(0xFFB45309);
 
   Color _rankColor(int rank) {
     if (rank == 1) return _gold;
@@ -1080,7 +1077,7 @@ class _LeaderboardTab extends ConsumerWidget {
                       child: OutlinedButton.icon(
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.cyan,
-                          side: const BorderSide(color: AppColors.cyan),
+                          side: BorderSide(color: AppColors.cyan),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
@@ -1123,7 +1120,7 @@ class _LeaderboardTab extends ConsumerWidget {
     final leaderboardAsync = ref.watch(leaderboardProvider(clubId));
 
     return leaderboardAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator(color: Colors.amber)),
+      loading: () => Center(child: CircularProgressIndicator(color: AppColors.amber)),
       error: (e, _) => _errorCard('Failed to load leaderboard: $e'),
       data: (players) {
         if (players.isEmpty) {
@@ -1138,7 +1135,7 @@ class _LeaderboardTab extends ConsumerWidget {
         return ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            _sectionLabel('ELO LEADERBOARD', Colors.amber),
+            _sectionLabel('ELO LEADERBOARD', AppColors.amber),
             const SizedBox(height: 4),
             Text(
               'Tap any player for details & H2H',
@@ -1332,7 +1329,7 @@ class _ActivityTab extends ConsumerWidget {
     final activityAsync = ref.watch(clubActivityProvider(clubId));
 
     return activityAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      loading: () => Center(child: CircularProgressIndicator(color: AppColors.primary)),
       error: (e, _) => _errorCard('Failed to load activity: $e'),
       data: (matches) {
         if (matches.isEmpty) {
@@ -1340,7 +1337,7 @@ class _ActivityTab extends ConsumerWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.timeline, size: 56, color: AppColors.textMuted),
+                Icon(Icons.timeline, size: 56, color: AppColors.textMuted),
                 const SizedBox(height: 12),
                 Text('No match activity yet.', style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 16)),
               ],
@@ -1408,7 +1405,7 @@ class _ActivityTab extends ConsumerWidget {
                     resultColor = AppColors.lossRed;
                   } else {
                     resultLabel = 'DRAW';
-                    resultColor = Colors.amber;
+                    resultColor = AppColors.amber;
                   }
                 } else if (isUserP2) {
                   if (isP2Win) {
@@ -1419,7 +1416,7 @@ class _ActivityTab extends ConsumerWidget {
                     resultColor = AppColors.lossRed;
                   } else {
                     resultLabel = 'DRAW';
-                    resultColor = Colors.amber;
+                    resultColor = AppColors.amber;
                   }
                 } else {
                   resultLabel = 'FT';
@@ -1550,7 +1547,7 @@ class _SeasonsTabState extends ConsumerState<_SeasonsTab> {
     });
 
     return seasonsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator(color: AppColors.offWhite)),
+      loading: () => Center(child: CircularProgressIndicator(color: AppColors.offWhite)),
       error: (e, _) => _errorCard('Failed to load seasons: $e'),
       data: (seasons) {
         // Find active season
@@ -1586,7 +1583,7 @@ class _SeasonsTabState extends ConsumerState<_SeasonsTab> {
                           ? null
                           : () => _endSeason(activeSeason['id']?.toString() ?? ''),
                       icon: _endingScene
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 14,
                               height: 14,
                               child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.lossRed),
@@ -1711,7 +1708,7 @@ class _SeasonCard extends StatelessWidget {
                       ),
                     ),
                     if (isActive)
-                      const GlowBadge(label: 'ACTIVE', color: AppColors.cyan)
+                      GlowBadge(label: 'ACTIVE', color: AppColors.cyan)
                           .animate(onPlay: (c) => c.repeat(reverse: true))
                           .fadeIn(duration: 800.ms),
                   ],
@@ -1725,14 +1722,14 @@ class _SeasonCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(Icons.emoji_events, size: 12, color: Colors.amber),
+                      Icon(Icons.emoji_events, size: 12, color: AppColors.amber),
                       const SizedBox(width: 4),
                       Text(
                         'Champion: $champion',
                         style: GoogleFonts.rajdhani(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: Colors.amber,
+                          color: AppColors.amber,
                         ),
                       ),
                     ],
@@ -1755,8 +1752,8 @@ Color _roleColor(String role) {
   if (role == 'admin') return AppColors.primary;
   if (role == 'president') return AppColors.offWhite;
   if (role == 'organizer') return AppColors.cyan;
-  if (role == 'captain') return Colors.amber;
-  if (role == 'vice-captain') return Colors.orangeAccent;
+  if (role == 'captain') return AppColors.amber;
+  if (role == 'vice-captain') return AppColors.amber;
   return Colors.white54;
 }
 
@@ -1780,9 +1777,9 @@ Widget _errorCard(String msg) {
         borderColor: AppColors.lossRed.withValues(alpha: 0.4),
         child: Row(
           children: [
-            const Icon(Icons.error_outline, color: AppColors.lossRed),
+            Icon(Icons.error_outline, color: AppColors.lossRed),
             const SizedBox(width: 12),
-            Expanded(child: Text(msg, style: const TextStyle(color: AppColors.lossRed))),
+            Expanded(child: Text(msg, style: TextStyle(color: AppColors.lossRed))),
           ],
         ),
       ),
@@ -1813,7 +1810,7 @@ class _ResolvedTab extends ConsumerWidget {
     final resolvedAsync = ref.watch(clubResolvedActivityProvider(clubId));
 
     return resolvedAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      loading: () => Center(child: CircularProgressIndicator(color: AppColors.primary)),
       error: (e, _) => _errorCard('Failed to load resolved activity: $e'),
       data: (activity) {
         if (activity.isEmpty) {
@@ -1842,6 +1839,7 @@ class _ResolvedTab extends ConsumerWidget {
             final gf = match['goals_for']?.toString() ?? '0';
             final ga = match['goals_against']?.toString() ?? '0';
             final date = _formatDate(match['created_at']?.toString() ?? '');
+            final submitter = match['submitter_username'] ?? 'Player';
             final verifier = match['verifier_username'] ?? 'Unknown Admin';
 
             return Padding(
@@ -1860,7 +1858,7 @@ class _ResolvedTab extends ConsumerWidget {
                           color: AppColors.cyan,
                           icon: Icons.sports_soccer,
                         ),
-                        Text(date, style: const TextStyle(color: AppColors.textMuted, fontSize: 11)),
+                        Text(date, style: TextStyle(color: AppColors.textMuted, fontSize: 11)),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -1910,11 +1908,18 @@ class _ResolvedTab extends ConsumerWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        const Icon(Icons.verified, color: AppColors.winGreen, size: 14),
+                        Icon(Icons.file_upload_outlined, color: AppColors.textMuted, size: 12),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Submitted by $submitter',
+                          style: TextStyle(color: AppColors.textMuted, fontSize: 11, fontStyle: FontStyle.italic),
+                        ),
+                        const SizedBox(width: 12),
+                        Icon(Icons.verified, color: AppColors.winGreen, size: 14),
                         const SizedBox(width: 4),
                         Text(
                           'Verified by $verifier',
-                          style: const TextStyle(color: AppColors.winGreen, fontSize: 11, fontStyle: FontStyle.italic),
+                          style: TextStyle(color: AppColors.winGreen, fontSize: 11, fontStyle: FontStyle.italic),
                         ),
                       ],
                     ),

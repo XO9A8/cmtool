@@ -46,11 +46,12 @@ pub struct KnockoutBracket {
     pub fixtures: Vec<FixtureNode>,
 }
 
-/// Distributes matchday dates evenly across the tournament period.
+/// Distributes matchday dates evenly across the tournament period, or precisely by gap_days if provided.
 pub fn distribute_matchday_dates(
     start_date: Option<NaiveDate>,
     end_date: Option<NaiveDate>,
     num_matchdays: usize,
+    gap_days: Option<i64>,
 ) -> Vec<Option<NaiveDate>> {
     if num_matchdays == 0 {
         return vec![];
@@ -58,33 +59,77 @@ pub fn distribute_matchday_dates(
     if num_matchdays == 1 {
         return vec![start_date];
     }
-    
+
     match (start_date, end_date) {
         (Some(start), Some(end)) => {
-            let total_days = (end - start).num_days();
-            if total_days <= 0 {
-                // If end date is before start date, fallback to 1 week per matchday
-                (0..num_matchdays)
-                    .map(|i| start.checked_add_signed(chrono::Duration::days(i as i64 * 7)))
-                    .collect()
-            } else {
-                let interval = (total_days as f64) / ((num_matchdays - 1) as f64);
+            if let Some(gap) = gap_days {
+                // Gap-based precise scheduling, capped at end_date
                 (0..num_matchdays)
                     .map(|i| {
-                        let offset = (i as f64 * interval).round() as i64;
-                        start.checked_add_signed(chrono::Duration::days(offset))
+                        let date = start.checked_add_signed(chrono::Duration::days(i as i64 * gap));
+                        if let Some(d) = date {
+                            if d <= end { Some(d) } else { Some(end) }
+                        } else {
+                            None
+                        }
                     })
                     .collect()
+            } else {
+                let total_days = (end - start).num_days();
+                if total_days <= 0 {
+                    // If end date is before start date, fallback to 1 week per matchday
+                    (0..num_matchdays)
+                        .map(|i| start.checked_add_signed(chrono::Duration::days(i as i64 * 7)))
+                        .collect()
+                } else {
+                    let interval = (total_days as f64) / ((num_matchdays - 1) as f64);
+                    (0..num_matchdays)
+                        .map(|i| {
+                            let offset = (i as f64 * interval).round() as i64;
+                            start.checked_add_signed(chrono::Duration::days(offset))
+                        })
+                        .collect()
+                }
             }
         }
-        (Some(start), _) => {
-            // Fallback: 1 matchday per week if no end_date is provided
+        (Some(start), None) => {
+            // Gap-based or fallback to 1 week per matchday if no end_date is provided
+            let gap = gap_days.unwrap_or(7);
             (0..num_matchdays)
-                .map(|i| start.checked_add_signed(chrono::Duration::days(i as i64 * 7)))
+                .map(|i| start.checked_add_signed(chrono::Duration::days(i as i64 * gap)))
                 .collect()
         }
         _ => vec![None; num_matchdays],
     }
+}
+
+/// Helper: Packs N rounds evenly into M matchdays when multi-match is allowed.
+pub fn pack_rounds_into_matchdays(
+    total_rounds: usize,
+    total_matchdays: usize,
+) -> Vec<Vec<u32>> {
+    let mut result = vec![Vec::new(); total_matchdays];
+    if total_matchdays == 0 {
+        return result;
+    }
+
+    // Distribute rounds evenly. e.g., 10 rounds into 4 matchdays => sizes: 3, 3, 2, 2
+    let base_rounds_per_md = total_rounds / total_matchdays;
+    let mut remainder = total_rounds % total_matchdays;
+
+    let mut current_round = 1;
+    for md in &mut result {
+        let mut rounds_to_add = base_rounds_per_md;
+        if remainder > 0 {
+            rounds_to_add += 1;
+            remainder -= 1;
+        }
+        for _ in 0..rounds_to_add {
+            md.push(current_round as u32);
+            current_round += 1;
+        }
+    }
+    result
 }
 
 
@@ -662,7 +707,7 @@ pub async fn transition_group_knockout_phase(
             end_date
         };
         let phase_two_rounds = bracket.total_rounds as usize;
-        let phase_two_dates = distribute_matchday_dates(Some(start_date), Some(effective_end_date), phase_two_rounds);
+        let phase_two_dates = distribute_matchday_dates(Some(start_date), Some(effective_end_date), phase_two_rounds, None);
         for (r, d) in ((round_offset + 1)..=max_bracket_round).zip(phase_two_dates) {
             matchdays_data.push((r as i32, d));
         }
@@ -820,19 +865,19 @@ mod tests {
         let end = NaiveDate::from_ymd_opt(2023, 1, 10);
         
         // 1. Zero matchdays
-        let dates = distribute_matchday_dates(start, end, 0);
+        let dates = distribute_matchday_dates(start, end, 0, None);
         assert!(dates.is_empty());
         
         // 2. Single matchday
-        let dates = distribute_matchday_dates(start, end, 1);
+        let dates = distribute_matchday_dates(start, end, 1, None);
         assert_eq!(dates, vec![start]);
         
         // 3. Two matchdays
-        let dates = distribute_matchday_dates(start, end, 2);
+        let dates = distribute_matchday_dates(start, end, 2, None);
         assert_eq!(dates, vec![start, end]);
         
         // 4. Three matchdays
-        let dates = distribute_matchday_dates(start, end, 3);
+        let dates = distribute_matchday_dates(start, end, 3, None);
         assert_eq!(dates, vec![
             NaiveDate::from_ymd_opt(2023, 1, 1),
             NaiveDate::from_ymd_opt(2023, 1, 6),
@@ -840,7 +885,7 @@ mod tests {
         ]);
         
         // 5. Without dates
-        let dates = distribute_matchday_dates(None, None, 3);
+        let dates = distribute_matchday_dates(None, None, 3, None);
         assert_eq!(dates, vec![None, None, None]);
     }
 
@@ -850,5 +895,63 @@ mod tests {
         let total_rounds = (r1_matches as f64).log2().ceil() as i32 + 1;
         println!("test_issue_total_rounds: r1_matches={}, total_rounds={}", r1_matches, total_rounds);
         assert_eq!(total_rounds, 2);
+    }
+
+    #[test]
+    fn test_distribute_matchday_dates_with_gap() {
+        use chrono::NaiveDate;
+        
+        let start = NaiveDate::from_ymd_opt(2023, 1, 1);
+        let end = NaiveDate::from_ymd_opt(2023, 1, 10);
+        
+        // 1. Precise gap with no end cap reached (gap = 2 days, 3 matchdays => days 1, 3, 5)
+        let dates = distribute_matchday_dates(start, end, 3, Some(2));
+        assert_eq!(dates, vec![
+            NaiveDate::from_ymd_opt(2023, 1, 1),
+            NaiveDate::from_ymd_opt(2023, 1, 3),
+            NaiveDate::from_ymd_opt(2023, 1, 5),
+        ]);
+
+        // 2. Gap that hits the end cap (gap = 7 days, 3 matchdays => days 1, 8, and cap at 10)
+        let dates2 = distribute_matchday_dates(start, end, 3, Some(7));
+        assert_eq!(dates2, vec![
+            NaiveDate::from_ymd_opt(2023, 1, 1),
+            NaiveDate::from_ymd_opt(2023, 1, 8),
+            NaiveDate::from_ymd_opt(2023, 1, 10),
+        ]);
+
+        // 3. Fallback when end date is None (gap = 4 days, 3 matchdays => days 1, 5, 9)
+        let dates3 = distribute_matchday_dates(start, None, 3, Some(4));
+        assert_eq!(dates3, vec![
+            NaiveDate::from_ymd_opt(2023, 1, 1),
+            NaiveDate::from_ymd_opt(2023, 1, 5),
+            NaiveDate::from_ymd_opt(2023, 1, 9),
+        ]);
+    }
+
+    #[test]
+    fn test_pack_rounds_into_matchdays() {
+        // 1. Even distribution: 10 rounds into 4 matchdays => 3, 3, 2, 2
+        let packed_1 = pack_rounds_into_matchdays(10, 4);
+        assert_eq!(packed_1.len(), 4);
+        assert_eq!(packed_1[0], vec![1, 2, 3]);
+        assert_eq!(packed_1[1], vec![4, 5, 6]);
+        assert_eq!(packed_1[2], vec![7, 8]);
+        assert_eq!(packed_1[3], vec![9, 10]);
+
+        // 2. 1-to-1 distribution: 5 rounds into 5 matchdays
+        let packed_2 = pack_rounds_into_matchdays(5, 5);
+        assert_eq!(packed_2.len(), 5);
+        assert_eq!(packed_2[0], vec![1]);
+        assert_eq!(packed_2[1], vec![2]);
+        assert_eq!(packed_2[4], vec![5]);
+
+        // 3. Less rounds than matchdays: 2 rounds into 4 matchdays => 1, 1, 0, 0
+        let packed_3 = pack_rounds_into_matchdays(2, 4);
+        assert_eq!(packed_3.len(), 4);
+        assert_eq!(packed_3[0], vec![1]);
+        assert_eq!(packed_3[1], vec![2]);
+        assert!(packed_3[2].is_empty());
+        assert!(packed_3[3].is_empty());
     }
 }

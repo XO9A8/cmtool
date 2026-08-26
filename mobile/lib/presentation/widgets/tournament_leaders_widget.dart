@@ -85,7 +85,7 @@ class TournamentLeadersWidget extends ConsumerWidget {
             // Section Header
             Row(
               children: [
-                const Icon(Icons.stars, color: Colors.amber, size: 20),
+                Icon(Icons.stars, color: AppColors.amber, size: 20),
                 const SizedBox(width: 8),
                 Text(
                   'TOURNAMENT LEADERS & STATS',
@@ -100,14 +100,14 @@ class TournamentLeadersWidget extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: Colors.amber.withValues(alpha: 0.15),
+                    color: AppColors.amber.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+                    border: Border.all(color: AppColors.amber.withValues(alpha: 0.4)),
                   ),
                   child: Text(
                     'LIVE STATS',
                     style: GoogleFonts.rajdhani(
-                      color: Colors.amber,
+                      color: AppColors.amber,
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
                     ),
@@ -127,7 +127,7 @@ class TournamentLeadersWidget extends ConsumerWidget {
                   _buildLeaderCard(
                     title: 'TOP GOAL SCORER',
                     icon: Icons.sports_soccer,
-                    badgeColor: Colors.amber,
+                    badgeColor: AppColors.amber,
                     playerName: topScorer['player_name']?.toString() ?? 'Player',
                     primaryStat: '$topScorerGf GOALS',
                     subStat: '${(topScorerGf / (topScorerPlayed > 0 ? topScorerPlayed : 1)).toStringAsFixed(1)} G / Match',

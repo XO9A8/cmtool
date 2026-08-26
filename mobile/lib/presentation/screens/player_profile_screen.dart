@@ -27,26 +27,26 @@ class PredefinedAvatar {
   });
 }
 
-const List<PredefinedAvatar> predefinedAvatars = [
+final List<PredefinedAvatar> predefinedAvatars = [
   PredefinedAvatar(
     id: 'striker',
     name: 'Striker Ace',
     icon: Icons.sports_soccer,
-    gradient: [Color(0xFFFF6D00), Color(0xFFFFD700)],
+    gradient: [AppColors.primary, AppColors.gold],
   ),
   PredefinedAvatar(
     id: 'inferno',
     name: 'Inferno Flame',
     icon: Icons.local_fire_department,
-    gradient: [Color(0xFFFF1744), Color(0xFFFF9100)],
+    gradient: [AppColors.lossRed, AppColors.primary],
   ),
   PredefinedAvatar(
     id: 'lightning',
     name: 'Cyber Bolt',
     icon: Icons.bolt,
-    gradient: [Color(0xFF00E5FF), Color(0xFFFFEA00)],
+    gradient: [AppColors.gold, const Color(0xFFFFEA00)],
   ),
-  PredefinedAvatar(
+  const PredefinedAvatar(
     id: 'defender',
     name: 'Iron Shield',
     icon: Icons.shield,
@@ -56,9 +56,9 @@ const List<PredefinedAvatar> predefinedAvatars = [
     id: 'crown',
     name: 'Golden Crown',
     icon: Icons.workspace_premium,
-    gradient: [Color(0xFFFFD700), Color(0xFFFFAB00)],
+    gradient: [AppColors.gold, const Color(0xFFFFAB00)],
   ),
-  PredefinedAvatar(
+  const PredefinedAvatar(
     id: 'star',
     name: 'Mystic Star',
     icon: Icons.auto_awesome,
@@ -68,15 +68,15 @@ const List<PredefinedAvatar> predefinedAvatars = [
     id: 'commander',
     name: 'Honor Badge',
     icon: Icons.military_tech,
-    gradient: [Color(0xFF00E676), Color(0xFF00B0FF)],
+    gradient: [AppColors.winGreen, const Color(0xFF00B0FF)],
   ),
-  PredefinedAvatar(
+  const PredefinedAvatar(
     id: 'tactician',
     name: 'Mastermind',
     icon: Icons.psychology,
     gradient: [Color(0xFF00B8D4), Color(0xFF64FFDA)],
   ),
-  PredefinedAvatar(
+  const PredefinedAvatar(
     id: 'fortress',
     name: 'Titan Fortress',
     icon: Icons.fort,
@@ -86,15 +86,15 @@ const List<PredefinedAvatar> predefinedAvatars = [
     id: 'mecha',
     name: 'Mecha Cyber',
     icon: Icons.smart_toy,
-    gradient: [Color(0xFF00E676), Color(0xFF00E5FF)],
+    gradient: [AppColors.winGreen, AppColors.gold],
   ),
   PredefinedAvatar(
     id: 'shadow',
     name: 'Shadow Dragon',
     icon: Icons.pest_control_rodent,
-    gradient: [Color(0xFFE2E8F0), Color(0xFFFF1744)],
+    gradient: [const Color(0xFFE2E8F0), AppColors.lossRed],
   ),
-  PredefinedAvatar(
+  const PredefinedAvatar(
     id: 'apex',
     name: 'Apex Racer',
     icon: Icons.sports_motorsports,
@@ -176,7 +176,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
             backgroundColor: AppColors.background,
             flexibleSpace: FlexibleSpaceBar(
               background: profileAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+                loading: () => Center(child: CircularProgressIndicator(color: AppColors.primary)),
                 error: (_, __) => _buildHeroCard(
                   context,
                   ref,
@@ -283,7 +283,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
     Color tierColor;
     if (elo >= 1800) {
       tierName = 'LEGEND';
-      tierColor = const Color(0xFFFFD700);
+      tierColor = AppColors.gold;
     } else if (elo >= 1600) {
       tierName = 'GRANDMASTER';
       tierColor = AppColors.offWhite;
@@ -306,9 +306,9 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 46, 16, 14),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF2E1704), Color(0xFF141624), Color(0xFF090A0F)],
+          colors: [const Color(0xFF2E1704), const Color(0xFF141624), AppColors.navy],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
@@ -342,7 +342,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                     Container(
                       width: 70,
                       height: 70,
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: AppColors.surface,
                       ),
@@ -354,7 +354,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                         top: 0,
                         child: Container(
                           padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
+                          decoration: BoxDecoration(
                             color: AppColors.primary,
                             shape: BoxShape.circle,
                           ),
@@ -416,13 +416,13 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFFFD700).withValues(alpha: 0.15),
+                              color: AppColors.gold.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: const Color(0xFFFFD700).withValues(alpha: 0.3)),
+                              border: Border.all(color: AppColors.gold.withValues(alpha: 0.3)),
                             ),
                             child: Text(
                               'PEAK: $peakElo',
-                              style: GoogleFonts.rajdhani(fontSize: 9, fontWeight: FontWeight.bold, color: const Color(0xFFFFD700)),
+                              style: GoogleFonts.rajdhani(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.gold),
                             ),
                           ),
                         ],
@@ -457,9 +457,9 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
               children: [
                 _buildQuickStat('MATCHES', '$played'),
                 _buildQuickStat('W', '$wins', color: AppColors.winGreen),
-                _buildQuickStat('D', '$draws', color: Colors.amber),
+                _buildQuickStat('D', '$draws', color: AppColors.amber),
                 _buildQuickStat('L', '$losses', color: AppColors.lossRed),
-                _buildQuickStat('GOALS', '$goalsFor', color: const Color(0xFFFF9100)),
+                _buildQuickStat('GOALS', '$goalsFor', color: AppColors.primary),
                 _buildQuickStat('CS', '$cleanSheets', color: AppColors.cyan),
               ],
             ),
@@ -475,8 +475,8 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                         height: 36,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(10),
-                          gradient: const LinearGradient(
-                            colors: [AppColors.primary, Color(0xFFFF8C00)],
+                          gradient: LinearGradient(
+                            colors: [AppColors.primary, const Color(0xFFFF8C00)],
                           ),
                           boxShadow: [
                             BoxShadow(color: AppColors.primary.withValues(alpha: 0.3), blurRadius: 8),
@@ -510,7 +510,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.verified, size: 14, color: AppColors.cyan),
+                            Icon(Icons.verified, size: 14, color: AppColors.cyan),
                             const SizedBox(width: 4),
                             FittedBox(
                               fit: BoxFit.scaleDown,
@@ -533,7 +533,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                     color: AppColors.cyan.withValues(alpha: 0.1),
                   ),
                   child: TextButton.icon(
-                    icon: const Icon(Icons.share, size: 14, color: AppColors.cyan),
+                    icon: Icon(Icons.share, size: 14, color: AppColors.cyan),
                     label: FittedBox(
                       fit: BoxFit.scaleDown,
                       child: Text(
@@ -579,7 +579,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
     switch (tabIndex) {
       case 0:
         return profileAsync.when(
-          loading: () => const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator(color: AppColors.primary))),
+          loading: () => Center(child: Padding(padding: const EdgeInsets.all(32), child: CircularProgressIndicator(color: AppColors.primary))),
           error: (_, __) => _buildDossierTab(context, ref, userId, isOwnProfile, {}, profilePrefs),
           data: (data) => _buildDossierTab(context, ref, userId, isOwnProfile, data, profilePrefs),
         );
@@ -653,7 +653,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.format_quote, color: AppColors.primary, size: 20),
+                  Icon(Icons.format_quote, color: AppColors.primary, size: 20),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
@@ -664,7 +664,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                   ),
                   if (isOwnProfile)
                     IconButton(
-                      icon: const Icon(Icons.edit_note, color: AppColors.cyan, size: 20),
+                      icon: Icon(Icons.edit_note, color: AppColors.cyan, size: 20),
                       tooltip: 'Edit Bio',
                       onPressed: () => _showEditProfileBottomSheet(context, ref, userId, data, profilePrefs),
                     ),
@@ -684,7 +684,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFF0D0F18),
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: Colors.white12),
           ),
@@ -693,7 +693,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.workspace_premium, size: 18, color: Color(0xFFFFD700)),
+                  Icon(Icons.workspace_premium, size: 18, color: AppColors.gold),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -705,7 +705,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                   if (isOwnProfile)
                     TextButton.icon(
                       style: TextButton.styleFrom(padding: EdgeInsets.zero),
-                      icon: const Icon(Icons.edit, size: 14, color: AppColors.cyan),
+                      icon: Icon(Icons.edit, size: 14, color: AppColors.cyan),
                       label: Text('EDIT', style: GoogleFonts.orbitron(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.cyan)),
                       onPressed: () => _showEditProfileBottomSheet(context, ref, userId, data, profilePrefs),
                     ),
@@ -730,7 +730,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
               _buildDossierRow('DATE OF BIRTH', dob, valColor: Colors.white70, icon: Icons.cake),
               _buildDossierRow('REGISTRAR JOINED', joined, valColor: Colors.white54, icon: Icons.calendar_today),
               _buildDossierRow('CONTRACT START', start, valColor: Colors.white54, icon: Icons.play_arrow),
-              _buildDossierRow('CONTRACT END', end, valColor: const Color(0xFFFFD700), isBold: true, icon: Icons.flag),
+              _buildDossierRow('CONTRACT END', end, valColor: AppColors.gold, isBold: true, icon: Icons.flag),
             ],
           ),
         ),
@@ -740,7 +740,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFF0D0F18),
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: Colors.white12),
           ),
@@ -758,15 +758,15 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                   ),
                   if (isOwnProfile)
                     IconButton(
-                      icon: const Icon(Icons.edit, size: 14, color: AppColors.cyan),
+                      icon: Icon(Icons.edit, size: 14, color: AppColors.cyan),
                       onPressed: () => _showEditProfileBottomSheet(context, ref, userId, data, profilePrefs),
                     ),
                 ],
               ),
               const Divider(color: Colors.white10),
-              _buildDossierRow('CONTACT EMAIL', email, valColor: const Color(0xFFFFD700), icon: Icons.email),
+              _buildDossierRow('CONTACT EMAIL', email, valColor: AppColors.gold, icon: Icons.email),
               _buildDossierRow('PHONE LINE', phone, valColor: const Color(0xFF00FFC2), icon: Icons.phone),
-              _buildDossierRow('FACEBOOK LINK', facebook, valColor: const Color(0xFF00E5FF), icon: Icons.link),
+              _buildDossierRow('FACEBOOK LINK', facebook, valColor: AppColors.gold, icon: Icons.link),
             ],
           ),
         ),
@@ -776,7 +776,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFF0D0F18),
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: AppColors.winGreen.withValues(alpha: 0.3)),
           ),
@@ -785,7 +785,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.verified_user, color: AppColors.winGreen, size: 18),
+                  Icon(Icons.verified_user, color: AppColors.winGreen, size: 18),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -800,7 +800,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
               const Divider(color: Colors.white10),
               _buildDossierRow('NODE STATE', state, valColor: const Color(0xFF00FF66), isBold: true, icon: Icons.dns),
               _buildDossierRow('AUTH STATUS', authStatus, valColor: Colors.white, isBold: true, icon: Icons.security),
-              _buildDossierRow('SOURCE FEED', feed, valColor: const Color(0xFFFFD700), isBold: true, icon: Icons.wifi_lock),
+              _buildDossierRow('SOURCE FEED', feed, valColor: AppColors.gold, isBold: true, icon: Icons.wifi_lock),
             ],
           ),
         ),
@@ -978,7 +978,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
       formIcon = Icons.bolt;
     } else if (form >= 45.0) {
       formStatus = 'STEADY';
-      formColor = const Color(0xFF00E676);
+      formColor = AppColors.winGreen;
       formIcon = Icons.shield;
     } else {
       formStatus = 'COLD';
@@ -1059,7 +1059,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                   label: 'WIN STREAK',
                   value: currentStreak > 0 ? '$currentStreak W' : '$bestStreak W',
                   subValue: currentStreak > 0 ? 'Active Streak' : 'Career Best',
-                  valueColor: const Color(0xFFFF9100),
+                  valueColor: AppColors.primary,
                   icon: Icons.local_fire_department,
                 ),
               ),
@@ -1080,7 +1080,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
               if (currentStreak >= 2)
                 Text(
                   '$currentStreak IN A ROW',
-                  style: GoogleFonts.rajdhani(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFFFF9100)),
+                  style: GoogleFonts.rajdhani(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary),
                 ),
             ],
           ),
@@ -1110,7 +1110,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                       letter = 'L';
                       break;
                     default:
-                      c = Colors.amber;
+                      c = AppColors.amber;
                       letter = 'D';
                   }
                   return Container(
@@ -1153,7 +1153,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                     if (draws > 0)
                       Expanded(
                         flex: draws,
-                        child: Container(color: Colors.amber),
+                        child: Container(color: AppColors.amber),
                       ),
                     if (losses > 0)
                       Expanded(
@@ -1169,7 +1169,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('W: ${(wins / played * 100).toStringAsFixed(0)}%', style: GoogleFonts.rajdhani(color: AppColors.winGreen, fontSize: 10, fontWeight: FontWeight.bold)),
-                Text('D: ${(draws / played * 100).toStringAsFixed(0)}%', style: GoogleFonts.rajdhani(color: Colors.amber, fontSize: 10, fontWeight: FontWeight.bold)),
+                Text('D: ${(draws / played * 100).toStringAsFixed(0)}%', style: GoogleFonts.rajdhani(color: AppColors.amber, fontSize: 10, fontWeight: FontWeight.bold)),
                 Text('L: ${(losses / played * 100).toStringAsFixed(0)}%', style: GoogleFonts.rajdhani(color: AppColors.lossRed, fontSize: 10, fontWeight: FontWeight.bold)),
               ],
             ),
@@ -1286,7 +1286,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.radar, color: AppColors.cyan, size: 18),
+              Icon(Icons.radar, color: AppColors.cyan, size: 18),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -1299,10 +1299,10 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [Color(0xFFFFD700), Color(0xFFFF9100)]),
+                  gradient: LinearGradient(colors: [AppColors.gold, AppColors.primary]),
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: [
-                    BoxShadow(color: const Color(0xFFFFD700).withValues(alpha: 0.4), blurRadius: 8),
+                    BoxShadow(color: AppColors.gold.withValues(alpha: 0.4), blurRadius: 8),
                   ],
                 ),
                 child: Text(
@@ -1376,14 +1376,14 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
     required int goalDiff,
   }) {
     return GlassCard(
-      borderColor: const Color(0xFFFF9100).withValues(alpha: 0.35),
+      borderColor: AppColors.primary.withValues(alpha: 0.35),
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.sports_soccer, color: Color(0xFFFF9100), size: 18),
+              Icon(Icons.sports_soccer, color: AppColors.primary, size: 18),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -1396,12 +1396,12 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFF9100).withValues(alpha: 0.15),
+                  color: AppColors.primary.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   '${goalDiff >= 0 ? "+$goalDiff" : "$goalDiff"} GD',
-                  style: GoogleFonts.orbitron(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFFFF9100)),
+                  style: GoogleFonts.orbitron(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.primary),
                 ),
               ),
             ],
@@ -1415,7 +1415,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                   label: 'TOTAL GOALS',
                   value: '$goalsFor',
                   subValue: '${goalsPerMatch.toStringAsFixed(2)} G / Match',
-                  valueColor: const Color(0xFFFF9100),
+                  valueColor: AppColors.primary,
                   icon: Icons.sports_soccer,
                 ),
               ),
@@ -1435,7 +1435,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                   label: 'CONVERSION',
                   value: '${conversion.toStringAsFixed(1)}%',
                   subValue: conversion >= 25 ? 'Clinical Edge' : 'Standard',
-                  valueColor: const Color(0xFFFFD700),
+                  valueColor: AppColors.gold,
                   icon: Icons.percent,
                 ),
               ),
@@ -1458,8 +1458,8 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                   Expanded(
                     flex: (shotAcc * 10).round().clamp(1, 1000),
                     child: Container(
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(colors: [Color(0xFFFF9100), Color(0xFFFFD700)]),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(colors: [AppColors.primary, AppColors.gold]),
                       ),
                     ),
                   ),
@@ -1493,7 +1493,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.alt_route, color: AppColors.cyan, size: 18),
+              Icon(Icons.alt_route, color: AppColors.cyan, size: 18),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -1563,7 +1563,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.psychology, color: AppColors.cyan, size: 18),
+                Icon(Icons.psychology, color: AppColors.cyan, size: 18),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
@@ -1609,7 +1609,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.security, color: AppColors.winGreen, size: 18),
+              Icon(Icons.security, color: AppColors.winGreen, size: 18),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -1735,14 +1735,14 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
             final unlockedCount = badges.where((b) => b.isUnlocked).length;
 
             return GlassCard(
-              borderColor: const Color(0xFFFFD700).withValues(alpha: 0.35),
+              borderColor: AppColors.gold.withValues(alpha: 0.35),
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.workspace_premium, color: Color(0xFFFFD700), size: 18),
+                      Icon(Icons.workspace_premium, color: AppColors.gold, size: 18),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -1755,13 +1755,13 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFFD700).withValues(alpha: 0.15),
+                          color: AppColors.gold.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFFFD700).withValues(alpha: 0.4)),
+                          border: Border.all(color: AppColors.gold.withValues(alpha: 0.4)),
                         ),
                         child: Text(
                           '${((unlockedCount / badges.length) * 100).toStringAsFixed(0)}% COMPLETE',
-                          style: GoogleFonts.orbitron(fontSize: 9, fontWeight: FontWeight.bold, color: const Color(0xFFFFD700)),
+                          style: GoogleFonts.orbitron(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.gold),
                         ),
                       ),
                     ],
@@ -1806,7 +1806,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
               const SizedBox(width: 8),
               _buildFilterChip('WINS', 'win', color: AppColors.winGreen),
               const SizedBox(width: 8),
-              _buildFilterChip('DRAWS', 'draw', color: Colors.amber),
+              _buildFilterChip('DRAWS', 'draw', color: AppColors.amber),
               const SizedBox(width: 8),
               _buildFilterChip('LOSSES', 'loss', color: AppColors.lossRed),
             ],
@@ -1954,7 +1954,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                     ),
                   ),
                   if (badge.isUnlocked)
-                    const Icon(Icons.check_circle, size: 12, color: AppColors.winGreen),
+                    Icon(Icons.check_circle, size: 12, color: AppColors.winGreen),
                 ],
               ),
               const SizedBox(height: 4),
@@ -1993,7 +1993,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
         category: 'MATCHES',
         description: 'Participate in 100 competitive eFootball matches.',
         icon: Icons.military_tech,
-        color: const Color(0xFFFFD700),
+        color: AppColors.gold,
         currentProgress: matches.toDouble().clamp(0, 100),
         targetProgress: 100,
         progressLabel: '$matches / 100 Matches',
@@ -2017,7 +2017,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
         category: 'SCORING',
         description: 'Net 25 career goals across club fixtures.',
         icon: Icons.sports_soccer,
-        color: const Color(0xFFFF9100),
+        color: AppColors.primary,
         currentProgress: goals.toDouble().clamp(0, 25),
         targetProgress: 25,
         progressLabel: '$goals / 25 Goals',
@@ -2041,7 +2041,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
         category: 'SCORING',
         description: 'Achieve a 25%+ shot conversion rate.',
         icon: Icons.percent,
-        color: const Color(0xFFFFD700),
+        color: AppColors.gold,
         currentProgress: conversion.clamp(0, 25),
         targetProgress: 25,
         progressLabel: '${conversion.toStringAsFixed(1)}% / 25% Conv',
@@ -2065,7 +2065,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
         category: 'DEFENSE',
         description: 'Secure your first competitive clean sheet.',
         icon: Icons.gpp_good,
-        color: const Color(0xFF00E676),
+        color: AppColors.winGreen,
         currentProgress: cleanSheets.toDouble().clamp(0, 1),
         targetProgress: 1,
         progressLabel: '$cleanSheets / 1 Clean Sheet',
@@ -2077,7 +2077,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
         category: 'STREAKS',
         description: 'Achieve a winning streak of 5 consecutive victories.',
         icon: Icons.local_fire_department,
-        color: const Color(0xFFFF1744),
+        color: AppColors.lossRed,
         currentProgress: bestStreak.toDouble().clamp(0, 5),
         targetProgress: 5,
         progressLabel: '$bestStreak / 5 Win Streak',
@@ -2089,7 +2089,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
         category: 'STREAKS',
         description: 'Achieve a 3-match winning streak.',
         icon: Icons.bolt,
-        color: Colors.amber,
+        color: AppColors.amber,
         currentProgress: bestStreak.toDouble().clamp(0, 3),
         targetProgress: 3,
         progressLabel: '$bestStreak / 3 Win Streak',
@@ -2125,7 +2125,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
         category: 'RATING',
         description: 'Climb the competitive ladder to 1600+ Skill Rating.',
         icon: Icons.workspace_premium,
-        color: const Color(0xFFFFD700),
+        color: AppColors.gold,
         currentProgress: peakElo.toDouble().clamp(1000, 1600),
         targetProgress: 1600,
         progressLabel: '$peakElo / 1600 ELO',
@@ -2244,7 +2244,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                     child: Row(
                       children: [
-                        const Icon(Icons.edit_note, color: AppColors.primary, size: 24),
+                        Icon(Icons.edit_note, color: AppColors.primary, size: 24),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -2335,14 +2335,14 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                           _buildDropdownField(
                             label: 'Tactical Play Style',
                             value: selectedPlayStyle,
-                            items: const ['Possession Game', 'Quick Counter', 'Out Wide', 'Long Ball Counter', 'Long Ball'],
+                            items: ['Possession Game', 'Quick Counter', 'Out Wide', 'Long Ball Counter', 'Long Ball'],
                             onChanged: (v) => setModalState(() => selectedPlayStyle = v!),
                           ),
                           const SizedBox(height: 12),
                           _buildDropdownField(
                             label: 'Preferred Foot',
                             value: selectedFoot,
-                            items: const ['Right', 'Left', 'Both'],
+                            items: ['Right', 'Left', 'Both'],
                             onChanged: (v) => setModalState(() => selectedFoot = v!),
                           ),
 
@@ -2356,7 +2356,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                           _buildDropdownField(
                             label: 'Primary Gaming Platform/Device',
                             value: selectedDevice,
-                            items: const ['PlayStation 5', 'Xbox Series X|S', 'PC / Steam', 'Mobile', 'Cross-Platform'],
+                            items: ['PlayStation 5', 'Xbox Series X|S', 'PC / Steam', 'Mobile', 'Cross-Platform'],
                             onChanged: (v) => setModalState(() => selectedDevice = v!),
                           ),
 
@@ -2381,9 +2381,9 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                   // Bottom Save Action Bar
                   Container(
                     padding: const EdgeInsets.all(16),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF090A0F),
-                      border: Border(top: BorderSide(color: Colors.white10)),
+                    decoration: BoxDecoration(
+                      color: AppColors.navy,
+                      border: const Border(top: BorderSide(color: Colors.white10)),
                     ),
                     child: Row(
                       children: [
@@ -2400,8 +2400,8 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                             height: 46,
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(12),
-                              gradient: const LinearGradient(
-                                colors: [AppColors.primary, Color(0xFFFF8C00)],
+                              gradient: LinearGradient(
+                                colors: [AppColors.primary, const Color(0xFFFF8C00)],
                               ),
                               boxShadow: [
                                 BoxShadow(color: AppColors.primary.withValues(alpha: 0.4), blurRadius: 12),
@@ -2542,7 +2542,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.cyan, width: 1.5),
+          borderSide: BorderSide(color: AppColors.cyan, width: 1.5),
         ),
       ),
     );
@@ -2568,7 +2568,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
       decoration: InputDecoration(
         labelText: label,
         labelStyle: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 13),
-        prefixIcon: const Icon(Icons.list, color: AppColors.primary, size: 18),
+        prefixIcon: Icon(Icons.list, color: AppColors.primary, size: 18),
         filled: true,
         fillColor: Colors.white.withValues(alpha: 0.05),
         enabledBorder: OutlineInputBorder(
@@ -2577,7 +2577,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.cyan, width: 1.5),
+          borderSide: BorderSide(color: AppColors.cyan, width: 1.5),
         ),
       ),
     );
@@ -2759,7 +2759,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
               const Spacer(),
               Text(
                 'PEAK: $peakElo',
-                style: GoogleFonts.rajdhani(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFFFFD700)),
+                style: GoogleFonts.rajdhani(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.gold),
               ),
             ],
           ),
@@ -2828,7 +2828,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
         resultIcon = Icons.arrow_downward;
         break;
       default:
-        resultColor = Colors.amber;
+        resultColor = AppColors.amber;
         resultIcon = Icons.remove;
     }
 
@@ -2876,7 +2876,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                               borderRadius: BorderRadius.circular(4),
                               border: Border.all(color: AppColors.cyan.withValues(alpha: 0.5)),
                             ),
-                            child: const Icon(Icons.auto_awesome, color: AppColors.cyan, size: 12),
+                            child: Icon(Icons.auto_awesome, color: AppColors.cyan, size: 12),
                           ),
                       ],
                     ),
@@ -2894,7 +2894,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
               IconButton(
                 constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
                 padding: const EdgeInsets.all(6),
-                icon: const Icon(Icons.gavel, size: 16, color: Colors.amber),
+                icon: Icon(Icons.gavel, size: 16, color: AppColors.amber),
                 tooltip: 'Raise Dispute',
                 onPressed: () => _showDisputeDialog(context, ref, matchId),
               ),
@@ -2969,7 +2969,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
     return GlassCard(
       padding: const EdgeInsets.all(24),
       child: Center(
-        child: Text(message, style: const TextStyle(color: AppColors.textMuted, fontSize: 13), textAlign: TextAlign.center),
+        child: Text(message, style: TextStyle(color: AppColors.textMuted, fontSize: 13), textAlign: TextAlign.center),
       ),
     );
   }
@@ -3002,27 +3002,27 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
           controller: screenshotController,
           child: GlassCard(
             gradientColors: const [Color(0xFF332005), Color(0xFF141624)],
-            borderColor: const Color(0xFFFFD700),
+            borderColor: AppColors.gold,
             padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   'eFOOTBALL ULTIMATE CARD',
-                  style: GoogleFonts.orbitron(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFFFFD700), letterSpacing: 1.5),
+                  style: GoogleFonts.orbitron(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.gold, letterSpacing: 1.5),
                 ),
                 const SizedBox(height: 20),
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(20),
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFFFD700), Color(0xFFFF8C00)],
+                    gradient: LinearGradient(
+                      colors: [AppColors.gold, const Color(0xFFFF8C00)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     boxShadow: [
-                      BoxShadow(color: const Color(0xFFFFD700).withValues(alpha: 0.4), blurRadius: 20),
+                      BoxShadow(color: AppColors.gold.withValues(alpha: 0.4), blurRadius: 20),
                     ],
                   ),
                   child: Column(
@@ -3184,7 +3184,7 @@ class _EsportsTabHeaderDelegate extends SliverPersistentHeaderDelegate {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),
             gradient: isSelected
-                ? const LinearGradient(colors: [AppColors.primary, Color(0xFFFF8C00)])
+                ? LinearGradient(colors: [AppColors.primary, const Color(0xFFFF8C00)])
                 : null,
           ),
           child: Row(

@@ -69,7 +69,7 @@ class _DisputeDialogState extends ConsumerState<DisputeDialog> {
       backgroundColor: AppColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: AppColors.lossRed),
+        side: BorderSide(color: AppColors.lossRed),
       ),
       title: Text(
         'RAISE MATCH DISPUTE',
@@ -103,7 +103,7 @@ class _DisputeDialogState extends ConsumerState<DisputeDialog> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: AppColors.lossRed),
+                borderSide: BorderSide(color: AppColors.lossRed),
               ),
             ),
             maxLines: 3,
@@ -113,7 +113,7 @@ class _DisputeDialogState extends ConsumerState<DisputeDialog> {
             const SizedBox(height: 10),
             Text(
               _errorMessage!,
-              style: const TextStyle(color: AppColors.lossRed, fontSize: 12),
+              style: TextStyle(color: AppColors.lossRed, fontSize: 12),
             ),
           ],
         ],

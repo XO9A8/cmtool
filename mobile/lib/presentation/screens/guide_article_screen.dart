@@ -107,7 +107,7 @@ class GuideArticleScreen extends ConsumerWidget {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.schedule,
                               size: 12,
                               color: AppColors.textMuted,
@@ -139,7 +139,7 @@ class GuideArticleScreen extends ConsumerWidget {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.check_circle,
                                 size: 12,
                                 color: AppColors.winGreen,
@@ -227,7 +227,7 @@ class GuideArticleScreen extends ConsumerWidget {
                   children: [
                     Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.bolt,
                           color: AppColors.cyan,
                           size: 18,
@@ -251,8 +251,8 @@ class GuideArticleScreen extends ConsumerWidget {
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Padding(
-                              padding: EdgeInsets.only(top: 2, right: 4),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2, right: 4),
                               child: Icon(
                                 Icons.arrow_right,
                                 size: 16,
@@ -340,7 +340,7 @@ class GuideArticleScreen extends ConsumerWidget {
                 blockquoteDecoration: BoxDecoration(
                   color: AppColors.surfaceLight,
                   borderRadius: BorderRadius.circular(8),
-                  border: const Border(
+                  border: Border(
                     left: BorderSide(color: AppColors.cyan, width: 4),
                   ),
                 ),

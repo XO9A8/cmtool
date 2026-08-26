@@ -127,12 +127,18 @@ pub async fn create_tournament(
     rules_config: &serde_json::Value,
     start_date: Option<chrono::NaiveDate>,
     end_date: Option<chrono::NaiveDate>,
+    matchday_gap_days: Option<i16>,
+    allow_multi_match_per_matchday: Option<bool>,
 ) -> Result<Uuid, sqlx::Error> {
     let id = Uuid::new_v4();
+    
+    let gap = matchday_gap_days.unwrap_or(7);
+    let multi_match = allow_multi_match_per_matchday.unwrap_or(false);
+
     sqlx::query(
         r#"
-        INSERT INTO Tournaments (id, club_id, name, format_type, status, rules_config, start_date, end_date)
-        VALUES ($1, $2, $3, $4, 'draft', $5, $6, $7)
+        INSERT INTO Tournaments (id, club_id, name, format_type, status, rules_config, start_date, end_date, matchday_gap_days, allow_multi_match_per_matchday)
+        VALUES ($1, $2, $3, $4, 'draft', $5, $6, $7, $8, $9)
         "#,
     )
     .bind(id)
@@ -142,6 +148,8 @@ pub async fn create_tournament(
     .bind(rules_config)
     .bind(start_date)
     .bind(end_date)
+    .bind(gap)
+    .bind(multi_match)
     .execute(pool)
     .await?;
 
@@ -159,6 +167,9 @@ pub struct TournamentRow {
     pub participant_count: i64,
     pub club_id: Uuid,
     pub created_at: chrono::DateTime<chrono::Utc>,
+    pub end_date: Option<chrono::NaiveDate>,
+    pub matchday_gap_days: i16,
+    pub allow_multi_match_per_matchday: bool,
 }
 
 /// Fetches all tournaments for a club.
@@ -180,7 +191,7 @@ pub async fn get_club_tournaments(
                         SELECT player_2_id AS player_id FROM T_Matches WHERE tournament_id = t.id
                     ) tm_p WHERE tm_p.player_id IS NOT NULL)
                ) AS participant_count,
-               t.created_at
+               t.created_at, t.end_date, t.matchday_gap_days, t.allow_multi_match_per_matchday
         FROM Tournaments t
         WHERE t.club_id = $1 AND t.deleted_at IS NULL
         ORDER BY t.created_at DESC
@@ -210,8 +221,284 @@ pub async fn update_tournament_status(
     Ok(())
 }
 
-/// Inserts a T_Match fixture into the database.
-/// match_number identifies the fixture's slot within its round for knockout advancement.
+/// Retrieves tournament settings.
+pub async fn get_tournament_settings(
+    pool: &PgPool,
+    tournament_id: Uuid,
+) -> Result<Option<(Option<chrono::NaiveDate>, Option<chrono::NaiveDate>, i16, bool)>, sqlx::Error> {
+    let row = sqlx::query(
+        r#"
+        SELECT start_date, end_date, matchday_gap_days, allow_multi_match_per_matchday 
+        FROM Tournaments 
+        WHERE id = $1
+        "#,
+    )
+    .bind(tournament_id)
+    .fetch_optional(pool)
+    .await?;
+
+    if let Some(r) = row {
+        Ok(Some((
+            r.try_get("start_date")?,
+            r.try_get("end_date")?,
+            r.try_get("matchday_gap_days")?,
+            r.try_get("allow_multi_match_per_matchday")?,
+        )))
+    } else {
+        Ok(None)
+    }
+}
+
+/// Updates tournament settings.
+pub async fn update_tournament_settings(
+    pool: &PgPool,
+    tournament_id: Uuid,
+    matchday_gap_days: Option<i16>,
+    end_date: Option<Option<chrono::NaiveDate>>,
+    allow_multi_match_per_matchday: Option<bool>,
+) -> Result<(), sqlx::Error> {
+    let mut query = String::from("UPDATE Tournaments SET updated_at = NOW()");
+    
+    if matchday_gap_days.is_some() {
+        query.push_str(", matchday_gap_days = $2");
+    }
+    if end_date.is_some() {
+        query.push_str(", end_date = $3");
+    }
+    if allow_multi_match_per_matchday.is_some() {
+        query.push_str(", allow_multi_match_per_matchday = $4");
+    }
+    
+    query.push_str(" WHERE id = $1");
+
+    let mut q = sqlx::query(&query).bind(tournament_id);
+    
+    // Binding dynamically for pg requires exact index matching, which sqlx::query doesn't easily support dynamically. 
+    // We'll just construct the specific query or use COALESCE.
+    // Let's rewrite it safely.
+    let _ = q; // Ignore above
+    
+    sqlx::query(
+        r#"
+        UPDATE Tournaments 
+        SET 
+            updated_at = NOW(),
+            matchday_gap_days = COALESCE($2, matchday_gap_days),
+            end_date = CASE WHEN $3 THEN $4 ELSE end_date END,
+            allow_multi_match_per_matchday = COALESCE($5, allow_multi_match_per_matchday)
+        WHERE id = $1
+        "#,
+    )
+    .bind(tournament_id)
+    .bind(matchday_gap_days)
+    .bind(end_date.is_some())
+    .bind(end_date.flatten())
+    .bind(allow_multi_match_per_matchday)
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+/// Recalculates and updates matchday dates for a tournament.
+pub async fn rebuild_remaining_matchdays(
+    pool: &PgPool,
+    tournament_id: Uuid,
+    end_date: Option<chrono::NaiveDate>,
+    gap_days: i16,
+    allow_multi_match: bool,
+) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await?;
+
+    // 1. Identify untouched (partially or fully completed) matchdays
+    // A matchday is untouched if it has AT LEAST 1 completed match.
+    // We also need its scheduled_date to find the anchor date.
+    let untouched_matchdays = sqlx::query!(
+        r#"
+        SELECT md.id, md.scheduled_date, md.matchday_number
+        FROM matchdays md
+        WHERE md.tournament_id = $1 
+          AND EXISTS (
+              SELECT 1 FROM t_matches tm 
+              WHERE tm.matchday_id = md.id AND tm.status IN ('completed', 'disputed', 'forfeit', 'bye')
+          )
+        ORDER BY md.matchday_number ASC
+        "#,
+        tournament_id
+    )
+    .fetch_all(&mut *tx)
+    .await?;
+
+    // 2. Identify touched (completely pending) matchdays
+    let touched_matchdays = sqlx::query!(
+        r#"
+        SELECT md.id, md.matchday_number
+        FROM matchdays md
+        WHERE md.tournament_id = $1
+          AND NOT EXISTS (
+              SELECT 1 FROM t_matches tm 
+              WHERE tm.matchday_id = md.id AND tm.status IN ('completed', 'disputed', 'forfeit', 'bye')
+          )
+        ORDER BY md.matchday_number ASC
+        "#,
+        tournament_id
+    )
+    .fetch_all(&mut *tx)
+    .await?;
+
+    if touched_matchdays.is_empty() {
+        // No remaining matchdays to rebuild
+        tx.commit().await?;
+        return Ok(());
+    }
+
+    // 3. Determine Anchor Date
+    // Anchor date = max(today, last_untouched_date + gap)
+    let today = chrono::Utc::now().naive_utc().date();
+    let anchor_date = if let Some(last_untouched) = untouched_matchdays.last() {
+        if let Some(d) = last_untouched.scheduled_date {
+            let next_date = d.checked_add_signed(chrono::Duration::days(gap_days as i64)).unwrap_or(today);
+            if next_date > today { next_date } else { today }
+        } else {
+            today
+        }
+    } else {
+        // No untouched matchdays, so start from today (or tournament start_date)
+        // Let's fetch tournament start_date
+        let t_start: Option<chrono::NaiveDate> = sqlx::query_scalar!(
+            "SELECT start_date FROM Tournaments WHERE id = $1",
+            tournament_id
+        )
+        .fetch_optional(&mut *tx)
+        .await?.flatten();
+        
+        let mut st = t_start.unwrap_or(today);
+        if st < today { st = today; }
+        st
+    };
+
+    // 4. Extract pending fixtures from touched matchdays
+    let touched_ids: Vec<Uuid> = touched_matchdays.iter().map(|m| m.id).collect();
+    
+    // We need to fetch t_matches, grouped by round_number, ordered by round_number
+    #[derive(sqlx::FromRow)]
+    struct PendingFixture {
+        id: Uuid,
+        round_number: i16,
+    }
+    
+    let pending_fixtures = sqlx::query_as::<_, PendingFixture>(
+        r#"
+        SELECT id, round_number 
+        FROM t_matches
+        WHERE matchday_id = ANY($1)
+        ORDER BY round_number ASC
+        "#
+    )
+    .bind(&touched_ids)
+    .fetch_all(&mut *tx)
+    .await?;
+    
+    if pending_fixtures.is_empty() {
+        tx.commit().await?;
+        return Ok(());
+    }
+
+    // Determine max round_number from pending fixtures
+    let max_round = pending_fixtures.last().map(|f| f.round_number as usize).unwrap_or(1);
+    let min_round = pending_fixtures.first().map(|f| f.round_number as usize).unwrap_or(1);
+    let rounds_to_pack = max_round - min_round + 1;
+
+    // 5. Delete touched matchdays
+    sqlx::query(
+        "DELETE FROM matchdays WHERE id = ANY($1)"
+    )
+    .bind(&touched_ids)
+    .execute(&mut *tx)
+    .await?;
+
+    // 6. Calculate new matchdays
+    let num_mds = if allow_multi_match {
+        match end_date {
+            Some(e) => {
+                let total_days = (e - anchor_date).num_days();
+                if total_days >= 0 {
+                    (total_days / (gap_days as i64) + 1) as usize
+                } else {
+                    1
+                }
+            }
+            None => rounds_to_pack,
+        }
+    } else {
+        rounds_to_pack
+    };
+    
+    let num_matchdays = std::cmp::max(1, std::cmp::min(num_mds, rounds_to_pack));
+    
+    let new_dates = crate::domain::tournament::distribute_matchday_dates(
+        Some(anchor_date),
+        end_date,
+        num_matchdays,
+        Some(gap_days as i64),
+    );
+    
+    let packing = crate::domain::tournament::pack_rounds_into_matchdays(rounds_to_pack, num_matchdays);
+    
+    // Determine starting matchday number
+    let starting_md_num = untouched_matchdays.last().map(|m| m.matchday_number).unwrap_or(0) + 1;
+    
+    // 7. Create new matchdays and re-assign fixtures
+    for (i, round_groups) in packing.into_iter().enumerate() {
+        let md_date = new_dates.get(i).copied().flatten();
+        let md_num = starting_md_num + (i as i16);
+        
+        let new_md_id: Uuid = sqlx::query_scalar!(
+            r#"
+            INSERT INTO matchdays (tournament_id, matchday_number, scheduled_date, status)
+            VALUES ($1, $2, $3, 'upcoming')
+            RETURNING id
+            "#,
+            tournament_id, md_num, md_date
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+        
+        // Find which fixtures belong to this matchday
+        // packing returns indices relative to 1..rounds_to_pack.
+        // We need to map these to actual round_numbers.
+        let actual_rounds: Vec<i16> = round_groups.iter().map(|&r| (r as usize - 1 + min_round) as i16).collect();
+        
+        let mut fixture_ids = Vec::new();
+        for fix in &pending_fixtures {
+            if actual_rounds.contains(&fix.round_number) {
+                fixture_ids.push(fix.id);
+            }
+        }
+        
+        if !fixture_ids.is_empty() {
+            let scheduled_at = md_date.map(|d| {
+                chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(
+                    d.and_hms_opt(0, 0, 0).unwrap(), 
+                    chrono::Utc
+                )
+            });
+            
+            sqlx::query(
+                "UPDATE t_matches SET matchday_id = $1, scheduled_at = $2, updated_at = NOW() WHERE id = ANY($3)"
+            )
+            .bind(new_md_id)
+            .bind(scheduled_at)
+            .bind(&fixture_ids)
+            .execute(&mut *tx)
+            .await?;
+        }
+    }
+
+    tx.commit().await?;
+    Ok(())
+}
+
 pub async fn insert_tournament_match(
     pool: &PgPool,
     tournament_id: Uuid,

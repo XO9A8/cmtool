@@ -36,9 +36,9 @@ class _ForfeitClaimModalState extends ConsumerState<ForfeitClaimModal> {
   Future<void> _submitForfeit() async {
     if (_forfeitingPlayerId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select which player is forfeiting.'),
-          backgroundColor: Colors.orange,
+        SnackBar(
+          content: const Text('Please select which player is forfeiting.'),
+          backgroundColor: AppColors.amber,
         ),
       );
       return;
@@ -57,8 +57,8 @@ class _ForfeitClaimModalState extends ConsumerState<ForfeitClaimModal> {
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Forfeit victory successfully claimed (3-0 default).'),
+          SnackBar(
+            content: const Text('Forfeit victory successfully claimed (3-0 default).'),
             backgroundColor: AppColors.winGreen,
           ),
         );
@@ -97,7 +97,7 @@ class _ForfeitClaimModalState extends ConsumerState<ForfeitClaimModal> {
                     color: AppColors.lossRed.withValues(alpha: 0.15),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.gavel, color: AppColors.lossRed, size: 24),
+                  child: Icon(Icons.gavel, color: AppColors.lossRed, size: 24),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -123,7 +123,7 @@ class _ForfeitClaimModalState extends ConsumerState<ForfeitClaimModal> {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: AppColors.textMuted),
+                  icon: Icon(Icons.close, color: AppColors.textMuted),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
@@ -245,7 +245,7 @@ class _ForfeitClaimModalState extends ConsumerState<ForfeitClaimModal> {
                   child: EsportsButton(
                     label: _submitting ? 'CLAIMING...' : 'CONFIRM',
                     icon: Icons.gavel,
-                    gradient: const [AppColors.lossRed, Colors.orangeAccent],
+                    gradient: [AppColors.lossRed, AppColors.amber],
                     onPressed: _submitting ? null : _submitForfeit,
                   ),
                 ),

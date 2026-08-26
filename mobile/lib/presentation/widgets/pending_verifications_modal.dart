@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../providers/match_provider.dart';
 import '../theme/app_theme.dart';
-import 'dispute_dialog.dart';
 
 class PendingVerificationsModal extends ConsumerWidget {
   const PendingVerificationsModal({super.key});
@@ -41,14 +40,14 @@ class PendingVerificationsModal extends ConsumerWidget {
             ),
             const SizedBox(height: 14),
             pendingAsync.when(
-              loading: () => const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
+              loading: () => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
                 child: Center(
                   child: CircularProgressIndicator(color: AppColors.primary),
                 ),
               ),
-              error: (err, _) => const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
+              error: (err, _) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
                 child: Center(
                   child: Text('Failed to load pending matches.', style: TextStyle(color: AppColors.lossRed, fontSize: 13)),
                 ),
@@ -205,7 +204,7 @@ class PendingVerificationsModal extends ConsumerWidget {
                                     child: OutlinedButton.icon(
                                       style: OutlinedButton.styleFrom(
                                         foregroundColor: AppColors.winGreen,
-                                        side: const BorderSide(color: AppColors.winGreen),
+                                        side: BorderSide(color: AppColors.winGreen),
                                         padding: const EdgeInsets.symmetric(vertical: 8),
                                       ),
                                       icon: const Icon(Icons.check, size: 14),
@@ -218,12 +217,12 @@ class PendingVerificationsModal extends ConsumerWidget {
                                     child: OutlinedButton.icon(
                                       style: OutlinedButton.styleFrom(
                                         foregroundColor: AppColors.lossRed,
-                                        side: const BorderSide(color: AppColors.lossRed),
+                                        side: BorderSide(color: AppColors.lossRed),
                                         padding: const EdgeInsets.symmetric(vertical: 8),
                                       ),
-                                      icon: const Icon(Icons.flag_outlined, size: 14),
-                                      label: Text('DISPUTE', style: GoogleFonts.rajdhani(color: AppColors.lossRed, fontWeight: FontWeight.bold, fontSize: 12)),
-                                      onPressed: () => _disputeMatch(context, ref, matchId, '$playerName vs $opponentName'),
+                                      icon: const Icon(Icons.close, size: 14),
+                                      label: Text('DISMISS', style: GoogleFonts.rajdhani(color: AppColors.lossRed, fontWeight: FontWeight.bold, fontSize: 12)),
+                                      onPressed: () => _dismissMatch(context, ref, matchId, '$playerName vs $opponentName'),
                                     ),
                                   ),
                                 ],
@@ -258,33 +257,59 @@ class PendingVerificationsModal extends ConsumerWidget {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to confirm match: $e'),
-            backgroundColor: AppColors.lossRed,
-          ),
-        );
+        final errorStr = e.toString().toLowerCase();
+        if (errorStr.contains('already been confirmed')) {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              backgroundColor: AppColors.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: AppColors.lossRed.withValues(alpha: 0.5)),
+              ),
+              title: Text('MATCH ALREADY CONFIRMED', style: GoogleFonts.orbitron(color: AppColors.lossRed, fontWeight: FontWeight.bold, fontSize: 18)),
+              content: Text(
+                'This match result has already been confirmed by another submitter/admin.\n\nYou must dispute the previous result first to bring it back to pending state.',
+                style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 15),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: Text('UNDERSTOOD', style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to confirm match: $e', style: GoogleFonts.rajdhani()),
+              backgroundColor: AppColors.lossRed,
+            ),
+          );
+        }
       }
     }
   }
 
-  void _disputeMatch(BuildContext context, WidgetRef ref, String matchId, String playerName) async {
-    final result = await showDialog<bool>(
-      context: context,
-      useRootNavigator: true,
-      builder: (_) => DisputeDialog(
-        matchRecordId: matchId,
-        matchTitle: playerName,
-      ),
-    );
-
-    if (result == true) {
+  void _dismissMatch(BuildContext context, WidgetRef ref, String matchId, String playerName) async {
+    try {
+      final client = ref.read(apiClientProvider);
+      await client.dismissPendingMatch(matchId);
       ref.invalidate(pendingMatchesProvider);
-      ref.invalidate(adminDisputesProvider);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Match with $playerName disputed. Case logged for admin review.'),
+            content: const Text('Duplicate/Invalid request dismissed safely.'),
+            backgroundColor: AppColors.textMuted,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to dismiss request: $e', style: GoogleFonts.rajdhani()),
             backgroundColor: AppColors.lossRed,
           ),
         );

@@ -95,8 +95,10 @@ class TournamentDetailScreen extends ConsumerStatefulWidget {
   final String formatType;
   final String status;
   final bool isAdmin;
-  /// Club UUID for associating OCR match submissions to the correct club.
   final String? clubId;
+  final DateTime? endDate;
+  final int matchdayGapDays;
+  final bool allowMultiMatchPerMatchday;
 
   const TournamentDetailScreen({
     super.key,
@@ -107,6 +109,9 @@ class TournamentDetailScreen extends ConsumerStatefulWidget {
     this.isAdmin =
         true, // Default to true if not passed for now, though better to explicitly pass
     this.clubId,
+    this.endDate,
+    this.matchdayGapDays = 7,
+    this.allowMultiMatchPerMatchday = false,
   });
 
   @override
@@ -178,6 +183,9 @@ class _TournamentDetailScreenState
                     tournamentName: widget.tournamentName,
                     formatType: widget.formatType,
                     status: _currentStatus,
+                    endDate: widget.endDate,
+                    matchdayGapDays: widget.matchdayGapDays,
+                    allowMultiMatchPerMatchday: widget.allowMultiMatchPerMatchday,
                     onStatusChanged: (newStatus) {
                       setState(() => _currentStatus = newStatus);
                       _refresh();
@@ -223,8 +231,8 @@ class _TournamentDetailScreenState
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(7),
             gradient: isSelected
-                ? const LinearGradient(
-                    colors: [AppColors.primary, Color(0xFFFF9E00)],
+                ? LinearGradient(
+                    colors: [AppColors.primary, const Color(0xFFFF9E00)],
                   )
                 : null,
             color: isSelected ? null : Colors.transparent,
@@ -267,7 +275,7 @@ class _TournamentDetailScreenState
       ),
       actions: [
         IconButton(
-          icon: const Icon(Icons.refresh, color: AppColors.cyan, size: 20),
+          icon: Icon(Icons.refresh, color: AppColors.cyan, size: 20),
           onPressed: _refresh,
           tooltip: 'Refresh',
         ),
@@ -579,18 +587,18 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
         Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: Colors.amber.withValues(alpha: 0.15),
+            color: AppColors.amber.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+            border: Border.all(color: AppColors.amber.withValues(alpha: 0.3)),
           ),
-          child: const Icon(Icons.update, color: Colors.amber, size: 16),
+          child: Icon(Icons.update, color: AppColors.amber, size: 16),
         ),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
             'RESCHEDULED MATCHES',
             style: GoogleFonts.orbitron(
-              color: Colors.amber,
+              color: AppColors.amber,
               fontSize: 13,
               fontWeight: FontWeight.bold,
               letterSpacing: 1.2,
@@ -603,14 +611,14 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
           decoration: BoxDecoration(
-            color: Colors.amber.withValues(alpha: 0.2),
+            color: AppColors.amber.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+            border: Border.all(color: AppColors.amber.withValues(alpha: 0.4)),
           ),
           child: Text(
             '$count',
             style: GoogleFonts.orbitron(
-              color: Colors.amber,
+              color: AppColors.amber,
               fontSize: 11,
               fontWeight: FontWeight.bold,
             ),
@@ -635,7 +643,7 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
 
     return Row(
       children: [
-        const Icon(Icons.sports_soccer, color: AppColors.cyan, size: 16),
+        Icon(Icons.sports_soccer, color: AppColors.cyan, size: 16),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
@@ -710,7 +718,7 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
           ),
           child: Row(
             children: [
-              const Icon(Icons.filter_list_rounded,
+              Icon(Icons.filter_list_rounded,
                   color: AppColors.primary, size: 20),
               const SizedBox(width: 12),
               Expanded(
@@ -722,7 +730,7 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
                         ? _selectedMatchdayId
                         : matchdays.first['id'].toString(),
                     dropdownColor: AppColors.surface,
-                    icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                    icon: Icon(Icons.keyboard_arrow_down_rounded,
                         color: AppColors.primary, size: 24),
                     isExpanded: true,
                     style: GoogleFonts.orbitron(
@@ -786,7 +794,7 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.calendar_today,
+                    Icon(Icons.calendar_today,
                         color: AppColors.primary, size: 18),
                     const SizedBox(width: 8),
                     Expanded(
@@ -812,7 +820,7 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.edit_calendar,
+                              Icon(Icons.edit_calendar,
                                   color: AppColors.cyan, size: 14),
                               const SizedBox(width: 4),
                               Text(
@@ -1243,7 +1251,7 @@ class _MatchFixtureTile extends ConsumerWidget {
       if (r == totalRounds - 2 && totalRounds > 2) return 'QUARTER-FINAL';
       return 'ROUND $r MATCH';
     }
-    return 'MATCH DAY $r';
+    return 'ROUND $r';
   }
 
   String _formatDateTime(dynamic dtVal) {
@@ -1340,7 +1348,7 @@ class _MatchFixtureTile extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(0),
       borderColor: isRescheduledSection
-          ? Colors.amber.withValues(alpha: 0.35)
+          ? AppColors.amber.withValues(alpha: 0.35)
           : AppColors.primary.withValues(alpha: 0.2),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1355,7 +1363,7 @@ class _MatchFixtureTile extends ConsumerWidget {
                     headerText,
                     style: GoogleFonts.rajdhani(
                       color: isRescheduledSection
-                          ? Colors.amber
+                          ? AppColors.amber
                           : (groupName != null && groupName.isNotEmpty
                               ? AppColors.cyan
                               : AppColors.textMuted),
@@ -1371,12 +1379,12 @@ class _MatchFixtureTile extends ConsumerWidget {
                 if (isRescheduledSection)
                   GlowBadge(
                     label: 'RESCHEDULED ($rescheduleCount/$maxReschedules)',
-                    color: Colors.amber,
+                    color: AppColors.amber,
                   )
                 else if (isCompleted)
-                  const GlowBadge(label: 'COMPLETED', color: AppColors.winGreen)
+                  GlowBadge(label: 'COMPLETED', color: AppColors.winGreen)
                 else
-                  const GlowBadge(label: 'SCHEDULED', color: AppColors.cyan),
+                  GlowBadge(label: 'SCHEDULED', color: AppColors.cyan),
               ],
             ),
           ),
@@ -1387,16 +1395,16 @@ class _MatchFixtureTile extends ConsumerWidget {
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.amber.withValues(alpha: 0.08),
+                color: AppColors.amber.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.amber.withValues(alpha: 0.2)),
+                border: Border.all(color: AppColors.amber.withValues(alpha: 0.2)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.schedule, color: Colors.amber, size: 14),
+                      Icon(Icons.schedule, color: AppColors.amber, size: 14),
                       const SizedBox(width: 6),
                       Expanded(
                         child: RichText(
@@ -1404,11 +1412,11 @@ class _MatchFixtureTile extends ConsumerWidget {
                             style: GoogleFonts.rajdhani(
                                 color: Colors.white, fontSize: 12),
                             children: [
-                              const TextSpan(
+                              TextSpan(
                                 text: 'Rescheduled To: ',
                                 style: TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.amber),
+                                    color: AppColors.amber),
                               ),
                               TextSpan(
                                 text: _formatDateTime(schedAt),
@@ -1420,7 +1428,7 @@ class _MatchFixtureTile extends ConsumerWidget {
                                 TextSpan(
                                   text:
                                       '  (Was: ${_formatDateTime(origSchedAt)})',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                       color: AppColors.textMuted),
                                 ),
                               ],
@@ -1435,7 +1443,7 @@ class _MatchFixtureTile extends ConsumerWidget {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.notes,
+                        Icon(Icons.notes,
                             color: AppColors.cyan, size: 14),
                         const SizedBox(width: 6),
                         Expanded(
@@ -1546,7 +1554,7 @@ class _MatchFixtureTile extends ConsumerWidget {
                                 : 'RESCHEDULE',
                             color: rescheduleCount >= maxReschedules
                                 ? AppColors.textMuted
-                                : Colors.amber,
+                                : AppColors.amber,
                             onTap: rescheduleCount >= maxReschedules
                                 ? () {}
                                 : () => _showMatchRescheduleDialog(
@@ -1663,7 +1671,7 @@ class _MatchFixtureTile extends ConsumerWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 7, vertical: 1.5),
                 decoration: BoxDecoration(
-                  color: Colors.amber.withValues(alpha: 0.12),
+                  color: AppColors.amber.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
@@ -1671,7 +1679,7 @@ class _MatchFixtureTile extends ConsumerWidget {
                   style: GoogleFonts.rajdhani(
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
-                    color: Colors.amber,
+                    color: AppColors.amber,
                   ),
                 ),
               ),
@@ -1740,7 +1748,7 @@ class _MatchFixtureTile extends ConsumerWidget {
                   Expanded(
                     flex: (drawPct * 10).toInt().clamp(1, 1000),
                     child: Container(
-                      color: Colors.amber.withValues(alpha: 0.75),
+                      color: AppColors.amber.withValues(alpha: 0.75),
                     ),
                   ),
                   const SizedBox(width: 1),
@@ -1811,10 +1819,10 @@ class _MatchFixtureTile extends ConsumerWidget {
       String p1Name, String p2Name, bool p1Won, bool p2Won, bool isDraw,
       {num? p1Score, num? p2Score, String? p1Avatar, String? p2Avatar}) {
     Color p1Color = isDraw
-        ? Colors.amber
+        ? AppColors.amber
         : (p1Won ? AppColors.winGreen : AppColors.lossRed);
     Color p2Color = isDraw
-        ? Colors.amber
+        ? AppColors.amber
         : (p2Won ? AppColors.winGreen : AppColors.lossRed);
 
     final scoreDisplay = (p1Score != null && p2Score != null)
@@ -2268,7 +2276,7 @@ class _StandingsTabState extends State<_StandingsTab> {
               borderColor: AppColors.cyan.withValues(alpha: 0.25),
               child: Column(
                 children: [
-                  const Icon(Icons.account_tree,
+                  Icon(Icons.account_tree,
                       color: AppColors.cyan, size: 40),
                   const SizedBox(height: 16),
                   Text(
@@ -2293,7 +2301,7 @@ class _StandingsTabState extends State<_StandingsTab> {
                   EsportsButton(
                     label: 'GO TO FIXTURES & BRACKET',
                     icon: Icons.calendar_month,
-                    gradient: const [AppColors.cyan, AppColors.offWhite],
+                    gradient: [AppColors.cyan, AppColors.offWhite],
                     onPressed: widget.onGoToFixtures,
                   ),
                 ],
@@ -2322,6 +2330,9 @@ class _InfoTab extends ConsumerStatefulWidget {
   final String tournamentName;
   final String formatType;
   final String status;
+  final DateTime? endDate;
+  final int matchdayGapDays;
+  final bool allowMultiMatchPerMatchday;
   final ValueChanged<String> onStatusChanged;
 
   const _InfoTab({
@@ -2329,6 +2340,9 @@ class _InfoTab extends ConsumerStatefulWidget {
     required this.tournamentName,
     required this.formatType,
     required this.status,
+    this.endDate,
+    required this.matchdayGapDays,
+    required this.allowMultiMatchPerMatchday,
     required this.onStatusChanged,
   });
 
@@ -2338,6 +2352,162 @@ class _InfoTab extends ConsumerStatefulWidget {
 
 class _InfoTabState extends ConsumerState<_InfoTab> {
   bool _isActing = false;
+
+
+  Future<void> _showEditSettingsDialog() async {
+    int currentGap = widget.matchdayGapDays;
+    bool currentMultiMatch = widget.allowMultiMatchPerMatchday;
+    DateTime? currentEndDate = widget.endDate;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setStateDialog) {
+            return AlertDialog(
+              backgroundColor: AppColors.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
+              ),
+              title: Text('EDIT SCHEDULING SETTINGS',
+                  style: GoogleFonts.rajdhani(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18)),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('DAYS BETWEEN MATCHDAYS', style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 13)),
+                        Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.remove, color: Colors.white70, size: 20),
+                              onPressed: () {
+                                setStateDialog(() {
+                                  if (currentGap > 0) currentGap--;
+                                });
+                              },
+                            ),
+                            Text('$currentGap', style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                            IconButton(
+                              icon: const Icon(Icons.add, color: Colors.white70, size: 20),
+                              onPressed: () {
+                                setStateDialog(() {
+                                  currentGap++;
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(child: Text('ALLOW MULTI-MATCH PER DAY', style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 13))),
+                        Switch.adaptive(
+                          value: currentMultiMatch,
+                          activeThumbColor: AppColors.primary,
+                          onChanged: (val) => setStateDialog(() => currentMultiMatch = val),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(child: Text('END DATE', style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 13))),
+                        TextButton(
+                          onPressed: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: currentEndDate ?? DateTime.now().add(const Duration(days: 30)),
+                              firstDate: DateTime.now(),
+                              lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
+                              builder: (ctx, child) => Theme(
+                                data: ThemeData.dark().copyWith(
+                                  colorScheme: ColorScheme.dark(
+                                    primary: AppColors.primary,
+                                    onPrimary: Colors.black,
+                                    surface: AppColors.surface,
+                                    onSurface: Colors.white,
+                                  ),
+                                ),
+                                child: child!,
+                              ),
+                            );
+                            if (picked != null) {
+                              setStateDialog(() => currentEndDate = picked);
+                            }
+                          },
+                          child: Text(
+                            currentEndDate != null ? currentEndDate!.toIso8601String().split('T').first : 'SELECT DATE',
+                            style: GoogleFonts.rajdhani(color: AppColors.primary, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        if (currentEndDate != null)
+                          IconButton(
+                            icon: Icon(Icons.clear, color: AppColors.textMuted, size: 18),
+                            onPressed: () => setStateDialog(() => currentEndDate = null),
+                          )
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  child: Text('CANCEL', style: GoogleFonts.rajdhani(color: AppColors.textMuted)),
+                ),
+                EsportsButton(
+                  label: 'SAVE',
+                  icon: Icons.save,
+                  height: 40,
+                  onPressed: () => Navigator.of(ctx).pop(true),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) return;
+    setState(() => _isActing = true);
+    try {
+      final client = ref.read(apiClientProvider);
+      await client.updateTournamentSettings(
+        widget.tournamentId,
+        matchdayGapDays: currentGap,
+        allowMultiMatchPerMatchday: currentMultiMatch,
+        endDate: currentEndDate,
+        clearEndDate: currentEndDate == null && widget.endDate != null,
+      );
+      if (mounted) {
+        ref.invalidate(clubTournamentsProvider);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Settings updated successfully', style: GoogleFonts.rajdhani()),
+          backgroundColor: AppColors.winGreen,
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Failed: ${ApiClient.formatErrorMessage(e)}', style: GoogleFonts.rajdhani()),
+          backgroundColor: AppColors.lossRed,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _isActing = false);
+    }
+  }
 
   Future<void> _confirmAndStart() async {
     final confirmed = await showDialog<bool>(
@@ -2423,7 +2593,7 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
             label: 'COMPLETE',
             icon: Icons.check_circle_outline,
             height: 40,
-            gradient: const [AppColors.textMuted, Colors.grey],
+            gradient: [AppColors.textMuted, Colors.grey],
             onPressed: () => Navigator.of(ctx).pop(true),
           ),
         ],
@@ -2480,7 +2650,7 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
             label: 'DELETE',
             icon: Icons.delete_outline,
             height: 40,
-            gradient: const [AppColors.lossRed, Colors.red],
+            gradient: [AppColors.lossRed, Colors.red],
             onPressed: () => Navigator.of(ctx).pop(true),
           ),
         ],
@@ -2853,7 +3023,7 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
                       label: 'START TOURNAMENT',
                       icon: Icons.play_arrow_rounded,
                       isLoading: _isActing,
-                      gradient: const [AppColors.winGreen, AppColors.cyan],
+                      gradient: [AppColors.winGreen, AppColors.cyan],
                       textColor: Colors.black,
                       onPressed: _confirmAndStart,
                     ),
@@ -2869,11 +3039,20 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
                       label: 'MARK TOURNAMENT COMPLETE',
                       icon: Icons.emoji_events_outlined,
                       isLoading: _isActing,
-                      gradient: [AppColors.primary, Colors.amber.shade600],
+                      gradient: [AppColors.primary, AppColors.amber],
                       textColor: Colors.black,
                       onPressed: _confirmAndComplete,
                     ),
                   ],
+                  const SizedBox(height: 16),
+                  EsportsButton(
+                    label: 'EDIT SCHEDULING SETTINGS',
+                    icon: Icons.settings,
+                    isLoading: _isActing,
+                    gradient: [AppColors.offWhite, AppColors.textMuted],
+                    textColor: Colors.black,
+                    onPressed: _showEditSettingsDialog,
+                  ),
                   const SizedBox(height: 16),
                   Divider(
                       color: Colors.white.withValues(alpha: 0.08), height: 1),

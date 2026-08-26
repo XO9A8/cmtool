@@ -21,19 +21,19 @@ class AdminDisputeScreen extends ConsumerWidget {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: AppColors.cyan),
+            icon: Icon(Icons.refresh, color: AppColors.cyan),
             onPressed: () => ref.invalidate(adminDisputesProvider),
           ),
         ],
       ),
       body: disputesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+        loading: () => Center(child: CircularProgressIndicator(color: AppColors.primary)),
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Text(
               'Failed to load disputes: $e',
-              style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+              style: TextStyle(color: AppColors.lossRed, fontSize: 13),
               textAlign: TextAlign.center,
             ),
           ),
@@ -44,14 +44,14 @@ class AdminDisputeScreen extends ConsumerWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.gavel_rounded, size: 64, color: AppColors.textMuted),
+                  Icon(Icons.gavel_rounded, size: 64, color: AppColors.textMuted),
                   const SizedBox(height: 16),
                   Text(
                     'No Open Disputes',
                     style: GoogleFonts.rajdhani(fontSize: 20, color: Colors.white70, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 6),
-                  const Text(
+                  Text(
                     'All club match records are verified and clean.',
                     style: TextStyle(color: AppColors.textMuted, fontSize: 13),
                   ),
@@ -83,14 +83,14 @@ class AdminDisputeScreen extends ConsumerWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const GlowBadge(
+                          GlowBadge(
                             label: 'DISPUTE',
                             color: AppColors.lossRed,
                             icon: Icons.warning_amber_rounded,
                           ),
                           Text(
                             createdAt.length > 10 ? createdAt.substring(0, 10) : createdAt,
-                            style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                            style: TextStyle(color: AppColors.textMuted, fontSize: 11),
                           ),
                         ],
                       ),
@@ -108,7 +108,7 @@ class AdminDisputeScreen extends ConsumerWidget {
                       const SizedBox(height: 4),
                       Text(
                         'Match: $matchId',
-                        style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                        style: TextStyle(fontSize: 11, color: AppColors.textMuted),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -120,7 +120,7 @@ class AdminDisputeScreen extends ConsumerWidget {
                           Expanded(
                             child: Column(
                               children: [
-                                const Text('Reported Image', style: TextStyle(color: AppColors.textMuted, fontSize: 11)),
+                                Text('Reported Image', style: TextStyle(color: AppColors.textMuted, fontSize: 11)),
                                 const SizedBox(height: 4),
                                 Container(
                                   height: 80,
@@ -138,7 +138,7 @@ class AdminDisputeScreen extends ConsumerWidget {
                           Expanded(
                             child: Column(
                               children: [
-                                const Text('Counter Evidence', style: TextStyle(color: AppColors.textMuted, fontSize: 11)),
+                                Text('Counter Evidence', style: TextStyle(color: AppColors.textMuted, fontSize: 11)),
                                 const SizedBox(height: 4),
                                 Container(
                                   height: 80,
@@ -170,7 +170,7 @@ class AdminDisputeScreen extends ConsumerWidget {
                           Expanded(
                             child: OutlinedButton(
                               style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: AppColors.winGreen),
+                                side: BorderSide(color: AppColors.winGreen),
                                 padding: const EdgeInsets.symmetric(vertical: 10),
                               ),
                               onPressed: () => _resolve(context, ref, id, dismiss: false),
@@ -184,7 +184,7 @@ class AdminDisputeScreen extends ConsumerWidget {
                           Expanded(
                             child: OutlinedButton(
                               style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: AppColors.lossRed),
+                                side: BorderSide(color: AppColors.lossRed),
                                 padding: const EdgeInsets.symmetric(vertical: 10),
                               ),
                               onPressed: () => _resolve(context, ref, id, dismiss: true),
@@ -217,7 +217,7 @@ class AdminDisputeScreen extends ConsumerWidget {
           backgroundColor: AppColors.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: AppColors.cyan),
+            side: BorderSide(color: AppColors.cyan),
           ),
           title: Text(
             dismiss ? 'DISMISS DISPUTE' : 'UPHOLD DISPUTE',

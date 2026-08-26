@@ -55,10 +55,10 @@ class _OcrCorrectionScreenState extends State<OcrCorrectionScreen> {
 
       if (widget.isKnockout && gf == ga) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Knockout matches cannot end in a draw. Please input the score after penalties or extra time.'),
+          SnackBar(
+            content: const Text('Knockout matches cannot end in a draw. Please input the score after penalties or extra time.'),
             backgroundColor: AppColors.lossRed,
-            duration: Duration(seconds: 4),
+            duration: const Duration(seconds: 4),
           ),
         );
         return;
@@ -111,7 +111,7 @@ class _OcrCorrectionScreenState extends State<OcrCorrectionScreen> {
             ),
           ),
           prefixIcon: isLowConfidence 
-              ? const Icon(Icons.warning_amber_rounded, color: AppColors.lossRed)
+              ? Icon(Icons.warning_amber_rounded, color: AppColors.lossRed)
               : null,
         ),
         validator: (value) {

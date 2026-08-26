@@ -151,10 +151,10 @@ class _PodiumPlayer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Color medalColor = rank == 1
-        ? const Color(0xFFFFD700)
+        ? AppColors.gold
         : rank == 2
-            ? const Color(0xFFC0C0C0)
-            : const Color(0xFFCD7F32);
+            ? const Color(0xFFD9D4C8)
+            : const Color(0xFFB45309);
 
     final double avatarRadius = rank == 1 ? 30 : 24;
     final double fontSize = rank == 1 ? 14 : 12;
@@ -383,9 +383,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF0D0E16), Color(0xFF090A0F)],
+          colors: [AppColors.surface, AppColors.navy],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
@@ -416,13 +416,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ).animate().fade(duration: 500.ms).slideX(begin: -0.1),
                     const SizedBox(height: 6),
                     ShaderMask(
-                      shaderCallback: (bounds) => const LinearGradient(
+                      shaderCallback: (bounds) => LinearGradient(
                         colors: [
                           AppColors.primary,
                           Colors.white,
                           AppColors.cyan,
                         ],
-                        stops: [0.0, 0.5, 1.0],
+                        stops: const [0.0, 0.5, 1.0],
                       ).createShader(bounds),
                       child: Text(
                         'MATCH CENTER',
@@ -505,7 +505,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             winRate != null ? '${(winRate as num).toStringAsFixed(0)}%' : '—';
 
         return GlassCard(
-          gradientColors: const [Color(0xFF1C0A00), Color(0xFF090A0F)],
+          gradientColors: [AppColors.surface, AppColors.navy],
           borderColor: AppColors.primary.withValues(alpha: 0.6),
           padding: const EdgeInsets.all(20),
           onTap: () => Navigator.push(
@@ -583,7 +583,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         value: (form / 100.0).clamp(0.0, 1.0),
                         minHeight: 8,
                         backgroundColor: Colors.white10,
-                        valueColor: const AlwaysStoppedAnimation<Color>(
+                        valueColor: AlwaysStoppedAnimation<Color>(
                           AppColors.winGreen,
                         ),
                       ),
@@ -870,7 +870,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.calendar_month,
+                    Icon(Icons.calendar_month,
                         color: AppColors.primary, size: 18),
                     const SizedBox(width: 8),
                     Text(
@@ -888,7 +888,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.event_available,
+                    Icon(Icons.event_available,
                         color: AppColors.textMuted, size: 26),
                     const SizedBox(width: 10),
                     Text(
@@ -945,7 +945,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               // Header
               Row(
                 children: [
-                  const Icon(Icons.calendar_month,
+                  Icon(Icons.calendar_month,
                       color: AppColors.primary, size: 18),
                   const SizedBox(width: 8),
                   Expanded(
@@ -1004,7 +1004,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             Container(
                               width: 7,
                               height: 7,
-                              decoration: const BoxDecoration(
+                              decoration: BoxDecoration(
                                 color: AppColors.cyan,
                                 shape: BoxShape.circle,
                               ),
@@ -1088,12 +1088,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                             horizontal: 5, vertical: 1.5),
                                         margin: const EdgeInsets.only(right: 6),
                                         decoration: BoxDecoration(
-                                          color: Colors.amber
+                                          color: AppColors.amber
                                               .withValues(alpha: 0.15),
                                           borderRadius:
                                               BorderRadius.circular(4),
                                           border: Border.all(
-                                              color: Colors.amber
+                                              color: AppColors.amber
                                                   .withValues(alpha: 0.4)),
                                         ),
                                         child: Text(
@@ -1101,7 +1101,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                           style: GoogleFonts.rajdhani(
                                             fontSize: 9,
                                             fontWeight: FontWeight.bold,
-                                            color: Colors.amber,
+                                            color: AppColors.amber,
                                           ),
                                         ),
                                       ),
@@ -1225,7 +1225,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           ),
                         ),
                         const SizedBox(width: 6),
-                        const Icon(Icons.arrow_forward_rounded,
+                        Icon(Icons.arrow_forward_rounded,
                             color: AppColors.cyan, size: 14),
                       ],
                     ),
@@ -1247,7 +1247,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         'label': 'APPROVALS',
         'sub': 'Pending Verifications',
         'icon': Icons.mark_email_unread_outlined,
-        'color': Colors.amber,
+        'color': AppColors.amber,
         'badge': pendingCount > 0 ? pendingCount : null,
         'action': () => showDialog(
               context: context,
@@ -1670,7 +1670,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     col = AppColors.lossRed;
                   } else {
                     resultLabel = 'DRAW';
-                    col = Colors.amber;
+                    col = AppColors.amber;
                   }
                 } else if (isUserP2) {
                   if (isP2Win) {
@@ -1681,7 +1681,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     col = AppColors.lossRed;
                   } else {
                     resultLabel = 'DRAW';
-                    col = Colors.amber;
+                    col = AppColors.amber;
                   }
                 } else {
                   resultLabel = 'FT';
@@ -1783,18 +1783,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Widget _buildPendingBanner(int count) {
     return GlassCard(
-      borderColor: Colors.amber.withValues(alpha: 0.6),
+      borderColor: AppColors.amber.withValues(alpha: 0.6),
       gradientColors: [
-        Colors.amber.withValues(alpha: 0.12),
+        AppColors.amber.withValues(alpha: 0.12),
         AppColors.surface,
       ],
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
-          const Icon(Icons.notification_important,
-                  color: Colors.amber, size: 28)
+          Icon(Icons.notification_important,
+                  color: AppColors.amber, size: 28)
               .animate(onPlay: (c) => c.repeat())
-              .shimmer(duration: 1500.ms, color: Colors.amber),
+              .shimmer(duration: 1500.ms, color: AppColors.amber),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -1805,7 +1805,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   style: GoogleFonts.rajdhani(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: Colors.amber,
+                    color: AppColors.amber,
                     letterSpacing: 1.0,
                   ),
                 ),
@@ -1822,7 +1822,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           const SizedBox(width: 8),
           EsportsButton(
             label: 'REVIEW NOW',
-            gradient: const [Colors.amber, Color(0xFFFFB300)],
+            gradient: [AppColors.amber, const Color(0xFFFFB300)],
             height: 40,
             onPressed: () => showDialog(
               context: context,
@@ -1842,7 +1842,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       padding: const EdgeInsets.all(14),
       child: Row(
         children: [
-          const Icon(Icons.error_outline, color: AppColors.lossRed, size: 18),
+          Icon(Icons.error_outline, color: AppColors.lossRed, size: 18),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -1864,7 +1864,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
-          const Icon(Icons.info_outline, color: AppColors.textMuted, size: 18),
+          Icon(Icons.info_outline, color: AppColors.textMuted, size: 18),
           const SizedBox(width: 10),
           Expanded(
             child: Text(

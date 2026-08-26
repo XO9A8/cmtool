@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../theme/app_theme.dart';
+import '../providers/theme_provider.dart';
 import '../providers/match_provider.dart';
 import '../../infrastructure/offline_sync_service.dart';
 import 'admin_dispute_screen.dart';
@@ -12,10 +13,7 @@ import 'game_guide_screen.dart';
 import '../widgets/guide_onboarding_modal.dart';
 
 
-// Settings state providers
-final matchAlertsProvider = StateProvider<bool>((ref) => true);
-final aiInsightsSettingsProvider = StateProvider<bool>((ref) => true);
-final hapticFeedbackProvider = StateProvider<bool>((ref) => true);
+
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -41,9 +39,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
 
-    ref.read(matchAlertsProvider.notifier).state = prefs.getBool('match_alerts') ?? true;
-    ref.read(aiInsightsSettingsProvider.notifier).state = prefs.getBool('ai_insights') ?? true;
-    ref.read(hapticFeedbackProvider.notifier).state = prefs.getBool('haptic_feedback') ?? true;
+
   }
 
   Future<void> _persistToggle(String key, bool value) async {
@@ -92,7 +88,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           backgroundColor: AppColors.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: AppColors.cyan),
+            side: BorderSide(color: AppColors.cyan),
           ),
           title: Text(
             'UPDATE PASSWORD',
@@ -171,7 +167,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           backgroundColor: AppColors.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: AppColors.cyan),
+            side: BorderSide(color: AppColors.cyan),
           ),
           title: Text(
             'UPDATE PROFILE',
@@ -263,7 +259,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.lossRed),
+          side: BorderSide(color: AppColors.lossRed),
         ),
         title: Text(
           'TERMINATE SESSION',
@@ -300,9 +296,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final userId = ref.watch(authStateProvider);
     final profileAsync = userId != null ? ref.watch(playerProfileProvider(userId)) : null;
 
-    final matchAlerts = ref.watch(matchAlertsProvider);
-    final aiInsights = ref.watch(aiInsightsSettingsProvider);
-    final haptic = ref.watch(hapticFeedbackProvider);
+    final isPremium = ref.watch(themeProvider);
     final profilePrefs = ref.watch(profilePreferencesProvider);
 
     return Scaffold(
@@ -331,7 +325,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             GlassCard(
               borderColor: AppColors.primary.withValues(alpha: 0.4),
               child: ListTile(
-                leading: const Icon(Icons.lock_outline, color: AppColors.cyan),
+                leading: Icon(Icons.lock_outline, color: AppColors.cyan),
                 title: const Text('Update Password', style: TextStyle(color: Colors.white)),
                 subtitle: const Text('Change your account password', style: TextStyle(color: Colors.white60, fontSize: 12)),
                 trailing: const Icon(Icons.chevron_right, color: Colors.white30),
@@ -347,7 +341,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               borderColor: AppColors.primary.withValues(alpha: 0.4),
               padding: const EdgeInsets.all(20),
               child: profileAsync?.when(
-                    loading: () => const Center(
+                    loading: () => Center(
                       child: CircularProgressIndicator(color: AppColors.cyan),
                     ),
                     error: (_, __) => _buildProfileHeaderContent(
@@ -386,58 +380,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             _buildSectionHeader('SYSTEM PREFERENCES'),
             const SizedBox(height: 12),
             _buildSettingsTile(
-              icon: Icons.notifications_active_outlined,
-              title: 'Match Alerts',
-              subtitle: 'Push notifications for tournament fixtures',
+              icon: Icons.palette_outlined,
+              title: 'App Appearance',
+              subtitle: isPremium ? 'Premium (Navy/Scarlet)' : 'Legacy (Dark/Cyan)',
               trailing: Switch(
-                value: matchAlerts,
-                onChanged: (v) async {
-                  ref.read(matchAlertsProvider.notifier).state = v;
-                  await _persistToggle('match_alerts', v);
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Match Alerts ${v ? 'Enabled' : 'Disabled'}'),
-                      duration: const Duration(seconds: 1),
-                    ),
-                  );
+                value: isPremium,
+                onChanged: (v) {
+                  ref.read(themeProvider.notifier).toggleTheme(v);
                 },
                 activeThumbColor: AppColors.cyan,
               ),
             ).animate().fade(delay: 200.ms),
-            _buildSettingsTile(
-              icon: Icons.auto_awesome,
-              title: 'AI Tactical Insights',
-              subtitle: 'Enable post-match AI analysis engine',
-              trailing: Switch(
-                value: aiInsights,
-                onChanged: (v) async {
-                  ref.read(aiInsightsSettingsProvider.notifier).state = v;
-                  await _persistToggle('ai_insights', v);
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('AI Tactical Insights ${v ? 'Enabled' : 'Disabled'}'),
-                      duration: const Duration(seconds: 1),
-                    ),
-                  );
-                },
-                activeThumbColor: AppColors.cyan,
-              ),
-            ).animate().fade(delay: 250.ms),
-            _buildSettingsTile(
-              icon: Icons.vibration,
-              title: 'Haptic Feedback',
-              subtitle: 'Vibrate on match submission and OCR detection',
-              trailing: Switch(
-                value: haptic,
-                onChanged: (v) async {
-                  ref.read(hapticFeedbackProvider.notifier).state = v;
-                  await _persistToggle('haptic_feedback', v);
-                },
-                activeThumbColor: AppColors.cyan,
-              ),
-            ).animate().fade(delay: 300.ms),
             _buildSettingsTile(
               icon: Icons.visibility_outlined,
               title: 'Public Profile Visibility',
@@ -472,7 +425,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ? '$_pendingCount matches waiting to sync'
                   : 'All local match data is synchronized',
               trailing: _isSyncing
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 24,
                       height: 24,
                       child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.cyan),
@@ -530,7 +483,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               icon: Icons.gavel,
               title: 'Admin Dispute Center',
               subtitle: 'Review & resolve player match result disputes',
-              color: Colors.amber,
+              color: AppColors.amber,
               onTap: () {
                 Navigator.push(
                   context,
@@ -578,7 +531,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  const Icon(Icons.dns, color: AppColors.cyan, size: 24),
+                  Icon(Icons.dns, color: AppColors.cyan, size: 24),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -592,7 +545,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             fontSize: 14,
                           ),
                         ),
-                        const Text(
+                        Text(
                           'Backend API v1',
                           style: TextStyle(fontSize: 11, color: AppColors.textMuted),
                         ),
@@ -601,12 +554,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                   OutlinedButton(
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppColors.cyan),
+                      side: BorderSide(color: AppColors.cyan),
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     ),
                     onPressed: _isPinging ? null : _pingServer,
                     child: _isPinging
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 14,
                             height: 14,
                             child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.cyan),
@@ -668,7 +621,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           height: 56,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            gradient: const LinearGradient(
+            gradient: LinearGradient(
               colors: [AppColors.primary, AppColors.cyan],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -698,17 +651,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               const SizedBox(height: 2),
               Text(
                 'Skill Rating: $skillRating PTS • $playStyle',
-                style: const TextStyle(color: AppColors.cyan, fontSize: 12, fontWeight: FontWeight.w600),
+                style: TextStyle(color: AppColors.cyan, fontSize: 12, fontWeight: FontWeight.w600),
               ),
               Text(
                 'ID: ${userId.length > 8 ? userId.substring(0, 8) : userId}...',
-                style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
+                style: TextStyle(color: AppColors.textMuted, fontSize: 10),
               ),
             ],
           ),
         ),
         IconButton(
-          icon: const Icon(Icons.edit, color: AppColors.cyan, size: 20),
+          icon: Icon(Icons.edit, color: AppColors.cyan, size: 20),
           tooltip: 'Update Play Style',
           onPressed: () => _showEditProfileDialog(ProfilePreferences(
             displayName: username,
@@ -758,7 +711,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 Text(
                   subtitle,
-                  style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 11),
                 ),
               ],
             ),
@@ -808,7 +761,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                   Text(
                     subtitle,
-                    style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                    style: TextStyle(color: AppColors.textMuted, fontSize: 11),
                   ),
                 ],
               ),

@@ -361,6 +361,8 @@ pub struct ClubResolvedMatchRow {
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub verified_by_id: Option<Uuid>,
     pub verifier_username: Option<String>,
+    pub submitted_by_id: Option<Uuid>,
+    pub submitter_username: Option<String>,
 }
 
 pub async fn get_club_resolved_matches(
@@ -378,11 +380,14 @@ pub async fn get_club_resolved_matches(
                m.match_type, m.goals_for::INT4 AS goals_for, m.goals_against::INT4 AS goals_against,
                m.created_at,
                m.verified_by_id,
-               COALESCE(NULLIF(uv.full_name, ''), uv.username) AS verifier_username
+               COALESCE(NULLIF(uv.full_name, ''), uv.username) AS verifier_username,
+               m.submitted_by_id,
+               COALESCE(NULLIF(us.full_name, ''), us.username) AS submitter_username
         FROM Match_Records m
         LEFT JOIN Users u1 ON m.player_id = u1.id
         LEFT JOIN Users u2 ON m.opponent_id = u2.id
         LEFT JOIN Users uv ON m.verified_by_id = uv.id
+        LEFT JOIN Users us ON m.submitted_by_id = us.id
         WHERE m.club_id = $1 AND m.deleted_at IS NULL AND m.verification_status = 'approved'
         ORDER BY m.updated_at DESC
         LIMIT $2

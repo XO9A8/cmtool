@@ -38,7 +38,7 @@ class _GroupStandingsWidgetState extends ConsumerState<GroupStandingsWidget> {
       error: (e, _) => Center(
         child: Padding(
           padding: const EdgeInsets.all(20),
-          child: Text('Failed to load group standings: $e', style: const TextStyle(color: Colors.redAccent)),
+          child: Text('Failed to load group standings: $e', style: TextStyle(color: AppColors.lossRed)),
         ),
       ),
       data: (data) {
@@ -137,7 +137,7 @@ class _GroupStandingsWidgetState extends ConsumerState<GroupStandingsWidget> {
               color: AppColors.cyan.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.grid_view, color: AppColors.cyan, size: 24),
+            child: Icon(Icons.grid_view, color: AppColors.cyan, size: 24),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -159,7 +159,7 @@ class _GroupStandingsWidgetState extends ConsumerState<GroupStandingsWidget> {
                     Container(
                       width: 8,
                       height: 8,
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         color: AppColors.winGreen,
                         shape: BoxShape.circle,
                       ),
@@ -242,7 +242,7 @@ class _GroupStandingsWidgetState extends ConsumerState<GroupStandingsWidget> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.shield_outlined, color: AppColors.offWhite, size: 18),
+                  Icon(Icons.shield_outlined, color: AppColors.offWhite, size: 18),
                   const SizedBox(width: 8),
                   Text(
                     groupName,
@@ -496,7 +496,7 @@ class _GroupStandingsWidgetState extends ConsumerState<GroupStandingsWidget> {
   }
 
   Widget _buildSkeleton() {
-    return const SizedBox(
+    return SizedBox(
       height: 250,
       child: GlassCard(
         padding: EdgeInsets.zero,
@@ -510,7 +510,7 @@ class _GroupStandingsWidgetState extends ConsumerState<GroupStandingsWidget> {
       padding: const EdgeInsets.all(32),
       child: Column(
         children: [
-          const Icon(Icons.grid_view, color: AppColors.textMuted, size: 48),
+          Icon(Icons.grid_view, color: AppColors.textMuted, size: 48),
           const SizedBox(height: 12),
           Text('No Group Standings Available', style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
