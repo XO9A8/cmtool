@@ -58,13 +58,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let max_conns: u32 = std::env::var("DATABASE_MAX_CONNECTIONS")
         .ok()
         .and_then(|s| s.parse().ok())
-        .unwrap_or(5);
+        .unwrap_or(15);
 
     let pool = match sqlx::postgres::PgPoolOptions::new()
         .max_connections(max_conns)
-        .min_connections(1)
-        .acquire_timeout(std::time::Duration::from_secs(5))
-        .idle_timeout(std::time::Duration::from_secs(30))
+        .min_connections(2)
+        .acquire_timeout(std::time::Duration::from_secs(15))
+        .idle_timeout(std::time::Duration::from_secs(60))
         .max_lifetime(std::time::Duration::from_secs(1800))
         .connect(&db_url)
         .await
@@ -81,8 +81,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             sqlx::postgres::PgPoolOptions::new()
                 .max_connections(max_conns)
                 .min_connections(1)
-                .acquire_timeout(std::time::Duration::from_secs(5))
-                .idle_timeout(std::time::Duration::from_secs(30))
+                .acquire_timeout(std::time::Duration::from_secs(15))
+                .idle_timeout(std::time::Duration::from_secs(60))
                 .max_lifetime(std::time::Duration::from_secs(1800))
                 .connect_lazy(&db_url)?
         }

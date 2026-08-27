@@ -181,6 +181,40 @@ pub struct ClubDetailRow {
     pub invite_code: String,
     pub owner_id: Option<Uuid>,
     pub member_count: i64,
+    pub user_role: Option<String>,
+}
+
+/// Single club full detail row.
+#[derive(FromRow, Serialize)]
+pub struct SingleClubDetailRow {
+    pub id: Uuid,
+    pub name: String,
+    pub invite_code: String,
+    pub owner_id: Option<Uuid>,
+    pub member_count: i64,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// Fetches full details for a single club.
+pub async fn get_club_by_id(
+    pool: &PgPool,
+    club_id: Uuid,
+) -> Result<Option<SingleClubDetailRow>, sqlx::Error> {
+    let row = sqlx::query_as::<_, SingleClubDetailRow>(
+        r#"
+        SELECT c.id, c.name, c.invite_code, c.owner_id,
+               (SELECT COUNT(*) FROM Club_Memberships cm WHERE cm.club_id = c.id) AS member_count,
+               c.created_at, c.updated_at
+        FROM Clubs c
+        WHERE c.id = $1 AND c.deleted_at IS NULL
+        "#,
+    )
+    .bind(club_id)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(row)
 }
 
 /// Fetches summary info for clubs a player belongs to.
@@ -191,7 +225,8 @@ pub async fn get_player_clubs(
     let rows = sqlx::query_as::<_, ClubDetailRow>(
         r#"
         SELECT c.id, c.name, c.invite_code, c.owner_id,
-               (SELECT COUNT(*) FROM Club_Memberships cm2 WHERE cm2.club_id = c.id) AS member_count
+               (SELECT COUNT(*) FROM Club_Memberships cm2 WHERE cm2.club_id = c.id) AS member_count,
+               cm.role AS user_role
         FROM Clubs c
         JOIN Club_Memberships cm ON cm.club_id = c.id
         WHERE cm.player_id = $1 AND c.deleted_at IS NULL
@@ -246,7 +281,7 @@ pub async fn get_club_members(
     Ok(rows)
 }
 
-/// Updates a club member's role (admin/organizer/player).
+/// Updates a club member's role (admin/organizer/president/captain/vice-captain/player).
 pub async fn update_member_role(
     pool: &PgPool,
     club_id: Uuid,
@@ -287,19 +322,130 @@ pub async fn update_club_details(
     pool: &PgPool,
     club_id: Uuid,
     name: &str,
-    invite_code: &str,
+    invite_code: Option<&str>,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(
-        r#"UPDATE Clubs SET name = $1, invite_code = $2, updated_at = NOW() WHERE id = $3"#,
-    )
-    .bind(name)
-    .bind(invite_code)
-    .bind(club_id)
-    .execute(pool)
-    .await?;
+    if let Some(code) = invite_code {
+        sqlx::query(
+            r#"UPDATE Clubs SET name = $1, invite_code = $2, updated_at = NOW() WHERE id = $3 AND deleted_at IS NULL"#,
+        )
+        .bind(name)
+        .bind(code)
+        .bind(club_id)
+        .execute(pool)
+        .await?;
+    } else {
+        sqlx::query(
+            r#"UPDATE Clubs SET name = $1, updated_at = NOW() WHERE id = $2 AND deleted_at IS NULL"#,
+        )
+        .bind(name)
+        .bind(club_id)
+        .execute(pool)
+        .await?;
+    }
 
     Ok(())
 }
+
+/// Regenerates a unique invite code for the club.
+pub async fn regenerate_club_invite_code(
+    pool: &PgPool,
+    club_id: Uuid,
+) -> Result<String, sqlx::Error> {
+    // Generate unique 6-character code from UUID
+    for _ in 0..10 {
+        let code = format!("{:X}", Uuid::new_v4().as_u128())[..6].to_string();
+        let exists: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM Clubs WHERE invite_code = $1 AND deleted_at IS NULL)"
+        )
+        .bind(&code)
+        .fetch_one(pool)
+        .await?;
+
+        if !exists {
+            sqlx::query("UPDATE Clubs SET invite_code = $1, updated_at = NOW() WHERE id = $2 AND deleted_at IS NULL")
+                .bind(&code)
+                .bind(club_id)
+                .execute(pool)
+                .await?;
+            return Ok(code);
+        }
+    }
+
+    let code = format!("C{}", &Uuid::new_v4().to_string()[..5].to_uppercase());
+    sqlx::query("UPDATE Clubs SET invite_code = $1, updated_at = NOW() WHERE id = $2 AND deleted_at IS NULL")
+        .bind(&code)
+        .bind(club_id)
+        .execute(pool)
+        .await?;
+    Ok(code)
+}
+
+/// Transfers club ownership to another member.
+pub async fn transfer_club_ownership(
+    pool: &PgPool,
+    club_id: Uuid,
+    new_owner_id: Uuid,
+) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await?;
+
+    sqlx::query("UPDATE Clubs SET owner_id = $1, updated_at = NOW() WHERE id = $2 AND deleted_at IS NULL")
+        .bind(new_owner_id)
+        .bind(club_id)
+        .execute(&mut *tx)
+        .await?;
+
+    sqlx::query(
+        r#"
+        INSERT INTO Club_Memberships (player_id, club_id, role)
+        VALUES ($1, $2, 'admin')
+        ON CONFLICT (player_id, club_id) DO UPDATE SET role = 'admin'
+        "#,
+    )
+    .bind(new_owner_id)
+    .bind(club_id)
+    .execute(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+    Ok(())
+}
+
+/// Allows a player to leave a club.
+pub async fn leave_club(
+    pool: &PgPool,
+    club_id: Uuid,
+    player_id: Uuid,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("DELETE FROM Club_Memberships WHERE club_id = $1 AND player_id = $2")
+        .bind(club_id)
+        .bind(player_id)
+        .execute(pool)
+        .await?;
+
+    Ok(())
+}
+
+/// Soft-deletes a club and removes its memberships.
+pub async fn delete_club(
+    pool: &PgPool,
+    club_id: Uuid,
+) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await?;
+
+    sqlx::query("UPDATE Clubs SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1")
+        .bind(club_id)
+        .execute(&mut *tx)
+        .await?;
+
+    sqlx::query("DELETE FROM Club_Memberships WHERE club_id = $1")
+        .bind(club_id)
+        .execute(&mut *tx)
+        .await?;
+
+    tx.commit().await?;
+    Ok(())
+}
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Club Activity & Seasons
@@ -494,7 +640,7 @@ pub async fn get_player_scheduled_matches(
     Ok(rows)
 }
 
-/// Checks if a user is a club official (admin, organizer, president, captain, vice-captain).
+/// Checks if a user is a club official (admin, organizer, president, captain, vice-captain) or owner.
 pub async fn is_club_official(
     pool: &PgPool,
     club_id: Uuid,
@@ -506,6 +652,9 @@ pub async fn is_club_official(
             SELECT 1 FROM Club_Memberships
             WHERE club_id = $1 AND player_id = $2
               AND LOWER(role) IN ('admin', 'organizer', 'president', 'captain', 'vice-captain')
+        ) OR EXISTS (
+            SELECT 1 FROM Clubs
+            WHERE id = $1 AND owner_id = $2 AND deleted_at IS NULL
         )
         "#,
     )
@@ -516,6 +665,7 @@ pub async fn is_club_official(
 
     Ok(is_official)
 }
+
 
 /// Checks if a user is the owner of a club.
 pub async fn is_club_owner(

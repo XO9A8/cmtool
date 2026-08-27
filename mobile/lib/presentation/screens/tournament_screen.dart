@@ -143,7 +143,7 @@ class _TournamentScreenState extends ConsumerState<TournamentScreen> {
                     : AppColors.surfaceLight.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: isSelected ? AppColors.primary : Colors.white.withValues(alpha: 0.1),
+                  color: isSelected ? AppColors.primary : AppColors.cardBorder,
                   width: isSelected ? 1.5 : 1,
                 ),
               ),
@@ -214,7 +214,7 @@ class _TournamentScreenState extends ConsumerState<TournamentScreen> {
                               style: GoogleFonts.orbitron(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w900,
-                                color: Colors.white,
+                                color: AppColors.textPrimary,
                                 letterSpacing: 1.2,
                               ),
                             ),
@@ -430,7 +430,7 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
                     Text(
                       'CREATE TOURNAMENT',
                       style: GoogleFonts.rajdhani(
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 1.2,
@@ -444,7 +444,7 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
                 TextField(
                   controller: _nameCtrl,
                   focusNode: _focusNode,
-                  style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 16),
+                  style: GoogleFonts.rajdhani(color: AppColors.textPrimary, fontSize: 16),
                   decoration: InputDecoration(
                     labelText: 'Tournament Name',
                     labelStyle: GoogleFonts.rajdhani(color: AppColors.textMuted),
@@ -456,7 +456,7 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                      borderSide: BorderSide(color: AppColors.cardBorder),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -853,7 +853,7 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
                     Row(
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.remove, color: Colors.white70, size: 20),
+                          icon: Icon(Icons.remove, color: AppColors.textSecondary, size: 20),
                           onPressed: () {
                             setState(() {
                               if (_matchdayGapDays > 0) _matchdayGapDays--;
@@ -862,10 +862,10 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
                         ),
                         Text(
                           '$_matchdayGapDays',
-                          style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                          style: GoogleFonts.rajdhani(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.add, color: Colors.white70, size: 20),
+                          icon: Icon(Icons.add, color: AppColors.textSecondary, size: 20),
                           onPressed: () {
                             setState(() {
                               _matchdayGapDays++;
@@ -965,12 +965,12 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
                       decoration: BoxDecoration(
                         color: AppColors.surfaceLight.withValues(alpha: 0.4),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                        border: Border.all(color: AppColors.cardBorder),
                       ),
                       child: ListView.separated(
                         shrinkWrap: true,
                         itemCount: members.length,
-                        separatorBuilder: (_, __) => Divider(height: 1, color: Colors.white.withValues(alpha: 0.05)),
+                        separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.divider),
                         itemBuilder: (ctx, i) {
                           final m = members[i];
                           final id = m['user_id']?.toString() ?? '';
@@ -985,7 +985,7 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
                             checkColor: Colors.black,
                             title: Text(
                               name,
-                              style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+                              style: GoogleFonts.rajdhani(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 14),
                             ),
                             subtitle: Text(
                               role.toUpperCase(),
@@ -1051,13 +1051,20 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
           firstDate: DateTime.now().subtract(const Duration(days: 365)),
           lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
           builder: (context, child) => Theme(
-            data: ThemeData.dark().copyWith(
-              colorScheme: ColorScheme.dark(
-                primary: AppColors.primary,
-                onPrimary: Colors.black,
-                surface: AppColors.surface,
-                onSurface: Colors.white,
-              ),
+            data: (AppColors.isLight ? ThemeData.light() : ThemeData.dark()).copyWith(
+              colorScheme: AppColors.isLight
+                  ? ColorScheme.light(
+                      primary: AppColors.primary,
+                      onPrimary: Colors.white,
+                      surface: AppColors.surface,
+                      onSurface: AppColors.textPrimary,
+                    )
+                  : ColorScheme.dark(
+                      primary: AppColors.primary,
+                      onPrimary: Colors.black,
+                      surface: AppColors.surface,
+                      onSurface: Colors.white,
+                    ),
             ),
             child: child!,
           ),
@@ -1071,7 +1078,7 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
         decoration: BoxDecoration(
           color: AppColors.surfaceLight.withValues(alpha: 0.6),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+          border: Border.all(color: AppColors.cardBorder),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1084,7 +1091,7 @@ class _CreateTournamentSheetState extends ConsumerState<_CreateTournamentSheet> 
                 const SizedBox(width: 8),
                 Text(
                   date != null ? '${date.day}/${date.month}/${date.year}' : 'Not set',
-                  style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                  style: GoogleFonts.rajdhani(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -1406,7 +1413,7 @@ class _TournamentHeroCard extends StatelessWidget {
                   Text(
                     name.toUpperCase(),
                     style: GoogleFonts.orbitron(
-                      color: Colors.white,
+                      color: AppColors.textPrimary,
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 1.0,
@@ -1497,7 +1504,7 @@ class _TournamentScheduledCardState extends ConsumerState<_TournamentScheduledCa
         ),
         title: Text(
           'START TOURNAMENT?',
-          style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+          style: GoogleFonts.rajdhani(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 18),
         ),
         content: Text(
           'Start "$name"? This will generate all fixtures and set the tournament to LIVE. This cannot be undone.',
@@ -1584,7 +1591,7 @@ class _TournamentScheduledCardState extends ConsumerState<_TournamentScheduledCa
             Text(
               name,
               style: GoogleFonts.rajdhani(
-                color: Colors.white,
+                color: AppColors.textPrimary,
                 fontWeight: FontWeight.bold,
                 fontSize: 15,
                 letterSpacing: 0.4,
@@ -1666,7 +1673,7 @@ class _TournamentCompletedRow extends StatelessWidget {
               child: Text(
                 name,
                 style: GoogleFonts.rajdhani(
-                  color: Colors.white,
+                  color: AppColors.textPrimary,
                   fontWeight: FontWeight.w600,
                   fontSize: 15,
                 ),

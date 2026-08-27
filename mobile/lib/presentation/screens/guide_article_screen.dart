@@ -48,7 +48,7 @@ class GuideArticleScreen extends ConsumerWidget {
           IconButton(
             icon: Icon(
               isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-              color: isBookmarked ? AppColors.primary : Colors.white70,
+              color: isBookmarked ? AppColors.primary : AppColors.textSecondary,
             ),
             tooltip: isBookmarked ? 'Remove Bookmark' : 'Bookmark Article',
             onPressed: () {
@@ -58,7 +58,7 @@ class GuideArticleScreen extends ConsumerWidget {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.share_outlined, color: Colors.white70),
+            icon: Icon(Icons.share_outlined, color: AppColors.textSecondary),
             tooltip: 'Share Guide',
             onPressed: () {
               SharePlus.instance.share(
@@ -164,7 +164,7 @@ class GuideArticleScreen extends ConsumerWidget {
                     style: GoogleFonts.orbitron(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: AppColors.textPrimary,
                       height: 1.2,
                     ),
                   ),
@@ -265,7 +265,7 @@ class GuideArticleScreen extends ConsumerWidget {
                                 style: GoogleFonts.rajdhani(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.white.withValues(alpha: 0.9),
+                                  color: AppColors.textPrimary,
                                 ),
                               ),
                             ),
@@ -297,12 +297,12 @@ class GuideArticleScreen extends ConsumerWidget {
                 h3: GoogleFonts.rajdhani(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  color: AppColors.textPrimary,
                 ),
                 p: GoogleFonts.rajdhani(
                   fontSize: 15,
                   fontWeight: FontWeight.w500,
-                  color: Colors.white.withValues(alpha: 0.9),
+                  color: AppColors.textPrimary,
                   height: 1.5,
                 ),
                 listBullet: GoogleFonts.rajdhani(
@@ -318,10 +318,10 @@ class GuideArticleScreen extends ConsumerWidget {
                 tableBody: GoogleFonts.rajdhani(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
-                  color: Colors.white,
+                  color: AppColors.textPrimary,
                 ),
                 tableBorder: TableBorder.all(
-                  color: Colors.white24,
+                  color: AppColors.cardBorder,
                   width: 1,
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -335,7 +335,7 @@ class GuideArticleScreen extends ConsumerWidget {
                 codeblockDecoration: BoxDecoration(
                   color: AppColors.surface,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.white12),
+                  border: Border.all(color: AppColors.cardBorder),
                 ),
                 blockquoteDecoration: BoxDecoration(
                   color: AppColors.surfaceLight,

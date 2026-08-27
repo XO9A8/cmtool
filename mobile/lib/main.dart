@@ -56,11 +56,14 @@ class EFootballApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isPremium = ref.watch(themeProvider);
+    final themeType = ref.watch(themeProvider);
     return MaterialApp(
       title: 'eFootball Club Manager',
       debugShowCheckedModeBanner: false,
-      theme: isPremium ? AppTheme.premiumTheme : AppTheme.legacyTheme,
+      theme: AppTheme.getTheme(themeType),
+      builder: (context, child) {
+        return ThemedBackground(child: child ?? const SizedBox.shrink());
+      },
       home: const AppRoot(),
     );
   }
@@ -138,30 +141,33 @@ class _AppRootState extends ConsumerState<AppRoot> with WidgetsBindingObserver {
   }
 }
 
-class NavigationRootScreen extends StatefulWidget {
+class NavigationRootScreen extends ConsumerStatefulWidget {
   const NavigationRootScreen({super.key});
 
   @override
-  State<NavigationRootScreen> createState() => _NavigationRootScreenState();
+  ConsumerState<NavigationRootScreen> createState() => _NavigationRootScreenState();
 }
 
-class _NavigationRootScreenState extends State<NavigationRootScreen> {
+class _NavigationRootScreenState extends ConsumerState<NavigationRootScreen> {
   int _selectedIndex = 0;
-
-  final List<Widget> _screens = const [
-    DashboardScreen(),
-    TournamentScreen(),
-    GameGuideScreen(),
-    ClubsScreen(),
-    H2hScreen(),
-  ];
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.themeColors;
+
+    const screens = [
+      DashboardScreen(),
+      TournamentScreen(),
+      GameGuideScreen(),
+      ClubsScreen(),
+      H2hScreen(),
+    ];
+
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: AppColors.background.withValues(alpha: 0.8),
+        backgroundColor: colors.surface.withValues(alpha: 0.85),
+        elevation: 0,
         title: FittedBox(
           fit: BoxFit.scaleDown,
           alignment: Alignment.centerLeft,
@@ -172,17 +178,20 @@ class _NavigationRootScreenState extends State<NavigationRootScreen> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: LinearGradient(
-                    colors: [AppColors.primary, AppColors.cyan],
+                    colors: [colors.primary, colors.cyan],
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.5),
+                      color: colors.primary.withValues(alpha: 0.5),
                       blurRadius: 10,
                     ),
                   ],
                 ),
-                child: const Icon(Icons.sports_soccer,
-                    color: Colors.black, size: 20),
+                child: Icon(
+                  Icons.sports_soccer,
+                  color: colors.isLight ? Colors.white : Colors.black,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 10),
               Text(
@@ -191,7 +200,7 @@ class _NavigationRootScreenState extends State<NavigationRootScreen> {
                   fontWeight: FontWeight.bold,
                   fontSize: 18,
                   letterSpacing: 1.2,
-                  color: Colors.white,
+                  color: colors.isLight ? colors.navy : Colors.white,
                 ),
               ),
             ],
@@ -199,8 +208,7 @@ class _NavigationRootScreenState extends State<NavigationRootScreen> {
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.mark_email_unread_outlined,
-                color: AppColors.cyan),
+            icon: Icon(Icons.mark_email_unread_outlined, color: colors.cyan),
             tooltip: 'Pending Approvals',
             onPressed: () {
               showDialog(
@@ -210,7 +218,7 @@ class _NavigationRootScreenState extends State<NavigationRootScreen> {
             },
           ),
           IconButton(
-            icon: Icon(Icons.gavel_outlined, color: AppColors.primary),
+            icon: Icon(Icons.gavel_outlined, color: colors.primary),
             tooltip: 'Admin Disputes',
             onPressed: () {
               Navigator.push(
@@ -220,7 +228,10 @@ class _NavigationRootScreenState extends State<NavigationRootScreen> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.settings_outlined, color: Colors.white70),
+            icon: Icon(
+              Icons.settings_outlined,
+              color: colors.isLight ? colors.navy : Colors.white70,
+            ),
             tooltip: 'Settings',
             onPressed: () {
               Navigator.push(
@@ -262,10 +273,10 @@ class _NavigationRootScreenState extends State<NavigationRootScreen> {
                     child: Padding(
                       padding: const EdgeInsets.all(1.5),
                       child: CircleAvatar(
-                        backgroundColor: AppColors.background,
+                        backgroundColor: colors.background,
                         child: Icon(
                           avatarData.icon,
-                          color: Colors.white,
+                          color: colors.isLight ? colors.navy : Colors.white,
                           size: 14,
                         ),
                       ),
@@ -279,18 +290,19 @@ class _NavigationRootScreenState extends State<NavigationRootScreen> {
       ),
       body: IndexedStack(
         index: _selectedIndex,
-        children: _screens,
+        children: screens,
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: AppColors.surface,
-          border:
-              const Border(top: BorderSide(color: Colors.white10, width: 1)),
+          color: colors.surface.withValues(alpha: colors.isLight ? 0.96 : 0.92),
+          border: Border(top: BorderSide(color: colors.cardBorder, width: 1)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.5),
-              blurRadius: 20,
-              offset: const Offset(0, -4),
+              color: colors.isLight
+                  ? const Color(0xFF0A1628).withValues(alpha: 0.08)
+                  : Colors.black.withValues(alpha: 0.5),
+              blurRadius: colors.isLight ? 16 : 20,
+              offset: const Offset(0, -3),
             ),
           ],
         ),
@@ -299,8 +311,8 @@ class _NavigationRootScreenState extends State<NavigationRootScreen> {
           onTap: (idx) => setState(() => _selectedIndex = idx),
           backgroundColor: Colors.transparent,
           elevation: 0,
-          selectedItemColor: AppColors.primary,
-          unselectedItemColor: AppColors.textMuted,
+          selectedItemColor: colors.primary,
+          unselectedItemColor: colors.textMuted,
           selectedLabelStyle:
               GoogleFonts.rajdhani(fontWeight: FontWeight.bold, fontSize: 12),
           unselectedLabelStyle:

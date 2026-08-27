@@ -96,20 +96,20 @@ class _PlayerPickerBottomSheetState extends State<PlayerPickerBottomSheet> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: TextField(
               onChanged: (val) => setState(() => _searchQuery = val),
-              style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 15),
+              style: GoogleFonts.rajdhani(color: AppColors.textPrimary, fontSize: 15),
               decoration: InputDecoration(
                 hintText: 'Search player name or play style...',
-                hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
+                hintStyle: TextStyle(color: AppColors.textDim, fontSize: 13),
                 prefixIcon:
-                    const Icon(Icons.search, color: Colors.white60, size: 20),
+                    Icon(Icons.search, color: AppColors.textSecondary, size: 20),
                 filled: true,
-                fillColor: Colors.white.withValues(alpha: 0.04),
+                fillColor: AppColors.isLight ? AppColors.surfaceLight : Colors.white.withValues(alpha: 0.04),
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide:
-                      BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                      BorderSide(color: AppColors.cardBorder),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -199,7 +199,7 @@ class _PlayerPickerBottomSheetState extends State<PlayerPickerBottomSheet> {
                                               style: GoogleFonts.rajdhani(
                                                 fontSize: 16,
                                                 fontWeight: FontWeight.bold,
-                                                color: Colors.white,
+                                                color: AppColors.textPrimary,
                                               ),
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,

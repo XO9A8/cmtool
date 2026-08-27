@@ -308,7 +308,9 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
       padding: const EdgeInsets.fromLTRB(16, 46, 16, 14),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [const Color(0xFF2E1704), const Color(0xFF141624), AppColors.navy],
+          colors: AppColors.isLight
+              ? [const Color(0xFF0A1628), const Color(0xFF1E293B), const Color(0xFF0A1628)]
+              : [const Color(0xFF2E1704), const Color(0xFF141624), AppColors.navy],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
@@ -488,12 +490,17 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                             shadowColor: Colors.transparent,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
-                          icon: const Icon(Icons.edit, size: 15, color: Colors.black),
+                          icon: Icon(Icons.edit, size: 15, color: AppColors.isLight ? Colors.white : Colors.black),
                           label: FittedBox(
                             fit: BoxFit.scaleDown,
                             child: Text(
                               'EDIT PROFILE',
-                              style: GoogleFonts.orbitron(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.black, letterSpacing: 0.8),
+                              style: GoogleFonts.orbitron(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.isLight ? Colors.white : Colors.black,
+                                letterSpacing: 0.8,
+                              ),
                             ),
                           ),
                           onPressed: () => _showEditProfileBottomSheet(context, ref, userId, data, profilePrefs),
@@ -560,7 +567,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
           fit: BoxFit.scaleDown,
           child: Text(value, style: GoogleFonts.orbitron(fontSize: 13, fontWeight: FontWeight.bold, color: color)),
         ),
-        Text(label, style: GoogleFonts.rajdhani(fontSize: 8.5, color: AppColors.textMuted, letterSpacing: 0.8, fontWeight: FontWeight.bold)),
+        Text(label, style: GoogleFonts.rajdhani(fontSize: 8.5, color: Colors.white70, letterSpacing: 0.8, fontWeight: FontWeight.bold)),
       ],
     );
   }
@@ -658,7 +665,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                   Expanded(
                     child: Text(
                       'PLAYER TACTICAL BIO',
-                      style: GoogleFonts.orbitron(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                      style: GoogleFonts.orbitron(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -673,7 +680,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
               const SizedBox(height: 6),
               Text(
                 '"$bio"',
-                style: GoogleFonts.shareTechMono(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.white70),
+                style: GoogleFonts.shareTechMono(fontSize: 12, fontStyle: FontStyle.italic, color: AppColors.textSecondary),
               ),
             ],
           ),
@@ -686,7 +693,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white12),
+            border: Border.all(color: AppColors.cardBorder),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -698,7 +705,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                   Expanded(
                     child: Text(
                       'PLAYER DOSSIER',
-                      style: GoogleFonts.orbitron(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1),
+                      style: GoogleFonts.orbitron(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary, letterSpacing: 1),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -712,11 +719,11 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                 ],
               ),
               const SizedBox(height: 8),
-              const Divider(color: Colors.white10),
-              _buildDossierRow('EFOOTBALL GAME ID', gameId, valColor: Colors.white, icon: Icons.sports_esports),
+              Divider(color: AppColors.divider),
+              _buildDossierRow('EFOOTBALL GAME ID', gameId, valColor: AppColors.textPrimary, icon: Icons.sports_esports),
               _buildDossierRow('PREFERRED FOOT', foot, valColor: AppColors.cyan, icon: Icons.straighten),
-              _buildDossierRow('JERSEY NUMBER', jersey, valColor: Colors.white, icon: Icons.numbers),
-              _buildDossierRow('SYSTEM DEVICE', device, valColor: Colors.white, icon: Icons.devices),
+              _buildDossierRow('JERSEY NUMBER', jersey, valColor: AppColors.textPrimary, icon: Icons.numbers),
+              _buildDossierRow('SYSTEM DEVICE', device, valColor: AppColors.textPrimary, icon: Icons.devices),
               _buildDossierRow(
                 'PLAY STYLE',
                 isOwnProfile && profilePrefs.playStyle.isNotEmpty
@@ -726,10 +733,10 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                 isBold: true,
                 icon: Icons.auto_awesome,
               ),
-              _buildDossierRow('DISTRICT / REGION', district, valColor: Colors.white70, icon: Icons.location_on),
-              _buildDossierRow('DATE OF BIRTH', dob, valColor: Colors.white70, icon: Icons.cake),
-              _buildDossierRow('REGISTRAR JOINED', joined, valColor: Colors.white54, icon: Icons.calendar_today),
-              _buildDossierRow('CONTRACT START', start, valColor: Colors.white54, icon: Icons.play_arrow),
+              _buildDossierRow('DISTRICT / REGION', district, valColor: AppColors.textSecondary, icon: Icons.location_on),
+              _buildDossierRow('DATE OF BIRTH', dob, valColor: AppColors.textSecondary, icon: Icons.cake),
+              _buildDossierRow('REGISTRAR JOINED', joined, valColor: AppColors.textDim, icon: Icons.calendar_today),
+              _buildDossierRow('CONTRACT START', start, valColor: AppColors.textDim, icon: Icons.play_arrow),
               _buildDossierRow('CONTRACT END', end, valColor: AppColors.gold, isBold: true, icon: Icons.flag),
             ],
           ),
@@ -742,7 +749,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white12),
+            border: Border.all(color: AppColors.cardBorder),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -752,7 +759,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                   Expanded(
                     child: Text(
                       'REGISTRY CONTACT',
-                      style: GoogleFonts.orbitron(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white54, letterSpacing: 1.5),
+                      style: GoogleFonts.orbitron(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary, letterSpacing: 1.5),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -763,7 +770,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                     ),
                 ],
               ),
-              const Divider(color: Colors.white10),
+              Divider(color: AppColors.divider),
               _buildDossierRow('CONTACT EMAIL', email, valColor: AppColors.gold, icon: Icons.email),
               _buildDossierRow('PHONE LINE', phone, valColor: const Color(0xFF00FFC2), icon: Icons.phone),
               _buildDossierRow('FACEBOOK LINK', facebook, valColor: AppColors.gold, icon: Icons.link),
@@ -797,9 +804,9 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                 ],
               ),
               const SizedBox(height: 8),
-              const Divider(color: Colors.white10),
+              Divider(color: AppColors.divider),
               _buildDossierRow('NODE STATE', state, valColor: const Color(0xFF00FF66), isBold: true, icon: Icons.dns),
-              _buildDossierRow('AUTH STATUS', authStatus, valColor: Colors.white, isBold: true, icon: Icons.security),
+              _buildDossierRow('AUTH STATUS', authStatus, valColor: AppColors.textPrimary, isBold: true, icon: Icons.security),
               _buildDossierRow('SOURCE FEED', feed, valColor: AppColors.gold, isBold: true, icon: Icons.wifi_lock),
             ],
           ),
@@ -1000,7 +1007,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
               Expanded(
                 child: Text(
                   'FORM STATUS',
-                  style: GoogleFonts.orbitron(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1.0),
+                  style: GoogleFonts.orbitron(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary, letterSpacing: 1.0),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -1090,7 +1097,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
             Container(
               padding: const EdgeInsets.symmetric(vertical: 8),
               alignment: Alignment.centerLeft,
-              child: Text('No recent matches recorded in registry', style: GoogleFonts.rajdhani(color: Colors.white54, fontSize: 12)),
+              child: Text('No recent matches recorded in registry', style: GoogleFonts.rajdhani(color: AppColors.textDim, fontSize: 12)),
             )
           else
             SingleChildScrollView(
@@ -1291,7 +1298,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
               Expanded(
                 child: Text(
                   '6-PILLAR PERFORMANCE RADAR',
-                  style: GoogleFonts.orbitron(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1.0),
+                  style: GoogleFonts.orbitron(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary, letterSpacing: 1.0),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -1328,9 +1335,9 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.25),
+              color: AppColors.isLight ? AppColors.surfaceLight : Colors.black.withValues(alpha: 0.25),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white10),
+              border: Border.all(color: AppColors.cardBorder),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -1388,7 +1395,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
               Expanded(
                 child: Text(
                   'OFFENSIVE IMPACT',
-                  style: GoogleFonts.orbitron(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1.0),
+                  style: GoogleFonts.orbitron(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary, letterSpacing: 1.0),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -1465,7 +1472,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                   ),
                   Expanded(
                     flex: ((100.0 - shotAcc) * 10).round().clamp(1, 1000),
-                    child: Container(color: Colors.white12),
+                    child: Container(color: AppColors.divider),
                   ),
                 ],
               ),
@@ -1498,7 +1505,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
               Expanded(
                 child: Text(
                   'PASSING & POSSESSION',
-                  style: GoogleFonts.orbitron(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1.0),
+                  style: GoogleFonts.orbitron(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary, letterSpacing: 1.0),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -1557,9 +1564,9 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.04),
+              color: AppColors.isLight ? AppColors.surfaceLight : Colors.white.withValues(alpha: 0.04),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+              border: Border.all(color: AppColors.cardBorder),
             ),
             child: Row(
               children: [
@@ -1571,7 +1578,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                     children: [
                       Text(
                         'TACTICAL IDENTITY: $playStyle',
-                        style: GoogleFonts.orbitron(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                        style: GoogleFonts.orbitron(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 2),
@@ -1614,7 +1621,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
               Expanded(
                 child: Text(
                   'DEFENSIVE FORTRESS',
-                  style: GoogleFonts.orbitron(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1.0),
+                  style: GoogleFonts.orbitron(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary, letterSpacing: 1.0),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -1671,9 +1678,9 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
+        color: AppColors.isLight ? AppColors.surfaceLight : Colors.white.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: valueColor.withValues(alpha: 0.2)),
+        border: Border.all(color: valueColor.withValues(alpha: 0.25)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1703,7 +1710,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
           const SizedBox(height: 2),
           Text(
             subValue,
-            style: GoogleFonts.rajdhani(fontSize: 9, color: Colors.white60, fontWeight: FontWeight.w600),
+            style: GoogleFonts.rajdhani(fontSize: 9, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -1747,7 +1754,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                       Expanded(
                         child: Text(
                           'UNLOCKED: $unlockedCount / ${badges.length}',
-                          style: GoogleFonts.orbitron(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                          style: GoogleFonts.orbitron(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -1886,10 +1893,12 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: badge.isUnlocked ? const Color(0xFF141824) : Colors.black.withValues(alpha: 0.3),
+        color: badge.isUnlocked
+            ? (AppColors.isLight ? AppColors.surfaceLight : const Color(0xFF141824))
+            : (AppColors.isLight ? AppColors.surfaceLight.withValues(alpha: 0.5) : Colors.black.withValues(alpha: 0.3)),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: badge.isUnlocked ? badge.color.withValues(alpha: 0.6) : Colors.white.withValues(alpha: 0.08),
+          color: badge.isUnlocked ? badge.color.withValues(alpha: 0.6) : AppColors.cardBorder,
           width: badge.isUnlocked ? 1.5 : 1,
         ),
         boxShadow: badge.isUnlocked
@@ -1905,10 +1914,12 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: badge.isUnlocked ? badge.color.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.05),
+                  color: badge.isUnlocked
+                      ? badge.color.withValues(alpha: 0.2)
+                      : (AppColors.isLight ? AppColors.divider : Colors.white.withValues(alpha: 0.05)),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(badge.icon, size: 16, color: badge.isUnlocked ? badge.color : Colors.white30),
+                child: Icon(badge.icon, size: 16, color: badge.isUnlocked ? badge.color : AppColors.textDim),
               ),
               const SizedBox(width: 6),
               Expanded(
@@ -1920,14 +1931,18 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                       style: GoogleFonts.orbitron(
                         fontSize: 10.5,
                         fontWeight: FontWeight.bold,
-                        color: badge.isUnlocked ? Colors.white : Colors.white54,
+                        color: badge.isUnlocked ? AppColors.textPrimary : AppColors.textDim,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
                       badge.category,
-                      style: GoogleFonts.rajdhani(fontSize: 8.5, color: badge.isUnlocked ? badge.color : Colors.white30, fontWeight: FontWeight.bold),
+                      style: GoogleFonts.rajdhani(
+                        fontSize: 8.5,
+                        color: badge.isUnlocked ? badge.color : AppColors.textDim,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ),
@@ -1949,7 +1964,10 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                   Expanded(
                     child: Text(
                       badge.progressLabel,
-                      style: GoogleFonts.shareTechMono(fontSize: 8.5, color: badge.isUnlocked ? badge.color : Colors.white38),
+                      style: GoogleFonts.shareTechMono(
+                        fontSize: 8.5,
+                        color: badge.isUnlocked ? badge.color : AppColors.textDim,
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -1963,7 +1981,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                 child: LinearProgressIndicator(
                   value: pct,
                   minHeight: 3.5,
-                  backgroundColor: Colors.white10,
+                  backgroundColor: AppColors.divider,
                   valueColor: AlwaysStoppedAnimation<Color>(badge.isUnlocked ? badge.color : AppColors.cyan.withValues(alpha: 0.5)),
                 ),
               ),
@@ -2221,11 +2239,11 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
             return Container(
               height: MediaQuery.of(context).size.height * 0.88,
               decoration: BoxDecoration(
-                color: const Color(0xFF10121D),
+                color: AppColors.surface,
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                border: Border.all(color: AppColors.primary.withValues(alpha: 0.5)),
+                border: Border.all(color: AppColors.cardBorder),
                 boxShadow: [
-                  BoxShadow(color: AppColors.primary.withValues(alpha: 0.2), blurRadius: 30, offset: const Offset(0, -5)),
+                  BoxShadow(color: AppColors.primary.withValues(alpha: 0.15), blurRadius: 30, offset: const Offset(0, -5)),
                 ],
               ),
               child: Column(
@@ -2236,7 +2254,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                     width: 48,
                     height: 5,
                     decoration: BoxDecoration(
-                      color: Colors.white30,
+                      color: AppColors.divider,
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
@@ -2249,18 +2267,18 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                         Expanded(
                           child: Text(
                             'EDIT DOSSIER & PROFILE',
-                            style: GoogleFonts.orbitron(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                            style: GoogleFonts.orbitron(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.close, color: Colors.white70),
+                          icon: Icon(Icons.close, color: AppColors.textSecondary),
                           onPressed: () => Navigator.pop(ctx),
                         ),
                       ],
                     ),
                   ),
-                  const Divider(color: Colors.white10, height: 1),
+                  Divider(color: AppColors.divider, height: 1),
 
                   // Form Fields List
                   Expanded(
@@ -2383,14 +2401,14 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: AppColors.navy,
-                      border: const Border(top: BorderSide(color: Colors.white10)),
+                      border: Border(top: BorderSide(color: AppColors.divider)),
                     ),
                     child: Row(
                       children: [
                         Expanded(
                           child: TextButton(
                             onPressed: () => Navigator.pop(ctx),
-                            child: Text('CANCEL', style: GoogleFonts.orbitron(color: Colors.white54, fontWeight: FontWeight.bold)),
+                            child: Text('CANCEL', style: GoogleFonts.orbitron(color: AppColors.textDim, fontWeight: FontWeight.bold)),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -2529,16 +2547,16 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
       controller: controller,
       keyboardType: keyboardType,
       maxLines: maxLines,
-      style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+      style: GoogleFonts.rajdhani(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 13),
         prefixIcon: Icon(icon, color: AppColors.primary, size: 18),
         filled: true,
-        fillColor: Colors.white.withValues(alpha: 0.05),
+        fillColor: AppColors.isLight ? AppColors.surfaceLight : Colors.white.withValues(alpha: 0.05),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+          borderSide: BorderSide(color: AppColors.cardBorder),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -2559,21 +2577,21 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
       items: items
           .map((i) => DropdownMenuItem(
                 value: i,
-                child: Text(i, style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 14)),
+                child: Text(i, style: GoogleFonts.rajdhani(color: AppColors.textPrimary, fontSize: 14)),
               ))
           .toList(),
       onChanged: onChanged,
-      dropdownColor: const Color(0xFF161928),
-      style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 14),
+      dropdownColor: AppColors.surface,
+      style: GoogleFonts.rajdhani(color: AppColors.textPrimary, fontSize: 14),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 13),
         prefixIcon: Icon(Icons.list, color: AppColors.primary, size: 18),
         filled: true,
-        fillColor: Colors.white.withValues(alpha: 0.05),
+        fillColor: AppColors.isLight ? AppColors.surfaceLight : Colors.white.withValues(alpha: 0.05),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+          borderSide: BorderSide(color: AppColors.cardBorder),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -2594,7 +2612,8 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
     );
   }
 
-  Widget _buildDossierRow(String label, String value, {Color valColor = Colors.white, bool isBold = false, IconData? icon}) {
+  Widget _buildDossierRow(String label, String value, {Color? valColor, bool isBold = false, IconData? icon}) {
+    final effectiveValColor = valColor ?? AppColors.textPrimary;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -2603,12 +2622,12 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
           Row(
             children: [
               if (icon != null) ...[
-                Icon(icon, size: 14, color: Colors.white38),
+                Icon(icon, size: 14, color: AppColors.textMuted),
                 const SizedBox(width: 6),
               ],
               Text(
                 label,
-                style: GoogleFonts.shareTechMono(fontSize: 11, color: Colors.white38, letterSpacing: 1),
+                style: GoogleFonts.shareTechMono(fontSize: 11, color: AppColors.textMuted, letterSpacing: 1),
               ),
             ],
           ),
@@ -2619,7 +2638,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
               style: GoogleFonts.shareTechMono(
                 fontSize: 11,
                 fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-                color: valColor,
+                color: effectiveValColor,
                 letterSpacing: 1,
               ),
             ),
@@ -2863,7 +2882,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                             match['is_coop'] == true
                                 ? 'vs $opponent & ${match['opponent_partner'] ?? 'Unknown'}'
                                 : 'vs $opponent',
-                            style: GoogleFonts.rajdhani(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 16),
+                            style: GoogleFonts.rajdhani(fontWeight: FontWeight.bold, color: AppColors.textPrimary, fontSize: 16),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -2933,7 +2952,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
         ),
         Text(
           value,
-          style: GoogleFonts.orbitron(fontSize: 10, color: Colors.white70, fontWeight: FontWeight.bold),
+          style: GoogleFonts.orbitron(fontSize: 10, color: AppColors.textPrimary, fontWeight: FontWeight.bold),
         ),
       ],
     );
@@ -3158,23 +3177,29 @@ class _EsportsTabHeaderDelegate extends SliverPersistentHeaderDelegate {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF141624),
+          color: AppColors.isLight ? AppColors.surface : const Color(0xFF141624),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          border: Border.all(color: AppColors.cardBorder),
         ),
         child: Row(
           children: [
-            _buildTabItem(0, 'DOSSIER', Icons.badge),
-            _buildTabItem(1, 'ANALYTICS', Icons.analytics),
-            _buildTabItem(2, 'MATCHES', Icons.sports_soccer),
+            _buildTabItem(context, 0, 'DOSSIER', Icons.badge),
+            _buildTabItem(context, 1, 'ANALYTICS', Icons.analytics),
+            _buildTabItem(context, 2, 'MATCHES', Icons.sports_soccer),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildTabItem(int index, String label, IconData icon) {
+  Widget _buildTabItem(BuildContext context, int index, String label, IconData icon) {
     final isSelected = selectedIndex == index;
+    final selectedTextColor = AppColors.isLight ? Colors.white : Colors.black;
+    final unselectedTextColor = AppColors.textSecondary;
+    final selectedGradient = AppColors.isLight
+        ? LinearGradient(colors: [AppColors.primary, AppColors.gold])
+        : LinearGradient(colors: [AppColors.primary, const Color(0xFFFF8C00)]);
+
     return Expanded(
       child: GestureDetector(
         onTap: () => onTabSelected(index),
@@ -3183,21 +3208,19 @@ class _EsportsTabHeaderDelegate extends SliverPersistentHeaderDelegate {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),
-            gradient: isSelected
-                ? LinearGradient(colors: [AppColors.primary, const Color(0xFFFF8C00)])
-                : null,
+            gradient: isSelected ? selectedGradient : null,
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 14, color: isSelected ? Colors.black : Colors.white60),
+              Icon(icon, size: 14, color: isSelected ? selectedTextColor : unselectedTextColor),
               const SizedBox(width: 4),
               Text(
                 label,
                 style: GoogleFonts.orbitron(
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
-                  color: isSelected ? Colors.black : Colors.white60,
+                  color: isSelected ? selectedTextColor : unselectedTextColor,
                 ),
               ),
             ],

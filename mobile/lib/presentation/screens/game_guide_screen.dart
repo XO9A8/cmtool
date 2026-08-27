@@ -78,7 +78,7 @@ class _GameGuideScreenState extends ConsumerState<GameGuideScreen> {
                             shaderCallback: (bounds) => LinearGradient(
                               colors: [
                                 AppColors.primary,
-                                Colors.white,
+                                AppColors.textPrimary,
                                 AppColors.cyan,
                               ],
                               stops: const [0.0, 0.5, 1.0],
@@ -88,7 +88,7 @@ class _GameGuideScreenState extends ConsumerState<GameGuideScreen> {
                               style: GoogleFonts.orbitron(
                                 fontSize: 26,
                                 fontWeight: FontWeight.w900,
-                                color: Colors.white,
+                                color: AppColors.textPrimary,
                                 letterSpacing: 1.2,
                               ),
                             ),
@@ -171,13 +171,13 @@ class _GameGuideScreenState extends ConsumerState<GameGuideScreen> {
                     decoration: BoxDecoration(
                       color: AppColors.surface,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white12),
+                      border: Border.all(color: AppColors.cardBorder),
                     ),
                     child: TextField(
                       controller: _searchController,
                       style: GoogleFonts.rajdhani(
                         fontSize: 15,
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                         fontWeight: FontWeight.w600,
                       ),
                       onChanged: (val) {
@@ -372,7 +372,7 @@ class _GameGuideScreenState extends ConsumerState<GameGuideScreen> {
                       style: GoogleFonts.rajdhani(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white70,
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ],
@@ -440,7 +440,7 @@ class _GameGuideScreenState extends ConsumerState<GameGuideScreen> {
               : AppColors.surface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? color : Colors.white12,
+            color: isSelected ? color : AppColors.cardBorder,
             width: isSelected ? 1.5 : 1.0,
           ),
         ),
@@ -450,7 +450,7 @@ class _GameGuideScreenState extends ConsumerState<GameGuideScreen> {
             style: GoogleFonts.rajdhani(
               fontSize: 13,
               fontWeight: FontWeight.bold,
-              color: isSelected ? Colors.white : AppColors.textMuted,
+              color: isSelected ? (AppColors.isLight ? Colors.white : Colors.black) : AppColors.textMuted,
             ),
           ),
         ),
@@ -464,7 +464,7 @@ class _GameGuideScreenState extends ConsumerState<GameGuideScreen> {
     required bool isSelected,
     required VoidCallback onTap,
   }) {
-    final effectiveColor = color ?? Colors.white70;
+    final effectiveColor = color ?? AppColors.textSecondary;
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -475,7 +475,7 @@ class _GameGuideScreenState extends ConsumerState<GameGuideScreen> {
               : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? effectiveColor : Colors.white12,
+            color: isSelected ? effectiveColor : AppColors.cardBorder,
           ),
         ),
         child: Text(
@@ -506,7 +506,7 @@ class _GameGuideScreenState extends ConsumerState<GameGuideScreen> {
         border: Border.all(
           color: isRead
               ? AppColors.winGreen.withValues(alpha: 0.3)
-              : Colors.white.withValues(alpha: 0.08),
+              : AppColors.cardBorder,
         ),
       ),
       child: Material(
@@ -544,7 +544,7 @@ class _GameGuideScreenState extends ConsumerState<GameGuideScreen> {
                       child: Icon(
                         isBookmarked ? Icons.bookmark : Icons.bookmark_border,
                         size: 18,
-                        color: isBookmarked ? AppColors.primary : Colors.white38,
+                        color: isBookmarked ? AppColors.primary : AppColors.textDim,
                       ),
                     ),
                   ],
@@ -557,7 +557,7 @@ class _GameGuideScreenState extends ConsumerState<GameGuideScreen> {
                   style: GoogleFonts.orbitron(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 6),

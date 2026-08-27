@@ -270,7 +270,7 @@ class _TournamentDetailScreenState
       expandedHeight: 110,
       backgroundColor: AppColors.background,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+        icon: Icon(Icons.arrow_back, color: AppColors.textPrimary, size: 20),
         onPressed: () => Navigator.of(context).pop(),
       ),
       actions: [
@@ -287,7 +287,7 @@ class _TournamentDetailScreenState
                   child: Text(
                     widget.tournamentName,
                     style: GoogleFonts.orbitron(
-                      color: Colors.white,
+                      color: AppColors.textPrimary,
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
                     ),
@@ -345,7 +345,7 @@ class _TournamentDetailScreenState
                   Text(
                     widget.tournamentName.toUpperCase(),
                     style: GoogleFonts.orbitron(
-                      color: Colors.white,
+                      color: AppColors.textPrimary,
                       fontSize: 15,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 0.8,
@@ -649,7 +649,7 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
           child: Text(
             title,
             style: GoogleFonts.orbitron(
-              color: Colors.white,
+              color: AppColors.textPrimary,
               fontSize: 13,
               fontWeight: FontWeight.bold,
               letterSpacing: 1.2,
@@ -734,7 +734,7 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
                         color: AppColors.primary, size: 24),
                     isExpanded: true,
                     style: GoogleFonts.orbitron(
-                      color: Colors.white,
+                      color: AppColors.textPrimary,
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
                     ),
@@ -755,7 +755,7 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
                           child: Text(
                             'MATCHDAY $mdNum$dShort',
                             style: GoogleFonts.orbitron(
-                              color: Colors.white,
+                              color: AppColors.textPrimary,
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
                             ),
@@ -801,7 +801,7 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
                       child: Text(
                         isAllSelected ? 'All Matchdays' : 'Scheduled: $dateLabel',
                         style: GoogleFonts.rajdhani(
-                            color: Colors.white,
+                            color: AppColors.textPrimary,
                             fontSize: 16,
                             fontWeight: FontWeight.bold),
                       ),
@@ -838,7 +838,7 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                const Divider(color: Colors.white10, height: 1),
+                Divider(color: AppColors.divider, height: 1),
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -894,7 +894,7 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
             Text(
               label,
               style: GoogleFonts.rajdhani(
-                color: Colors.white,
+                color: AppColors.textPrimary,
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
               ),
@@ -981,7 +981,7 @@ class _FixturesTabState extends ConsumerState<_FixturesTab> {
             Text(
               'No matches found',
               style: GoogleFonts.rajdhani(
-                  color: Colors.white,
+                  color: AppColors.textPrimary,
                   fontSize: 16,
                   fontWeight: FontWeight.bold),
             ),
@@ -1410,7 +1410,7 @@ class _MatchFixtureTile extends ConsumerWidget {
                         child: RichText(
                           text: TextSpan(
                             style: GoogleFonts.rajdhani(
-                                color: Colors.white, fontSize: 12),
+                                color: AppColors.textPrimary, fontSize: 12),
                             children: [
                               TextSpan(
                                 text: 'Rescheduled To: ',
@@ -1420,9 +1420,9 @@ class _MatchFixtureTile extends ConsumerWidget {
                               ),
                               TextSpan(
                                 text: _formatDateTime(schedAt),
-                                style: const TextStyle(
+                                style: TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.white),
+                                    color: AppColors.textPrimary),
                               ),
                               if (origSchedAt != null) ...[
                                 TextSpan(
@@ -1450,7 +1450,7 @@ class _MatchFixtureTile extends ConsumerWidget {
                           child: Text(
                             'Reason: $reason',
                             style: GoogleFonts.rajdhani(
-                              color: Colors.white70,
+                              color: AppColors.textSecondary,
                               fontSize: 12,
                               fontStyle: FontStyle.italic,
                             ),
@@ -1797,7 +1797,7 @@ class _MatchFixtureTile extends ConsumerWidget {
             child: Text(
               'VS',
               style: GoogleFonts.orbitron(
-                color: Colors.white70,
+                color: AppColors.textSecondary,
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
               ),
@@ -1844,7 +1844,7 @@ class _MatchFixtureTile extends ConsumerWidget {
               Text(
                 scoreDisplay,
                 style: GoogleFonts.orbitron(
-                  color: Colors.white,
+                  color: AppColors.textPrimary,
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
@@ -1954,7 +1954,7 @@ class _PlayerColumn extends StatelessWidget {
         Text(
           name,
           style: GoogleFonts.rajdhani(
-            color: Colors.white,
+            color: AppColors.textPrimary,
             fontWeight: highlight ? FontWeight.bold : FontWeight.w500,
             fontSize: 14,
           ),
@@ -2108,7 +2108,7 @@ class _BracketVersusPill extends ConsumerWidget {
             child: Text(
               name,
               style: GoogleFonts.rajdhani(
-                color: Colors.white,
+                color: AppColors.textPrimary,
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
               ),
@@ -2121,7 +2121,7 @@ class _BracketVersusPill extends ConsumerWidget {
             style: GoogleFonts.rajdhani(
               color: score == 'W'
                   ? AppColors.winGreen
-                  : (score == 'L' ? AppColors.lossRed : Colors.white70),
+                  : (score == 'L' ? AppColors.lossRed : AppColors.textSecondary),
               fontSize: 13,
               fontWeight: FontWeight.bold,
             ),
@@ -2207,7 +2207,7 @@ class _StandingsTabState extends State<_StandingsTab> {
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
                               color: _viewMode == 0
-                                  ? Colors.white
+                                  ? (AppColors.isLight ? AppColors.primary : Colors.white)
                                   : AppColors.textMuted,
                             ),
                           ),
@@ -2249,7 +2249,7 @@ class _StandingsTabState extends State<_StandingsTab> {
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
                               color: _viewMode == 1
-                                  ? Colors.white
+                                  ? (AppColors.isLight ? AppColors.primary : Colors.white)
                                   : AppColors.textMuted,
                             ),
                           ),
@@ -2282,7 +2282,7 @@ class _StandingsTabState extends State<_StandingsTab> {
                   Text(
                     'DIRECT KNOCKOUT BRACKET',
                     style: GoogleFonts.orbitron(
-                      color: Colors.white,
+                      color: AppColors.textPrimary,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
@@ -2372,7 +2372,7 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
               ),
               title: Text('EDIT SCHEDULING SETTINGS',
                   style: GoogleFonts.rajdhani(
-                      color: Colors.white,
+                      color: AppColors.textPrimary,
                       fontWeight: FontWeight.bold,
                       fontSize: 18)),
               content: SingleChildScrollView(
@@ -2386,16 +2386,16 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
                         Row(
                           children: [
                             IconButton(
-                              icon: const Icon(Icons.remove, color: Colors.white70, size: 20),
+                              icon: Icon(Icons.remove, color: AppColors.textSecondary, size: 20),
                               onPressed: () {
                                 setStateDialog(() {
                                   if (currentGap > 0) currentGap--;
                                 });
                               },
                             ),
-                            Text('$currentGap', style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                            Text('$currentGap', style: GoogleFonts.rajdhani(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold)),
                             IconButton(
-                              icon: const Icon(Icons.add, color: Colors.white70, size: 20),
+                              icon: Icon(Icons.add, color: AppColors.textSecondary, size: 20),
                               onPressed: () {
                                 setStateDialog(() {
                                   currentGap++;
@@ -2520,7 +2520,7 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
         ),
         title: Text('START TOURNAMENT?',
             style: GoogleFonts.rajdhani(
-                color: Colors.white,
+                color: AppColors.textPrimary,
                 fontWeight: FontWeight.bold,
                 fontSize: 18)),
         content: Text(
@@ -2576,7 +2576,7 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
         ),
         title: Text('COMPLETE TOURNAMENT?',
             style: GoogleFonts.rajdhani(
-                color: Colors.white,
+                color: AppColors.textPrimary,
                 fontWeight: FontWeight.bold,
                 fontSize: 18)),
         content: Text(
@@ -2633,7 +2633,7 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
         ),
         title: Text('DELETE TOURNAMENT?',
             style: GoogleFonts.rajdhani(
-                color: Colors.white,
+                color: AppColors.textPrimary,
                 fontWeight: FontWeight.bold,
                 fontSize: 18)),
         content: Text(
@@ -2760,7 +2760,7 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
                           Text(
                             widget.tournamentName.toUpperCase(),
                             style: GoogleFonts.orbitron(
-                              color: Colors.white,
+                              color: AppColors.textPrimary,
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                               letterSpacing: 1.0,
@@ -2786,7 +2786,7 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                Divider(color: Colors.white.withValues(alpha: 0.08), height: 1),
+                Divider(color: AppColors.divider, height: 1),
                 const SizedBox(height: 16),
 
                 // 4 Grid metrics
@@ -2892,7 +2892,7 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: _subStatBox(
-                            'TOTAL', '$totalMatches', Colors.white70),
+                            'TOTAL', '$totalMatches', AppColors.textSecondary),
                       ),
                     ],
                   ),
@@ -2989,7 +2989,7 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
                           Text(
                             'ADMIN CONTROLS',
                             style: GoogleFonts.rajdhani(
-                              color: Colors.white,
+                              color: AppColors.textPrimary,
                               fontSize: 15,
                               fontWeight: FontWeight.bold,
                               letterSpacing: 1.2,
@@ -3010,7 +3010,7 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
                   ),
                   const SizedBox(height: 16),
                   Divider(
-                      color: Colors.white.withValues(alpha: 0.08), height: 1),
+                      color: AppColors.divider, height: 1),
                   const SizedBox(height: 16),
                   if (isDraft) ...[
                     Text(
@@ -3055,7 +3055,7 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
                   ),
                   const SizedBox(height: 16),
                   Divider(
-                      color: Colors.white.withValues(alpha: 0.08), height: 1),
+                      color: AppColors.divider, height: 1),
                   const SizedBox(height: 16),
                   Text(
                     'DANGER ZONE',
@@ -3098,7 +3098,7 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
       decoration: BoxDecoration(
         color: AppColors.surfaceLight.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        border: Border.all(color: AppColors.cardBorder),
       ),
       child: Column(
         children: [
@@ -3107,7 +3107,7 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
           Text(
             value,
             style: GoogleFonts.orbitron(
-              color: Colors.white,
+              color: AppColors.textPrimary,
               fontSize: 14,
               fontWeight: FontWeight.bold,
             ),
@@ -3180,7 +3180,7 @@ class _InfoTabState extends ConsumerState<_InfoTab> {
               Text(
                 value,
                 style: GoogleFonts.rajdhani(
-                  color: Colors.white,
+                  color: AppColors.textPrimary,
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
                 ),

@@ -59,7 +59,7 @@ class UpdateDialog extends StatelessWidget {
                 style: GoogleFonts.orbitron(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  color: AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 8),
@@ -82,15 +82,15 @@ class UpdateDialog extends StatelessWidget {
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.black26,
+                    color: AppColors.isLight ? AppColors.surfaceLight : Colors.black26,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.white10),
+                    border: Border.all(color: AppColors.cardBorder),
                   ),
                   child: Text(
                     versionInfo.releaseNotes,
                     style: GoogleFonts.rajdhani(
                       fontSize: 14,
-                      color: Colors.white70,
+                      color: AppColors.textSecondary,
                     ),
                     textAlign: TextAlign.center,
                   ),

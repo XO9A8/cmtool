@@ -82,26 +82,26 @@ class _OcrCorrectionScreenState extends State<OcrCorrectionScreen> {
       child: TextFormField(
         controller: _controllers[key],
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        style: TextStyle(color: isLowConfidence ? AppColors.lossRed : Colors.white),
+        style: TextStyle(color: isLowConfidence ? AppColors.lossRed : AppColors.textPrimary),
         decoration: InputDecoration(
           labelText: label,
           labelStyle: TextStyle(
-            color: isLowConfidence ? AppColors.lossRed.withValues(alpha: 0.8) : Colors.white54,
+            color: isLowConfidence ? AppColors.lossRed.withValues(alpha: 0.8) : AppColors.textMuted,
           ),
           filled: true,
           fillColor: isLowConfidence 
               ? AppColors.lossRed.withValues(alpha: 0.05) 
-              : Colors.white.withValues(alpha: 0.05),
+              : (AppColors.isLight ? AppColors.surfaceLight : Colors.white.withValues(alpha: 0.05)),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
             borderSide: BorderSide(
-              color: isLowConfidence ? AppColors.lossRed : Colors.white24,
+              color: isLowConfidence ? AppColors.lossRed : AppColors.cardBorder,
             ),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
             borderSide: BorderSide(
-              color: isLowConfidence ? AppColors.lossRed : Colors.white24,
+              color: isLowConfidence ? AppColors.lossRed : AppColors.cardBorder,
             ),
           ),
           focusedBorder: OutlineInputBorder(
@@ -138,10 +138,10 @@ class _OcrCorrectionScreenState extends State<OcrCorrectionScreen> {
           'REVIEW OCR DATA',
           style: GoogleFonts.rajdhani(
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            color: AppColors.textPrimary,
           ),
         ),
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(color: AppColors.textPrimary),
       ),
       body: Column(
         children: [
@@ -177,9 +177,9 @@ class _OcrCorrectionScreenState extends State<OcrCorrectionScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
+                  Text(
                     'Please verify the extracted values. Low confidence fields are highlighted in red.',
-                    style: TextStyle(color: Colors.white70, fontSize: 14),
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
                   ),
                   const SizedBox(height: 16),
                   

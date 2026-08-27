@@ -203,7 +203,7 @@ class HeroArena extends StatelessWidget {
                           style: GoogleFonts.orbitron(
                             fontSize: 13,
                             fontWeight: FontWeight.w900,
-                            color: Colors.white,
+                            color: AppColors.textPrimary,
                             letterSpacing: 1.0,
                           ),
                         ),
@@ -249,9 +249,11 @@ class HeroArena extends StatelessWidget {
                 label: isAnalyzing ? 'UPDATE ANALYSIS' : 'ANALYZE RIVALRY',
                 icon: Icons.flash_on,
                 gradient: isReadyToDuel
-                    ? [AppColors.primary, AppColors.cyan]
-                    : [Colors.white24, Colors.white12],
-                textColor: isReadyToDuel ? Colors.black : Colors.white38,
+                    ? (AppColors.isLight
+                        ? [AppColors.primary, AppColors.gold]
+                        : [AppColors.primary, AppColors.cyan])
+                    : [AppColors.cardBorder, AppColors.divider],
+                textColor: isReadyToDuel ? Colors.white : AppColors.textDim,
                 onPressed: isReadyToDuel ? onAnalyze : null,
               ),
             ),
@@ -367,7 +369,7 @@ class HeroArena extends StatelessWidget {
                 style: GoogleFonts.rajdhani(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
-                  color: hasPlayer ? Colors.white : Colors.white54,
+                  color: hasPlayer ? AppColors.textPrimary : AppColors.textDim,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,

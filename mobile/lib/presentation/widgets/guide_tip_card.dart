@@ -119,7 +119,7 @@ class GuideTipCard extends ConsumerWidget {
                 style: GoogleFonts.orbitron(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  color: AppColors.textPrimary,
                   letterSpacing: 0.5,
                 ),
               ),
@@ -131,7 +131,7 @@ class GuideTipCard extends ConsumerWidget {
                 style: GoogleFonts.rajdhani(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: Colors.white.withValues(alpha: 0.85),
+                  color: AppColors.textPrimary,
                   height: 1.35,
                 ),
               ),

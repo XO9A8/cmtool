@@ -149,7 +149,7 @@ class _MatchPredictorScreenState extends ConsumerState<MatchPredictorScreen> {
                               ),
                             ),
                             const SizedBox(height: 4),
-                            Text('Player 1 Win', style: GoogleFonts.rajdhani(fontWeight: FontWeight.w600, color: Colors.white70, fontSize: 13)),
+                            Text('Player 1 Win', style: GoogleFonts.rajdhani(fontWeight: FontWeight.w600, color: AppColors.textSecondary, fontSize: 13)),
                           ],
                         ),
                         Column(
@@ -163,7 +163,7 @@ class _MatchPredictorScreenState extends ConsumerState<MatchPredictorScreen> {
                               ),
                             ),
                             const SizedBox(height: 4),
-                            Text('Draw', style: GoogleFonts.rajdhani(fontWeight: FontWeight.w600, color: Colors.white54, fontSize: 13)),
+                            Text('Draw', style: GoogleFonts.rajdhani(fontWeight: FontWeight.w600, color: AppColors.textDim, fontSize: 13)),
                           ],
                         ),
                         Column(
@@ -177,7 +177,7 @@ class _MatchPredictorScreenState extends ConsumerState<MatchPredictorScreen> {
                               ),
                             ),
                             const SizedBox(height: 4),
-                            Text('Player 2 Win', style: GoogleFonts.rajdhani(fontWeight: FontWeight.w600, color: Colors.white70, fontSize: 13)),
+                            Text('Player 2 Win', style: GoogleFonts.rajdhani(fontWeight: FontWeight.w600, color: AppColors.textSecondary, fontSize: 13)),
                           ],
                         ),
                       ],

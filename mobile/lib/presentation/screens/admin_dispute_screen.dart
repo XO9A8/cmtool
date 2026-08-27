@@ -48,7 +48,7 @@ class AdminDisputeScreen extends ConsumerWidget {
                   const SizedBox(height: 16),
                   Text(
                     'No Open Disputes',
-                    style: GoogleFonts.rajdhani(fontSize: 20, color: Colors.white70, fontWeight: FontWeight.bold),
+                    style: GoogleFonts.rajdhani(fontSize: 20, color: AppColors.textSecondary, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 6),
                   Text(
@@ -102,7 +102,7 @@ class AdminDisputeScreen extends ConsumerWidget {
                         style: GoogleFonts.rajdhani(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -125,11 +125,11 @@ class AdminDisputeScreen extends ConsumerWidget {
                                 Container(
                                   height: 80,
                                   decoration: BoxDecoration(
-                                    color: Colors.black45,
+                                    color: AppColors.isLight ? AppColors.surfaceLight : Colors.black45,
                                     borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: Colors.white24),
+                                    border: Border.all(color: AppColors.cardBorder),
                                   ),
-                                  child: const Center(child: Icon(Icons.image, color: Colors.white54)),
+                                  child: Center(child: Icon(Icons.image, color: AppColors.textDim)),
                                 ),
                               ],
                             ),
@@ -143,12 +143,12 @@ class AdminDisputeScreen extends ConsumerWidget {
                                 Container(
                                   height: 80,
                                   decoration: BoxDecoration(
-                                    color: Colors.black45,
+                                    color: AppColors.isLight ? AppColors.surfaceLight : Colors.black45,
                                     borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: Colors.white24),
+                                    border: Border.all(color: AppColors.cardBorder),
                                   ),
-                                  child: const Center(
-                                    child: Text('No Evidence', style: TextStyle(color: Colors.white38, fontSize: 10)),
+                                  child: Center(
+                                    child: Text('No Evidence', style: TextStyle(color: AppColors.textDim, fontSize: 10)),
                                   ),
                                 ),
                               ],
@@ -159,9 +159,9 @@ class AdminDisputeScreen extends ConsumerWidget {
                       const SizedBox(height: 12),
 
                       // Reason
-                      Text('Reason:', style: GoogleFonts.rajdhani(fontWeight: FontWeight.bold, color: Colors.white70, fontSize: 13)),
+                      Text('Reason:', style: GoogleFonts.rajdhani(fontWeight: FontWeight.bold, color: AppColors.textSecondary, fontSize: 13)),
                       const SizedBox(height: 4),
-                      Text(reason, style: const TextStyle(color: Colors.white, fontSize: 12, height: 1.4)),
+                      Text(reason, style: TextStyle(color: AppColors.textPrimary, fontSize: 12, height: 1.4)),
                       const SizedBox(height: 16),
 
                       // Action buttons
@@ -221,18 +221,18 @@ class AdminDisputeScreen extends ConsumerWidget {
           ),
           title: Text(
             dismiss ? 'DISMISS DISPUTE' : 'UPHOLD DISPUTE',
-            style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold),
+            style: GoogleFonts.rajdhani(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
           ),
           content: Text(
             dismiss
                 ? 'Mark this dispute as dismissed? No rating changes will be applied.'
                 : 'Uphold this dispute and VOID the match? This will reverse all Elo and Standings updates so players can resubmit.',
-            style: const TextStyle(color: Colors.white70, fontSize: 13),
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
           ),
           actions: [
             TextButton(
               onPressed: isLoading ? null : () => Navigator.of(ctx).pop(false),
-              child: const Text('CANCEL', style: TextStyle(color: Colors.white54)),
+              child: Text('CANCEL', style: TextStyle(color: AppColors.textDim)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),

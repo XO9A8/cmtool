@@ -120,7 +120,7 @@ class _FormChip extends StatelessWidget {
               score,
               style: GoogleFonts.rajdhani(
                 fontSize: 10,
-                color: Colors.white70,
+                color: AppColors.textSecondary,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -209,7 +209,7 @@ class _PodiumPlayer extends StatelessWidget {
             style: GoogleFonts.rajdhani(
               fontSize: fontSize,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: AppColors.textPrimary,
             ),
             maxLines: 1,
           ),
@@ -419,7 +419,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       shaderCallback: (bounds) => LinearGradient(
                         colors: [
                           AppColors.primary,
-                          Colors.white,
+                          AppColors.textPrimary,
                           AppColors.cyan,
                         ],
                         stops: const [0.0, 0.5, 1.0],
@@ -429,7 +429,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         style: GoogleFonts.orbitron(
                           fontSize: 28,
                           fontWeight: FontWeight.w900,
-                          color: Colors.white,
+                          color: AppColors.textPrimary,
                           letterSpacing: 1.5,
                         ),
                       ),
@@ -548,7 +548,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           style: GoogleFonts.rajdhani(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
-                            color: Colors.white54,
+                            color: AppColors.textDim,
                           ),
                         ),
                       ],
@@ -582,7 +582,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       child: LinearProgressIndicator(
                         value: (form / 100.0).clamp(0.0, 1.0),
                         minHeight: 8,
-                        backgroundColor: Colors.white10,
+                        backgroundColor: AppColors.divider,
                         valueColor: AlwaysStoppedAnimation<Color>(
                           AppColors.winGreen,
                         ),
@@ -989,10 +989,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   return Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.03),
+                      color: AppColors.isLight
+                          ? AppColors.surfaceLight
+                          : Colors.white.withValues(alpha: 0.03),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.07),
+                        color: AppColors.isLight
+                            ? AppColors.cardBorder
+                            : Colors.white.withValues(alpha: 0.07),
                       ),
                     ),
                     child: Column(
@@ -1046,7 +1050,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           physics: const NeverScrollableScrollPhysics(),
                           itemCount: dayMatches.length,
                           separatorBuilder: (_, __) =>
-                              const Divider(color: Colors.white10, height: 14),
+                              Divider(color: AppColors.divider, height: 14),
                           itemBuilder: (_, mIdx) {
                             final m = dayMatches[mIdx];
                             final tName = m['tournament_name']?.toString() ??
@@ -1117,7 +1121,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                         roundLabel,
                                         style: GoogleFonts.rajdhani(
                                           fontSize: 10,
-                                          color: Colors.white70,
+                                          color: AppColors.textSecondary,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
@@ -1148,7 +1152,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                               : FontWeight.bold,
                                           color: isUserP1
                                               ? AppColors.primary
-                                              : Colors.white,
+                                              : AppColors.textPrimary,
                                         ),
                                         overflow: TextOverflow.ellipsis,
                                       ),
@@ -1177,7 +1181,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                               : FontWeight.bold,
                                           color: isUserP2
                                               ? AppColors.primary
-                                              : Colors.white,
+                                              : AppColors.textPrimary,
                                         ),
                                         overflow: TextOverflow.ellipsis,
                                       ),
@@ -1361,7 +1365,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     style: GoogleFonts.rajdhani(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: AppColors.textPrimary,
                       letterSpacing: 0.5,
                     ),
                   ),
@@ -1480,7 +1484,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   ),
 
                   if (rest.isNotEmpty) ...[
-                    const Divider(color: Colors.white10, height: 24),
+                    Divider(color: AppColors.divider, height: 24),
                     ...rest.asMap().entries.map((entry) {
                       final rank = entry.key + 4;
                       final p = entry.value;
@@ -1511,7 +1515,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                   style: GoogleFonts.rajdhani(
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                                    color: AppColors.textPrimary,
                                   ),
                                 ),
                               ),
@@ -1571,7 +1575,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       Text(
                         name,
                         style: GoogleFonts.rajdhani(
-                          color: Colors.white,
+                          color: AppColors.textPrimary,
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
@@ -1711,7 +1715,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                 style: GoogleFonts.rajdhani(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 14,
-                                  color: Colors.white,
+                                  color: AppColors.textPrimary,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -1734,7 +1738,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           style: GoogleFonts.orbitron(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -1813,7 +1817,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   'Match results require your review',
                   style: GoogleFonts.rajdhani(
                     fontSize: 12,
-                    color: Colors.white60,
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ],

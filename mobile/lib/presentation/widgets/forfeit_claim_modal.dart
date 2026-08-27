@@ -107,7 +107,7 @@ class _ForfeitClaimModalState extends ConsumerState<ForfeitClaimModal> {
                       Text(
                         'CLAIM FORFEIT VICTORY',
                         style: GoogleFonts.orbitron(
-                          color: Colors.white,
+                          color: AppColors.textPrimary,
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
@@ -134,9 +134,9 @@ class _ForfeitClaimModalState extends ConsumerState<ForfeitClaimModal> {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.3),
+                color: AppColors.isLight ? AppColors.surfaceLight : Colors.black.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                border: Border.all(color: AppColors.cardBorder),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -145,7 +145,7 @@ class _ForfeitClaimModalState extends ConsumerState<ForfeitClaimModal> {
                     child: Text(
                       widget.player1Name,
                       style: GoogleFonts.rajdhani(
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
                       ),
@@ -172,7 +172,7 @@ class _ForfeitClaimModalState extends ConsumerState<ForfeitClaimModal> {
                     child: Text(
                       widget.player2Name,
                       style: GoogleFonts.rajdhani(
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
                       ),
@@ -207,13 +207,13 @@ class _ForfeitClaimModalState extends ConsumerState<ForfeitClaimModal> {
                 child: Column(
                   children: [
                     RadioListTile<String>(
-                      title: Text(widget.player1Name, style: const TextStyle(color: Colors.white)),
+                      title: Text(widget.player1Name, style: TextStyle(color: AppColors.textPrimary)),
                       value: widget.player1Id,
                       activeColor: AppColors.lossRed,
                       contentPadding: EdgeInsets.zero,
                     ),
                     RadioListTile<String>(
-                      title: Text(widget.player2Name, style: const TextStyle(color: Colors.white)),
+                      title: Text(widget.player2Name, style: TextStyle(color: AppColors.textPrimary)),
                       value: widget.player2Id,
                       activeColor: AppColors.lossRed,
                       contentPadding: EdgeInsets.zero,

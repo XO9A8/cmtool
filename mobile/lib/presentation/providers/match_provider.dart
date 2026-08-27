@@ -424,6 +424,16 @@ final myClubsProvider = FutureProvider<Map<String, dynamic>>((ref) async {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Club Details Provider
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Fetches full details for a single club.
+final clubDetailsProvider = FutureProvider.family<Map<String, dynamic>, String>((ref, clubId) async {
+  final client = ref.watch(apiClientProvider);
+  return client.getClubDetails(clubId);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Club Members Provider
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -432,6 +442,7 @@ final clubMembersProvider = FutureProvider.family<Map<String, dynamic>, String>(
   final client = ref.watch(apiClientProvider);
   return client.getClubMembers(clubId);
 });
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Club Tournaments Provider

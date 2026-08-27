@@ -80,7 +80,7 @@ class _GuideOnboardingModalState extends ConsumerState<GuideOnboardingModal> {
                           style: GoogleFonts.orbitron(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                       ],
@@ -138,7 +138,7 @@ class _GuideOnboardingModalState extends ConsumerState<GuideOnboardingModal> {
                   Expanded(
                     child: OutlinedButton(
                       style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Colors.white24),
+                        side: BorderSide(color: AppColors.cardBorder),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -208,7 +208,7 @@ class _GuideOnboardingModalState extends ConsumerState<GuideOnboardingModal> {
           color: isSelected ? color.withValues(alpha: 0.12) : AppColors.surfaceLight,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? color : Colors.white10,
+            color: isSelected ? color : AppColors.cardBorder,
             width: isSelected ? 1.5 : 1.0,
           ),
         ),
@@ -232,7 +232,7 @@ class _GuideOnboardingModalState extends ConsumerState<GuideOnboardingModal> {
                     style: GoogleFonts.orbitron(
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
-                      color: isSelected ? Colors.white : Colors.white70,
+                      color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
                     ),
                   ),
                   const SizedBox(height: 2),

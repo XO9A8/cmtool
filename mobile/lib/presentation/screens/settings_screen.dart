@@ -2,18 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../theme/app_theme.dart';
 import '../providers/theme_provider.dart';
 import '../providers/match_provider.dart';
 import '../../infrastructure/offline_sync_service.dart';
-import 'admin_dispute_screen.dart';
-import 'game_guide_screen.dart';
-import '../widgets/guide_onboarding_modal.dart';
-
-
-
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -31,20 +24,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadSettings();
     _refreshPendingCount();
-  }
-
-  Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (!mounted) return;
-
-
-  }
-
-  Future<void> _persistToggle(String key, bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(key, value);
   }
 
   Future<void> _refreshPendingCount() async {
@@ -80,33 +60,42 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void _showUpdatePasswordDialog() {
     final passwordController = TextEditingController();
     bool isUpdating = false;
+    final colors = context.themeColors;
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: AppColors.surface,
+          backgroundColor: colors.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: AppColors.cyan),
+            side: BorderSide(color: colors.cardBorder),
           ),
           title: Text(
             'UPDATE PASSWORD',
-            style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold),
+            style: GoogleFonts.rajdhani(
+              color: colors.isLight ? colors.navy : Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
                 controller: passwordController,
-                style: const TextStyle(color: Colors.white),
+                style: TextStyle(color: colors.isLight ? colors.navy : Colors.white),
                 obscureText: true,
                 decoration: InputDecoration(
                   labelText: 'New Password',
-                  labelStyle: const TextStyle(color: Colors.white60),
+                  labelStyle: TextStyle(color: colors.textMuted),
                   filled: true,
-                  fillColor: Colors.white.withValues(alpha: 0.05),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  fillColor: colors.isLight
+                      ? colors.surfaceLight
+                      : Colors.white.withValues(alpha: 0.05),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: colors.cardBorder),
+                  ),
                 ),
               ),
             ],
@@ -114,40 +103,58 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           actions: [
             TextButton(
               onPressed: isUpdating ? null : () => Navigator.pop(ctx),
-              child: const Text('CANCEL', style: TextStyle(color: Colors.white60)),
+              child: Text('CANCEL', style: TextStyle(color: colors.textMuted)),
             ),
             ElevatedButton(
-              onPressed: isUpdating ? null : () async {
-                final pwd = passwordController.text;
-                if (pwd.length < 6) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Password must be at least 6 characters')),
-                  );
-                  return;
-                }
-                setDialogState(() => isUpdating = true);
-                try {
-                  await ref.read(authStateProvider.notifier).updatePassword(pwd);
-                  if (context.mounted) {
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Password updated successfully!')),
-                    );
-                  }
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error updating password: $e')),
-                    );
-                  }
-                } finally {
-                  if (mounted) setDialogState(() => isUpdating = false);
-                }
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.cyan),
-              child: isUpdating 
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
-                  : const Text('UPDATE', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+              onPressed: isUpdating
+                  ? null
+                  : () async {
+                      final pwd = passwordController.text;
+                      if (pwd.length < 6) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Password must be at least 6 characters')),
+                        );
+                        return;
+                      }
+                      setDialogState(() => isUpdating = true);
+                      try {
+                        await ref.read(authStateProvider.notifier).updatePassword(pwd);
+                        if (context.mounted) {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Password updated successfully!')),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error updating password: $e')),
+                          );
+                        }
+                      } finally {
+                        if (mounted) setDialogState(() => isUpdating = false);
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: colors.primary,
+                foregroundColor: colors.buttonTextColor,
+              ),
+              child: isUpdating
+                  ? SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        color: colors.buttonTextColor,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : Text(
+                      'UPDATE',
+                      style: GoogleFonts.rajdhani(
+                        color: colors.buttonTextColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
             ),
           ],
         ),
@@ -159,19 +166,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     String selectedStyle = currentProfile.playStyle;
     final displayNameController = TextEditingController(text: currentProfile.displayName);
     final validStyles = ['Possession Game', 'Quick Counter', 'Out-wide', 'Long Ball Counter', 'Park the Bus'];
+    final colors = context.themeColors;
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: AppColors.surface,
+          backgroundColor: colors.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: AppColors.cyan),
+            side: BorderSide(color: colors.cardBorder),
           ),
           title: Text(
             'UPDATE PROFILE',
-            style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold),
+            style: GoogleFonts.rajdhani(
+              color: colors.isLight ? colors.navy : Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -179,34 +190,47 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             children: [
               TextField(
                 controller: displayNameController,
-                style: const TextStyle(color: Colors.white),
+                style: TextStyle(color: colors.isLight ? colors.navy : Colors.white),
                 decoration: InputDecoration(
                   labelText: 'Display Name',
-                  labelStyle: const TextStyle(color: Colors.white60),
+                  labelStyle: TextStyle(color: colors.textMuted),
                   filled: true,
-                  fillColor: Colors.white.withValues(alpha: 0.05),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  fillColor: colors.isLight
+                      ? colors.surfaceLight
+                      : Colors.white.withValues(alpha: 0.05),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: colors.cardBorder),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Select your primary tactical play style preference:',
-                style: TextStyle(color: Colors.white70, fontSize: 13),
+                style: TextStyle(color: colors.textMuted, fontSize: 13),
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 initialValue: validStyles.contains(selectedStyle) ? selectedStyle : validStyles.first,
-                dropdownColor: AppColors.surface,
-                style: const TextStyle(color: Colors.white),
+                dropdownColor: colors.surface,
+                style: TextStyle(color: colors.isLight ? colors.navy : Colors.white),
                 decoration: InputDecoration(
                   filled: true,
-                  fillColor: Colors.white.withValues(alpha: 0.05),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  fillColor: colors.isLight
+                      ? colors.surfaceLight
+                      : Colors.white.withValues(alpha: 0.05),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: colors.cardBorder),
+                  ),
                 ),
                 items: validStyles.map((style) {
                   return DropdownMenuItem(
                     value: style,
-                    child: Text(style, style: const TextStyle(color: Colors.white)),
+                    child: Text(
+                      style,
+                      style: TextStyle(color: colors.isLight ? colors.navy : Colors.white),
+                    ),
                   );
                 }).toList(),
                 onChanged: (val) {
@@ -220,10 +244,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('CANCEL', style: TextStyle(color: Colors.white54)),
+              child: Text('CANCEL', style: TextStyle(color: colors.textMuted)),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: colors.primary,
+                foregroundColor: colors.buttonTextColor,
+              ),
               onPressed: () async {
                 Navigator.pop(ctx);
                 await ref.read(profilePreferencesProvider.notifier).update(
@@ -236,14 +263,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Profile updated for $selectedStyle'),
-                      backgroundColor: AppColors.winGreen,
+                      backgroundColor: colors.winGreen,
                     ),
                   );
                 }
               },
               child: Text(
                 'SAVE CHANGES',
-                style: GoogleFonts.rajdhani(color: Colors.black, fontWeight: FontWeight.bold),
+                style: GoogleFonts.rajdhani(
+                  color: colors.buttonTextColor,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
@@ -253,29 +283,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   void _confirmLogout() {
+    final colors = context.themeColors;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
+        backgroundColor: colors.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: AppColors.lossRed),
+          side: BorderSide(color: colors.lossRed),
         ),
         title: Text(
           'TERMINATE SESSION',
-          style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold),
+          style: GoogleFonts.rajdhani(
+            color: colors.isLight ? colors.navy : Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-        content: const Text(
+        content: Text(
           'Are you sure you want to log out of the Player Dashboard?',
-          style: TextStyle(color: Colors.white70, fontSize: 13),
+          style: TextStyle(color: colors.textMuted, fontSize: 13),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('CANCEL', style: TextStyle(color: Colors.white54)),
+            child: Text('CANCEL', style: TextStyle(color: colors.textMuted)),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.lossRed),
+            style: ElevatedButton.styleFrom(backgroundColor: colors.lossRed),
             onPressed: () async {
               Navigator.pop(ctx);
               final client = ref.read(apiClientProvider);
@@ -283,7 +317,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             },
             child: Text(
               'LOGOUT',
-              style: GoogleFonts.rajdhani(color: Colors.white, fontWeight: FontWeight.bold),
+              style: GoogleFonts.rajdhani(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],
@@ -296,8 +333,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final userId = ref.watch(authStateProvider);
     final profileAsync = userId != null ? ref.watch(playerProfileProvider(userId)) : null;
 
-    final isPremium = ref.watch(themeProvider);
+    final currentTheme = ref.watch(themeProvider);
     final profilePrefs = ref.watch(profilePreferencesProvider);
+    final colors = context.themeColors;
+    final titleColor = colors.isLight ? colors.navy : Colors.white;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -309,7 +348,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           style: GoogleFonts.orbitron(
             fontWeight: FontWeight.w800,
             letterSpacing: 2,
-            color: AppColors.cyan,
+            color: colors.isLight ? colors.navy : colors.cyan,
             fontSize: 18,
           ),
         ).animate().fade().slideX(),
@@ -320,35 +359,42 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Account Security Header
-            _buildSectionHeader('ACCOUNT SECURITY'),
+            _buildSectionHeader('ACCOUNT SECURITY', colors),
             const SizedBox(height: 12),
             GlassCard(
-              borderColor: AppColors.primary.withValues(alpha: 0.4),
+              borderColor: colors.cardBorder,
               child: ListTile(
-                leading: Icon(Icons.lock_outline, color: AppColors.cyan),
-                title: const Text('Update Password', style: TextStyle(color: Colors.white)),
-                subtitle: const Text('Change your account password', style: TextStyle(color: Colors.white60, fontSize: 12)),
-                trailing: const Icon(Icons.chevron_right, color: Colors.white30),
+                leading: Icon(Icons.lock_outline, color: colors.cyan),
+                title: Text(
+                  'Update Password',
+                  style: TextStyle(color: titleColor, fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  'Change your account password',
+                  style: TextStyle(color: colors.textMuted, fontSize: 12),
+                ),
+                trailing: Icon(Icons.chevron_right, color: colors.textMuted),
                 onTap: _showUpdatePasswordDialog,
               ),
             ),
             const SizedBox(height: 24),
 
             // Operative Profile Header
-            _buildSectionHeader('OPERATIVE PROFILE'),
+            _buildSectionHeader('OPERATIVE PROFILE', colors),
             const SizedBox(height: 12),
             GlassCard(
-              borderColor: AppColors.primary.withValues(alpha: 0.4),
+              borderColor: colors.cardBorder,
               padding: const EdgeInsets.all(20),
               child: profileAsync?.when(
                     loading: () => Center(
-                      child: CircularProgressIndicator(color: AppColors.cyan),
+                      child: CircularProgressIndicator(color: colors.cyan),
                     ),
                     error: (_, __) => _buildProfileHeaderContent(
                       username: 'Player',
                       userId: userId ?? 'Unknown',
                       skillRating: 1500,
                       playStyle: 'Possession Game',
+                      colors: colors,
                     ),
                     data: (data) {
                       final username = (data['username'] as String?)?.isNotEmpty == true
@@ -363,6 +409,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         userId: userId ?? 'Unknown',
                         skillRating: rating,
                         playStyle: style,
+                        colors: colors,
                       );
                     },
                   ) ??
@@ -371,26 +418,47 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     userId: userId ?? 'Unknown',
                     skillRating: 1500,
                     playStyle: profilePrefs.playStyle,
+                    colors: colors,
                   ),
             ).animate().fade(delay: 100.ms).slideY(begin: 0.1),
 
             const SizedBox(height: 28),
 
-            // System Preferences
-            _buildSectionHeader('SYSTEM PREFERENCES'),
+            // Appearance & Theme
+            _buildSectionHeader('THEME & APPEARANCE', colors),
             const SizedBox(height: 12),
-            _buildSettingsTile(
-              icon: Icons.palette_outlined,
-              title: 'App Appearance',
-              subtitle: isPremium ? 'Premium (Navy/Scarlet)' : 'Legacy (Dark/Cyan)',
-              trailing: Switch(
-                value: isPremium,
-                onChanged: (v) {
-                  ref.read(themeProvider.notifier).toggleTheme(v);
-                },
-                activeThumbColor: AppColors.cyan,
+            GlassCard(
+              borderColor: colors.cardBorder,
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: [
+                  _buildThemeOptionCard(
+                    themeType: AppThemeType.classic,
+                    isSelected: currentTheme == AppThemeType.classic,
+                    previewColors: const [
+                      Color(0xFFFF6D00), // Electric Orange
+                      Color(0xFF00E5FF), // Cyber Cyan
+                      Color(0xFF090A0F), // Void Dark
+                    ],
+                    onTap: () => ref.read(themeProvider.notifier).setTheme(AppThemeType.classic),
+                    colors: colors,
+                  ),
+                  const SizedBox(height: 10),
+                  _buildThemeOptionCard(
+                    themeType: AppThemeType.daylight,
+                    isSelected: currentTheme == AppThemeType.daylight,
+                    previewColors: const [
+                      Color(0xFFD90429), // Championship Scarlet
+                      Color(0xFFC9A84C), // Trophy Gold
+                      Color(0xFFF5F3EE), // Programme Paper
+                    ],
+                    onTap: () => ref.read(themeProvider.notifier).setTheme(AppThemeType.daylight),
+                    colors: colors,
+                  ),
+                ],
               ),
             ).animate().fade(delay: 200.ms),
+            const SizedBox(height: 12),
             _buildSettingsTile(
               icon: Icons.visibility_outlined,
               title: 'Public Profile Visibility',
@@ -409,14 +477,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                   );
                 },
-                activeThumbColor: AppColors.cyan,
+                activeThumbColor: colors.cyan,
               ),
+              colors: colors,
             ).animate().fade(delay: 320.ms),
 
             const SizedBox(height: 28),
 
             // Offline Sync & Engine Status
-            _buildSectionHeader('OFFLINE SYNC & DATA ENGINE'),
+            _buildSectionHeader('OFFLINE SYNC & DATA ENGINE', colors),
             const SizedBox(height: 12),
             _buildSettingsTile(
               icon: Icons.cloud_sync_outlined,
@@ -428,18 +497,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ? SizedBox(
                       width: 24,
                       height: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.cyan),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: colors.cyan),
                     )
                   : ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
+                        backgroundColor: colors.primary,
+                        foregroundColor: colors.buttonTextColor,
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       ),
-                      icon: const Icon(Icons.sync, size: 16, color: Colors.black),
+                      icon: Icon(Icons.sync, size: 16, color: colors.buttonTextColor),
                       label: Text(
                         'FORCE SYNC',
                         style: GoogleFonts.rajdhani(
-                          color: Colors.black,
+                          color: colors.buttonTextColor,
                           fontWeight: FontWeight.bold,
                           fontSize: 11,
                         ),
@@ -454,7 +524,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text('Sync complete: ${res.synced} synced, ${res.failed} failed.'),
-                                backgroundColor: AppColors.winGreen,
+                                backgroundColor: colors.winGreen,
                               ),
                             );
                           }
@@ -463,7 +533,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text('Sync error: $e'),
-                                backgroundColor: AppColors.lossRed,
+                                backgroundColor: colors.lossRed,
                               ),
                             );
                           }
@@ -472,66 +542,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         }
                       },
                     ),
+              colors: colors,
             ).animate().fade(delay: 350.ms),
 
             const SizedBox(height: 28),
 
-            // Admin & Governance Hub
-            _buildSectionHeader('ADMIN & GOVERNANCE HUB'),
-            const SizedBox(height: 12),
-            _buildActionTile(
-              icon: Icons.gavel,
-              title: 'Admin Dispute Center',
-              subtitle: 'Review & resolve player match result disputes',
-              color: AppColors.amber,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const AdminDisputeScreen()),
-                );
-              },
-            ).animate().fade(delay: 400.ms),
-            const SizedBox(height: 28),
-
-            // Game Guide & Learning Hub
-            _buildSectionHeader('GAME GUIDE & LEARNING'),
-            const SizedBox(height: 12),
-            _buildActionTile(
-              icon: Icons.menu_book,
-              title: 'eFootball Knowledge Base',
-              subtitle: 'Tactics, skill moves, mechanics & formations',
-              color: AppColors.cyan,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const GameGuideScreen()),
-                );
-              },
-            ).animate().fade(delay: 420.ms),
-            const SizedBox(height: 10),
-            _buildActionTile(
-              icon: Icons.school_outlined,
-              title: 'Skill Assessment & Onboarding Tour',
-              subtitle: 'Personalize difficulty and view curated learning paths',
-              color: AppColors.primary,
-              onTap: () {
-                showDialog(
-                  context: context,
-                  builder: (_) => const GuideOnboardingModal(),
-                );
-              },
-            ).animate().fade(delay: 440.ms),
-            const SizedBox(height: 28),
-
             // Server & Network Status
-            _buildSectionHeader('API BACKEND HEALTH'),
+            _buildSectionHeader('API BACKEND HEALTH', colors),
             const SizedBox(height: 12),
             GlassCard(
-              borderColor: AppColors.cyan.withValues(alpha: 0.3),
+              borderColor: colors.cardBorder,
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  Icon(Icons.dns, color: AppColors.cyan, size: 24),
+                  Icon(Icons.dns, color: colors.cyan, size: 24),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -541,20 +565,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           'Server Status: $_serverStatus',
                           style: GoogleFonts.rajdhani(
                             fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            color: titleColor,
                             fontSize: 14,
                           ),
                         ),
                         Text(
                           'Backend API v1',
-                          style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                          style: TextStyle(fontSize: 11, color: colors.textMuted),
                         ),
                       ],
                     ),
                   ),
                   OutlinedButton(
                     style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: AppColors.cyan),
+                      side: BorderSide(color: colors.cyan),
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     ),
                     onPressed: _isPinging ? null : _pingServer,
@@ -562,12 +586,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ? SizedBox(
                             width: 14,
                             height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.cyan),
+                            child: CircularProgressIndicator(strokeWidth: 2, color: colors.cyan),
                           )
                         : Text(
                             'PING',
                             style: GoogleFonts.rajdhani(
-                              color: AppColors.cyan,
+                              color: colors.cyan,
                               fontWeight: FontWeight.bold,
                               fontSize: 11,
                             ),
@@ -594,10 +618,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.lossRed.withValues(alpha: 0.2),
-                  foregroundColor: AppColors.lossRed,
+                  backgroundColor: colors.lossRed.withValues(alpha: 0.15),
+                  foregroundColor: colors.lossRed,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  side: BorderSide(color: AppColors.lossRed.withValues(alpha: 0.6)),
+                  side: BorderSide(color: colors.lossRed.withValues(alpha: 0.6)),
                 ),
                 onPressed: _confirmLogout,
               ),
@@ -613,7 +637,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     required String userId,
     required int skillRating,
     required String playStyle,
+    required AppThemeExtension colors,
   }) {
+    final titleColor = colors.isLight ? colors.navy : Colors.white;
+
     return Row(
       children: [
         Container(
@@ -622,13 +649,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             gradient: LinearGradient(
-              colors: [AppColors.primary, AppColors.cyan],
+              colors: [colors.primary, colors.cyan],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             boxShadow: [
               BoxShadow(
-                color: AppColors.cyan.withValues(alpha: 0.4),
+                color: colors.cyan.withValues(alpha: 0.4),
                 blurRadius: 12,
               )
             ],
@@ -645,23 +672,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 style: GoogleFonts.rajdhani(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  color: titleColor,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 'Skill Rating: $skillRating PTS • $playStyle',
-                style: TextStyle(color: AppColors.cyan, fontSize: 12, fontWeight: FontWeight.w600),
+                style: TextStyle(color: colors.cyan, fontSize: 12, fontWeight: FontWeight.w600),
               ),
               Text(
                 'ID: ${userId.length > 8 ? userId.substring(0, 8) : userId}...',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 10),
+                style: TextStyle(color: colors.textMuted, fontSize: 10),
               ),
             ],
           ),
         ),
         IconButton(
-          icon: Icon(Icons.edit, color: AppColors.cyan, size: 20),
+          icon: Icon(Icons.edit, color: colors.cyan, size: 20),
           tooltip: 'Update Play Style',
           onPressed: () => _showEditProfileDialog(ProfilePreferences(
             displayName: username,
@@ -672,13 +699,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Widget _buildSectionHeader(String title) {
+  Widget _buildSectionHeader(String title, AppThemeExtension colors) {
     return Text(
       title,
       style: GoogleFonts.rajdhani(
         fontSize: 12,
         fontWeight: FontWeight.bold,
-        color: AppColors.cyan,
+        color: colors.cyan,
         letterSpacing: 1.8,
       ),
     );
@@ -689,13 +716,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     required String title,
     required String subtitle,
     required Widget trailing,
+    required AppThemeExtension colors,
   }) {
+    final titleColor = colors.isLight ? colors.navy : Colors.white;
+
     return GlassCard(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      borderColor: colors.cardBorder,
       child: Row(
         children: [
-          Icon(icon, color: AppColors.cyan, size: 24),
+          Icon(icon, color: colors.cyan, size: 24),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -705,13 +736,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   title,
                   style: GoogleFonts.rajdhani(
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: titleColor,
                     fontSize: 15,
                   ),
                 ),
                 Text(
                   subtitle,
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+                  style: TextStyle(color: colors.textMuted, fontSize: 11),
                 ),
               ],
             ),
@@ -722,51 +753,90 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Widget _buildActionTile({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
+  Widget _buildThemeOptionCard({
+    required AppThemeType themeType,
+    required bool isSelected,
     required VoidCallback onTap,
+    required List<Color> previewColors,
+    required AppThemeExtension colors,
   }) {
-    return GlassCard(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      borderColor: color.withValues(alpha: 0.3),
-      child: InkWell(
-        onTap: onTap,
+    final titleColor = colors.isLight ? colors.navy : Colors.white;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          color: isSelected
+              ? previewColors.first.withValues(alpha: colors.isLight ? 0.12 : 0.15)
+              : (colors.isLight ? colors.surfaceLight : Colors.white.withValues(alpha: 0.03)),
+          border: Border.all(
+            color: isSelected ? previewColors.first : colors.cardBorder,
+            width: isSelected ? 1.6 : 1.0,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: previewColors.first.withValues(alpha: 0.25),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
         child: Row(
           children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: color, size: 20),
+            Row(
+              children: previewColors
+                  .map(
+                    (c) => Container(
+                      width: 13,
+                      height: 13,
+                      margin: const EdgeInsets.only(right: 6),
+                      decoration: BoxDecoration(
+                        color: c,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: colors.isLight ? const Color(0xFF0A1628).withValues(alpha: 0.2) : Colors.white24,
+                          width: 1,
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    title,
-                    style: GoogleFonts.rajdhani(
+                    themeType.displayName,
+                    style: TextStyle(
+                      fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      fontSize: 15,
+                      color: isSelected ? titleColor : colors.textMuted,
                     ),
                   ),
+                  const SizedBox(height: 2),
                   Text(
-                    subtitle,
-                    style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+                    themeType.description,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: colors.textMuted,
+                    ),
                   ),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: color, size: 20),
+            const SizedBox(width: 8),
+            Icon(
+              isSelected ? Icons.check_circle : Icons.radio_button_unchecked,
+              color: isSelected ? previewColors.first : colors.textMuted.withValues(alpha: 0.4),
+              size: 20,
+            ),
           ],
         ),
       ),

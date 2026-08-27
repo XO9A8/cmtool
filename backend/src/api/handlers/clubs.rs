@@ -11,7 +11,7 @@ use uuid::Uuid;
 use crate::{
     api::{
         auth_middleware::AuthenticatedUser,
-        error::{bad_request, forbidden, internal_error, ApiErrorResponse},
+        error::{bad_request, forbidden, internal_error, not_found, ApiErrorResponse},
     },
     domain::play_style::PlayStyleTag,
     infrastructure::postgres_adapter as db,
@@ -123,12 +123,15 @@ pub async fn get_my_clubs(
     let result: Vec<serde_json::Value> = clubs
         .into_iter()
         .map(|c| {
+            let role = c.user_role.clone().unwrap_or_else(|| "player".into());
             serde_json::json!({
                 "id": c.id,
                 "name": c.name,
                 "invite_code": c.invite_code,
                 "owner_id": c.owner_id,
                 "member_count": c.member_count,
+                "user_role": role,
+                "role": role,
                 "is_owner": c.owner_id == Some(auth.user_id),
             })
         })
@@ -137,15 +140,60 @@ pub async fn get_my_clubs(
     Ok(Json(serde_json::json!({ "clubs": result })))
 }
 
+/// Returns full details for a single club.
+pub async fn get_club_details(
+    State(state): State<Arc<AppState>>,
+    auth: AuthenticatedUser,
+    Path(club_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ApiErrorResponse>)> {
+    let club = db::get_club_by_id(&state.pool, club_id)
+        .await
+        .map_err(internal_error)?
+        .ok_or_else(|| not_found("NOT_FOUND", "Club not found"))?;
+
+    let is_official = db::is_club_official(&state.pool, club_id, auth.user_id)
+        .await
+        .map_err(internal_error)?;
+
+    let is_owner = club.owner_id == Some(auth.user_id);
+
+    let user_role: Option<String> = sqlx::query_scalar(
+        "SELECT role FROM Club_Memberships WHERE club_id = $1 AND player_id = $2"
+    )
+    .bind(club_id)
+    .bind(auth.user_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(internal_error)?;
+
+    Ok(Json(serde_json::json!({
+        "id": club.id,
+        "name": club.name,
+        "invite_code": club.invite_code,
+        "owner_id": club.owner_id,
+        "member_count": club.member_count,
+        "created_at": club.created_at.to_rfc3339(),
+        "updated_at": club.updated_at.to_rfc3339(),
+        "user_role": user_role.clone().unwrap_or_else(|| "player".into()),
+        "role": user_role.unwrap_or_else(|| "player".into()),
+        "is_official": is_official || is_owner,
+        "is_owner": is_owner,
+    })))
+}
+
 /// Returns all members of a club with their ratings and roles.
 pub async fn get_club_members(
     State(state): State<Arc<AppState>>,
     _auth: AuthenticatedUser,
     Path(club_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<ApiErrorResponse>)> {
+    let club_info = db::get_club_by_id(&state.pool, club_id)
+        .await
+        .map_err(internal_error)?;
+
     let members = db::get_club_members(&state.pool, club_id)
         .await
-        .map_err(|e| internal_error(e))?;
+        .map_err(internal_error)?;
 
     let result: Vec<serde_json::Value> = members
         .into_iter()
@@ -158,11 +206,29 @@ pub async fn get_club_members(
                 "form_rating": m.form_rating,
                 "play_style": m.play_style.unwrap_or_else(|| "Unclassified".into()),
                 "matches_played": m.matches_played,
+                "avatar_graphic": m.avatar_graphic,
             })
         })
         .collect();
 
-    Ok(Json(serde_json::json!({ "members": result })))
+    let mut response_map = serde_json::Map::new();
+    response_map.insert("members".to_string(), serde_json::Value::Array(result));
+
+    if let Some(club) = club_info {
+        response_map.insert("club".to_string(), serde_json::json!({
+            "id": club.id,
+            "name": club.name,
+            "invite_code": club.invite_code,
+            "owner_id": club.owner_id,
+            "member_count": club.member_count,
+            "created_at": club.created_at.to_rfc3339(),
+            "updated_at": club.updated_at.to_rfc3339(),
+        }));
+        response_map.insert("invite_code".to_string(), serde_json::Value::String(club.invite_code));
+        response_map.insert("name".to_string(), serde_json::Value::String(club.name));
+    }
+
+    Ok(Json(serde_json::Value::Object(response_map)))
 }
 
 #[derive(Deserialize)]
@@ -170,7 +236,7 @@ pub struct UpdateRoleRequest {
     pub role: String,
 }
 
-/// Updates a club member's role (admin, organizer, player).
+/// Updates a club member's role (admin, organizer, president, captain, vice-captain, player).
 pub async fn update_member_role(
     State(state): State<Arc<AppState>>,
     auth: AuthenticatedUser,
@@ -188,19 +254,20 @@ pub async fn update_member_role(
         return Err(bad_request("SELF_DEMOTION", "You cannot change your own role."));
     }
 
-    let valid_roles = ["admin", "organizer", "player"];
-    if !valid_roles.contains(&payload.role.as_str()) {
-        return Err(bad_request("INVALID_ROLE", "Role must be admin, organizer, or player"));
+    let valid_roles = ["admin", "organizer", "president", "captain", "vice-captain", "player"];
+    let role_lower = payload.role.to_lowercase();
+    if !valid_roles.contains(&role_lower.as_str()) {
+        return Err(bad_request("INVALID_ROLE", "Role must be admin, organizer, president, captain, vice-captain, or player"));
     }
 
-    db::update_member_role(&state.pool, club_id, player_id, &payload.role)
+    db::update_member_role(&state.pool, club_id, player_id, &role_lower)
         .await
         .map_err(|e| internal_error(e))?;
 
     Ok(Json(serde_json::json!({
-        "message": format!("Role updated to {}", payload.role),
+        "message": format!("Role updated to {}", role_lower),
         "player_id": player_id,
-        "new_role": payload.role,
+        "new_role": role_lower,
     })))
 }
 
@@ -239,10 +306,10 @@ pub async fn remove_member(
 #[derive(Deserialize)]
 pub struct UpdateClubRequest {
     pub name: String,
-    pub invite_code: String,
+    pub invite_code: Option<String>,
 }
 
-/// Updates club details (name and invite code).
+/// Updates club details (name and optionally invite code).
 pub async fn update_club(
     State(state): State<Arc<AppState>>,
     auth: AuthenticatedUser,
@@ -257,15 +324,179 @@ pub async fn update_club(
         return Err(forbidden("FORBIDDEN", "Only club officials can update club details."));
     }
 
-    db::update_club_details(&state.pool, club_id, &payload.name, &payload.invite_code)
+    let trimmed_name = payload.name.trim();
+    if trimmed_name.is_empty() {
+        return Err(bad_request("INVALID_NAME", "Club name cannot be empty."));
+    }
+
+    let trimmed_code = payload.invite_code.as_ref().map(|s| s.trim()).filter(|s| !s.is_empty());
+    if let Some(code) = trimmed_code {
+        let code_taken: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM Clubs WHERE invite_code = $1 AND id != $2 AND deleted_at IS NULL)"
+        )
+        .bind(code)
+        .bind(club_id)
+        .fetch_one(&state.pool)
+        .await
+        .map_err(internal_error)?;
+
+        if code_taken {
+            return Err(bad_request(
+                "INVITE_CODE_TAKEN",
+                "This invite code is already in use by another club. Please choose a different code.",
+            ));
+        }
+    }
+
+    db::update_club_details(&state.pool, club_id, trimmed_name, trimmed_code)
         .await
         .map_err(|e| internal_error(e))?;
 
     Ok(Json(serde_json::json!({
         "message": "Club updated successfully",
         "club_id": club_id,
+        "name": trimmed_name,
     })))
 }
+
+/// Regenerates a unique invite code for the club.
+pub async fn regenerate_invite_code(
+    State(state): State<Arc<AppState>>,
+    auth: AuthenticatedUser,
+    Path(club_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ApiErrorResponse>)> {
+    let is_official = db::is_club_official(&state.pool, club_id, auth.user_id)
+        .await
+        .map_err(internal_error)?;
+    
+    if !is_official {
+        return Err(forbidden("FORBIDDEN", "Only club officials can regenerate invite codes."));
+    }
+
+    let new_code = db::regenerate_club_invite_code(&state.pool, club_id)
+        .await
+        .map_err(internal_error)?;
+
+    Ok(Json(serde_json::json!({
+        "message": "Invite code regenerated successfully",
+        "club_id": club_id,
+        "invite_code": new_code,
+    })))
+}
+
+#[derive(Deserialize)]
+pub struct TransferOwnershipRequest {
+    pub new_owner_id: Uuid,
+}
+
+/// Transfers club ownership to another member.
+pub async fn transfer_ownership(
+    State(state): State<Arc<AppState>>,
+    auth: AuthenticatedUser,
+    Path(club_id): Path<Uuid>,
+    Json(payload): Json<TransferOwnershipRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ApiErrorResponse>)> {
+    let is_owner = db::is_club_owner(&state.pool, club_id, auth.user_id)
+        .await
+        .map_err(internal_error)?;
+
+    if !is_owner {
+        return Err(forbidden("FORBIDDEN", "Only the current club owner can transfer ownership."));
+    }
+
+    if payload.new_owner_id == auth.user_id {
+        return Err(bad_request("INVALID_TARGET", "You are already the owner."));
+    }
+
+    let is_member: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM Club_Memberships WHERE club_id = $1 AND player_id = $2)"
+    )
+    .bind(club_id)
+    .bind(payload.new_owner_id)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(internal_error)?;
+
+    if !is_member {
+        return Err(bad_request("NOT_A_MEMBER", "The selected user is not a member of this club."));
+    }
+
+    db::transfer_club_ownership(&state.pool, club_id, payload.new_owner_id)
+        .await
+        .map_err(internal_error)?;
+
+    Ok(Json(serde_json::json!({
+        "message": "Club ownership transferred successfully",
+        "club_id": club_id,
+        "new_owner_id": payload.new_owner_id,
+    })))
+}
+
+/// Allows a player to leave a club.
+pub async fn leave_club(
+    State(state): State<Arc<AppState>>,
+    auth: AuthenticatedUser,
+    Path(club_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ApiErrorResponse>)> {
+    let is_owner = db::is_club_owner(&state.pool, club_id, auth.user_id)
+        .await
+        .map_err(internal_error)?;
+
+    if is_owner {
+        return Err(bad_request("OWNER_CANNOT_LEAVE", "Club owners cannot leave their club. Transfer ownership or delete the club instead."));
+    }
+
+    let is_member: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM Club_Memberships WHERE club_id = $1 AND player_id = $2)"
+    )
+    .bind(club_id)
+    .bind(auth.user_id)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(internal_error)?;
+
+    if !is_member {
+        return Err(bad_request("NOT_A_MEMBER", "You are not a member of this club."));
+    }
+
+    db::leave_club(&state.pool, club_id, auth.user_id)
+        .await
+        .map_err(internal_error)?;
+
+    Ok(Json(serde_json::json!({
+        "message": "You have left the club.",
+        "club_id": club_id,
+    })))
+}
+
+/// Disbands / deletes a club.
+pub async fn delete_club(
+    State(state): State<Arc<AppState>>,
+    auth: AuthenticatedUser,
+    Path(club_id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ApiErrorResponse>)> {
+    let is_owner = db::is_club_owner(&state.pool, club_id, auth.user_id)
+        .await
+        .map_err(internal_error)?;
+
+    let is_official = db::is_club_official(&state.pool, club_id, auth.user_id)
+        .await
+        .map_err(internal_error)?;
+
+    if !is_owner && !is_official {
+        return Err(forbidden("FORBIDDEN", "Only club owners or officials can delete the club."));
+    }
+
+    db::delete_club(&state.pool, club_id)
+        .await
+        .map_err(internal_error)?;
+
+    Ok(Json(serde_json::json!({
+        "message": "Club deleted successfully",
+        "club_id": club_id,
+    })))
+}
+
 
 /// Lists all tournaments for a club.
 pub async fn get_club_tournaments(

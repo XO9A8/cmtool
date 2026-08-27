@@ -90,6 +90,7 @@ class MatchdayPdfService {
   // ─────────────────────────────────────────────────────────────────────────────
 
   /// Generates a premium sports-programme style PDF for a matchday or date
+  /// with a fixed 10 match details per page and structured layout.
   static Future<Uint8List> generateMatchdayPdf({
     required String tournamentName,
     required String formatType,
@@ -100,7 +101,7 @@ class MatchdayPdfService {
   }) async {
     final titleType = includeResults ? 'Results' : 'Fixtures';
     final pdf = pw.Document(
-      title: '$tournamentName — Matchday $titleType Programme',
+      title: '$tournamentName - Matchday $titleType Programme',
       author: 'eFootball Club Manager',
     );
 
@@ -115,11 +116,6 @@ class MatchdayPdfService {
     }
 
     // ── Filter fixtures ──────────────────────────────────────────────────────
-    // 1. Strict matchday_id inclusion: matches originally assigned to this matchday.
-    // 2. Cross-matchday reschedule inclusion: matches from OTHER matchdays that were
-    //    genuinely rescheduled (is_rescheduled == true) into this matchday's date.
-    // 3. Un-rescheduled matches from other matchdays (even if co-scheduled on the same date)
-    //    are NEVER included here — they belong to their own matchday graphic.
     final List<Map<String, dynamic>> targetMatches = [];
     for (final raw in allFixtures) {
       if (raw is! Map) continue;
@@ -138,15 +134,11 @@ class MatchdayPdfService {
         targetMatches.add(f);
       } else {
         if (fMdId == selectedMdId) {
-          // Home matchday match (including any moved to a future date)
           targetMatches.add(f);
         } else if (isGenuinelyRescheduled &&
                    targetDate != null &&
                    fSchedDate != null &&
                    _isSameDay(fSchedDate, targetDate)) {
-          // Check if this match's own matchday is already on the target date.
-          // If so, it will be naturally included when selectedMdId == fMdId.
-          // We shouldn't duplicate it into this matchday too.
           bool currentMdIsOnTargetDate = false;
           final currentMdDateStr = f['matchday_scheduled_date']?.toString();
           if (currentMdDateStr != null && currentMdDateStr.isNotEmpty) {
@@ -159,8 +151,6 @@ class MatchdayPdfService {
           }
 
           if (!currentMdIsOnTargetDate) {
-            // It's an orphan arriving from a DIFFERENT date.
-            // Assign it to the FIRST matchday of targetDate to avoid duplication.
             int? minMdNum;
             String? minMdId;
             for (final fix in allFixtures) {
@@ -238,7 +228,7 @@ class MatchdayPdfService {
 
     final pageTheme = pw.PageTheme(
       pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.symmetric(horizontal: 22, vertical: 18),
+      margin: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 14),
       theme: pw.ThemeData.withFont(
         base: pw.Font.helvetica(),
         bold: pw.Font.helveticaBold(),
@@ -249,53 +239,69 @@ class MatchdayPdfService {
       ),
     );
 
-    pdf.addPage(
-      pw.MultiPage(
-        pageTheme: pageTheme,
-        header: (context) => _buildHeader(
-          tournamentName: tournamentName,
-          formatLabel: formatLabel,
-          mdNum: mdNum,
-          formattedDate: formattedDate,
-          includeResults: includeResults,
-          clubName: clubName,
-          totalMatches: totalMatches,
-          completedCount: completedCount,
-          reschedCount: reschedCount,
-          totalGoals: totalGoals,
+    // ── Chunk matches into fixed 10 matches per page ──────────────────────────
+    final List<List<Map<String, dynamic>>> matchChunks = [];
+    if (targetMatches.isEmpty) {
+      matchChunks.add([]);
+    } else {
+      for (int i = 0; i < targetMatches.length; i += 10) {
+        final end = (i + 10 < targetMatches.length) ? i + 10 : targetMatches.length;
+        matchChunks.add(targetMatches.sublist(i, end));
+      }
+    }
+
+    final totalPages = matchChunks.length;
+
+    for (int chunkIdx = 0; chunkIdx < totalPages; chunkIdx++) {
+      final pageMatches = matchChunks[chunkIdx];
+      final pageNum = chunkIdx + 1;
+      final pageStartIndex = chunkIdx * 10;
+
+      pdf.addPage(
+        pw.Page(
+          pageTheme: pageTheme,
+          build: (context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+              children: [
+                _buildHeader(
+                  tournamentName: tournamentName,
+                  formatLabel: formatLabel,
+                  mdNum: mdNum,
+                  formattedDate: formattedDate,
+                  includeResults: includeResults,
+                  clubName: clubName,
+                  totalMatches: totalMatches,
+                  completedCount: completedCount,
+                  reschedCount: reschedCount,
+                  totalGoals: totalGoals,
+                  currentPage: pageNum,
+                  totalPages: totalPages,
+                ),
+                pw.SizedBox(height: 5),
+                if (pageMatches.isEmpty)
+                  pw.Expanded(child: _buildEmptyState())
+                else
+                  pw.Expanded(
+                    child: _buildMatchPageContent(
+                      matches: pageMatches,
+                      startIndex: pageStartIndex,
+                      includeResults: includeResults,
+                      formatType: formatType,
+                    ),
+                  ),
+                _buildFooter(
+                  pageNum: pageNum,
+                  totalPages: totalPages,
+                  tournamentName: tournamentName,
+                  includeResults: includeResults,
+                ),
+              ],
+            );
+          },
         ),
-        build: (context) {
-          if (targetMatches.isEmpty) return [_buildEmptyState()];
-
-          final List<pw.Widget> content = [];
-          String? currentGroup;
-          int? currentRound;
-
-          for (int i = 0; i < targetMatches.length; i++) {
-            final match = targetMatches[i];
-            final groupName = match['group_name']?.toString();
-            final roundNum  = (match['round_number'] as num?)?.toInt() ?? 1;
-            final isGrouped = groupName != null && groupName.isNotEmpty;
-
-            if (isGrouped && groupName != currentGroup) {
-              currentGroup = groupName;
-              currentRound = roundNum;
-              content.add(_buildSectionHeader('GROUP  $groupName', icon: 'group'));
-              content.add(pw.SizedBox(height: 5));
-            } else if (!isGrouped && isAll && roundNum != currentRound) {
-              currentRound = roundNum;
-              content.add(_buildSectionHeader(_getRoundTitle(roundNum, formatType), icon: 'round'));
-              content.add(pw.SizedBox(height: 5));
-            }
-
-            content.add(_buildMatchCard(match, i + 1, includeResults, formatType));
-            content.add(pw.SizedBox(height: 7));
-          }
-
-          return content;
-        },
-      ),
-    );
+      );
+    }
 
     return pdf.save();
   }
@@ -339,7 +345,7 @@ class MatchdayPdfService {
 
     if (pngFiles.isNotEmpty) {
       await SharePlus.instance.share(ShareParams(
-        text: '$tournamentName — Matchday $mdNum ${includeResults ? "Results" : "Fixtures"}',
+        text: '$tournamentName - Matchday $mdNum ${includeResults ? "Results" : "Fixtures"}',
         files: pngFiles,
       ));
     } else {
@@ -347,7 +353,7 @@ class MatchdayPdfService {
       final file = File('${tempDir.path}/$fileName');
       await file.writeAsBytes(pdfBytes);
       await SharePlus.instance.share(ShareParams(
-        text: '$tournamentName — Matchday $mdNum ${includeResults ? "Results" : "Fixtures"}',
+        text: '$tournamentName - Matchday $mdNum ${includeResults ? "Results" : "Fixtures"}',
         files: [XFile(file.path, mimeType: 'application/pdf', name: fileName)],
       ));
     }
@@ -356,16 +362,6 @@ class MatchdayPdfService {
   /// Exports one image per matchday for every matchday that shares the same
   /// calendar date as [selectedMatchday]. This is the primary export entry-point
   /// for the in-app "Export Fixtures" button.
-  ///
-  /// Behaviour:
-  /// - Groups [allFixtures] by matchday_id using the `matchday_scheduled_date`
-  ///   field embedded in each fixture by the bracket API.
-  /// - For each matchday on the target date, generates an independent PDF page
-  ///   and rasters it to a PNG.
-  /// - All PNGs are shared together in a single share-sheet call.
-  /// - A match shown as RESCHEDULED means its `is_rescheduled` DB flag is true
-  ///   (i.e. it was individually rescheduled to a different time/date). The match
-  ///   stays in its original matchday; its new `scheduled_at` time is displayed.
   static Future<int> exportAndShareForDate({
     required String tournamentName,
     required String formatType,
@@ -374,15 +370,12 @@ class MatchdayPdfService {
     required bool includeResults,
     String? clubName,
   }) async {
-    // Resolve target date from the selected matchday.
     final targetDateStr = selectedMatchday?['scheduled_date']?.toString();
     DateTime? targetDate;
     if (targetDateStr != null && targetDateStr.isNotEmpty) {
       try { targetDate = DateTime.parse(targetDateStr); } catch (_) {}
     }
 
-    // Group all fixtures by matchday_id; include only matchdays whose
-    // matchday_scheduled_date matches the target date.
     final Map<String, List<Map<String, dynamic>>> byMatchday = {};
     final Map<String, int> matchdayNumbers = {};
     final Map<String, String> matchdayDates = {};
@@ -393,8 +386,6 @@ class MatchdayPdfService {
       final fMdId = f['matchday_id']?.toString();
       if (fMdId == null) continue;
 
-      // matchday_scheduled_date is a NaiveDate string ("YYYY-MM-DD") from the
-      // bracket API (tournaments.rs get_tournament_bracket query).
       final mdDateStr = f['matchday_scheduled_date']?.toString();
       DateTime? mdDate;
       if (mdDateStr != null && mdDateStr.isNotEmpty) {
@@ -411,8 +402,6 @@ class MatchdayPdfService {
       }
     }
 
-    // Fallback: if no grouped fixtures found (e.g. date field missing), export
-    // the single selected matchday the old way.
     if (byMatchday.isEmpty) {
       await exportAndShare(
         tournamentName: tournamentName,
@@ -425,7 +414,6 @@ class MatchdayPdfService {
       return 1;
     }
 
-    // Sort matchdays by ascending matchday_number so images are ordered MD1 → MD2 → …
     final sortedMdIds = byMatchday.keys.toList()
       ..sort((a, b) => (matchdayNumbers[a] ?? 0).compareTo(matchdayNumbers[b] ?? 0));
 
@@ -437,7 +425,6 @@ class MatchdayPdfService {
     for (final mdId in sortedMdIds) {
       final mdNum = matchdayNumbers[mdId] ?? 0;
 
-      // Build a synthetic matchday descriptor for generateMatchdayPdf.
       final syntheticMd = <String, dynamic>{
         'id': mdId,
         'matchday_number': mdNum,
@@ -470,7 +457,7 @@ class MatchdayPdfService {
           ? '${_pad(targetDate.day)} ${_monthName(targetDate.month)} ${targetDate.year}'
           : '';
       await SharePlus.instance.share(ShareParams(
-        text: '$tournamentName — $dateLabel ${includeResults ? "Results" : "Fixtures"} '
+        text: '$tournamentName - $dateLabel ${includeResults ? "Results" : "Fixtures"} '
               '(${sortedMdIds.length} matchday${sortedMdIds.length > 1 ? "s" : ""})',
         files: allPngFiles,
       ));
@@ -480,7 +467,7 @@ class MatchdayPdfService {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // HEADER  — full-bleed magazine masthead style
+  // HEADER — full-bleed magazine masthead style
   // ─────────────────────────────────────────────────────────────────────────────
 
   static pw.Widget _buildHeader({
@@ -494,10 +481,12 @@ class MatchdayPdfService {
     required int completedCount,
     required int reschedCount,
     required int totalGoals,
+    required int currentPage,
+    required int totalPages,
   }) {
     final modeLabel = includeResults ? 'RESULTS' : 'FIXTURES';
     final modeColor = includeResults ? _emerald : _scarlet;
-    final mdLabel   = mdNum == 'ALL' ? 'ALL MATCHDAYS' : 'MATCHDAY  $mdNum';
+    final mdLabel   = mdNum == 'ALL' ? 'ALL MATCHDAYS' : 'MATCHDAY $mdNum';
 
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
@@ -507,7 +496,7 @@ class MatchdayPdfService {
           decoration: const pw.BoxDecoration(
             color: _navy,
           ),
-          padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 7),
           child: pw.Row(
             crossAxisAlignment: pw.CrossAxisAlignment.center,
             children: [
@@ -516,93 +505,78 @@ class MatchdayPdfService {
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    // Club name kicker (if present)
                     if (clubName != null && clubName.isNotEmpty) ...[
                       pw.Text(
                         clubName.toUpperCase(),
                         style: const pw.TextStyle(
                           color: _gold,
-                          fontSize: 7,
+                          fontSize: 6.5,
                           fontWeight: pw.FontWeight.bold,
-                          letterSpacing: 2.5,
+                          letterSpacing: 2.0,
                         ),
                       ),
-                      pw.SizedBox(height: 3),
+                      pw.SizedBox(height: 2),
                     ],
-                    // Tournament name — bold serif-feeling at large size
                     pw.Text(
                       tournamentName.toUpperCase(),
+                      maxLines: 1,
+                      overflow: pw.TextOverflow.clip,
                       style: const pw.TextStyle(
                         color: _paper,
-                        fontSize: 18,
+                        fontSize: 15,
                         fontWeight: pw.FontWeight.bold,
-                        letterSpacing: 0.5,
+                        letterSpacing: 0.4,
                       ),
                     ),
-                    pw.SizedBox(height: 5),
-                    // Tag row
+                    pw.SizedBox(height: 4),
                     pw.Row(
                       children: [
                         // MODE badge
                         pw.Container(
-                          padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                           color: modeColor,
                           child: pw.Text(
                             modeLabel,
                             style: const pw.TextStyle(
                               color: _paper,
-                              fontSize: 7,
-                              fontWeight: pw.FontWeight.bold,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                        ),
-                        pw.SizedBox(width: 6),
-                        // Format label
-                        pw.Container(
-                          padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: pw.BoxDecoration(
-                            border: pw.Border.all(color: _gold, width: 0.7),
-                          ),
-                          child: pw.Text(
-                            formatLabel,
-                            style: const pw.TextStyle(
-                              color: _gold,
-                              fontSize: 7,
+                              fontSize: 6.5,
                               fontWeight: pw.FontWeight.bold,
                               letterSpacing: 1.0,
                             ),
                           ),
                         ),
-                        pw.SizedBox(width: 6),
+                        pw.SizedBox(width: 5),
+                        // Format label
+                        pw.Container(
+                          padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                          decoration: pw.BoxDecoration(
+                            border: pw.Border.all(color: _gold, width: 0.6),
+                          ),
+                          child: pw.Text(
+                            formatLabel,
+                            style: const pw.TextStyle(
+                              color: _gold,
+                              fontSize: 6.5,
+                              fontWeight: pw.FontWeight.bold,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ),
+                        pw.SizedBox(width: 5),
                         // Deadline badge
                         pw.Container(
-                          padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                           decoration: pw.BoxDecoration(
-                            border: pw.Border.all(color: _paper, width: 0.7),
+                            border: pw.Border.all(color: _paper, width: 0.6),
                           ),
-                          child: pw.Row(
-                            mainAxisSize: pw.MainAxisSize.min,
-                            children: [
-                              pw.Text(
-                                'DEADLINE  ',
-                                style: const pw.TextStyle(
-                                  color: _paper,
-                                  fontSize: 7,
-                                  fontWeight: pw.FontWeight.bold,
-                                  letterSpacing: 0.8,
-                                ),
-                              ),
-                              pw.Text(
-                                '12:59 PM BST',
-                                style: const pw.TextStyle(
-                                  color: _paper,
-                                  fontSize: 7,
-                                  fontWeight: pw.FontWeight.bold,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ],
+                          child: pw.Text(
+                            'DEADLINE: 12:59 PM BST',
+                            style: const pw.TextStyle(
+                              color: _paper,
+                              fontSize: 6.5,
+                              fontWeight: pw.FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
                           ),
                         ),
                       ],
@@ -615,31 +589,29 @@ class MatchdayPdfService {
               pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.end,
                 children: [
-                  // Big matchday number
                   pw.Text(
                     mdLabel,
                     style: const pw.TextStyle(
                       color: _paper,
-                      fontSize: 13,
+                      fontSize: 12,
                       fontWeight: pw.FontWeight.bold,
-                      letterSpacing: 0.5,
+                      letterSpacing: 0.4,
                     ),
                   ),
-                  pw.SizedBox(height: 4),
-                  // Date pill
+                  pw.SizedBox(height: 3),
                   pw.Container(
-                    padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const pw.EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                     decoration: pw.BoxDecoration(
                       color: _paper,
-                      border: pw.Border.all(color: _gold, width: 0.8),
+                      border: pw.Border.all(color: _gold, width: 0.7),
                     ),
                     child: pw.Text(
                       formattedDate,
                       style: const pw.TextStyle(
                         color: _navy,
-                        fontSize: 8,
+                        fontSize: 7.5,
                         fontWeight: pw.FontWeight.bold,
-                        letterSpacing: 0.6,
+                        letterSpacing: 0.5,
                       ),
                     ),
                   ),
@@ -650,12 +622,12 @@ class MatchdayPdfService {
         ),
 
         // ── Scarlet accent rule ───────────────────────────────────────────────
-        pw.Container(height: 3, color: _scarlet),
+        pw.Container(height: 2.5, color: _scarlet),
 
         // ── Stats strip on paper ──────────────────────────────────────────────
         pw.Container(
           color: _paperMid,
-          padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+          padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 3.5),
           child: pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
@@ -683,7 +655,6 @@ class MatchdayPdfService {
 
         // ── Bottom rule ───────────────────────────────────────────────────────
         pw.Container(height: 0.8, color: _paperDark),
-        pw.SizedBox(height: 8),
       ],
     );
   }
@@ -696,19 +667,18 @@ class MatchdayPdfService {
           value,
           style: pw.TextStyle(
             color: valueColor,
-            fontSize: 11,
+            fontSize: 10,
             fontWeight: pw.FontWeight.bold,
-            letterSpacing: 0.3,
+            letterSpacing: 0.2,
           ),
         ),
-        pw.SizedBox(height: 1),
         pw.Text(
           label,
           style: const pw.TextStyle(
             color: _textMuted,
-            fontSize: 6,
+            fontSize: 5.5,
             fontWeight: pw.FontWeight.bold,
-            letterSpacing: 0.8,
+            letterSpacing: 0.6,
           ),
         ),
       ],
@@ -718,53 +688,61 @@ class MatchdayPdfService {
   static pw.Widget _buildStatDivider() {
     return pw.Container(
       width: 0.6,
-      height: 22,
+      height: 18,
       color: _paperDark,
     );
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // SECTION HEADER — editorial chapter divider
+  // MATCH PAGE CONTENT (Fixed 10 matches per page with balanced height)
   // ─────────────────────────────────────────────────────────────────────────────
 
-  static pw.Widget _buildSectionHeader(String title, {String icon = 'round'}) {
-    return pw.Container(
-      margin: const pw.EdgeInsets.symmetric(vertical: 2),
-      child: pw.Row(
-        crossAxisAlignment: pw.CrossAxisAlignment.center,
+  static pw.Widget _buildMatchPageContent({
+    required List<Map<String, dynamic>> matches,
+    required int startIndex,
+    required bool includeResults,
+    required String formatType,
+  }) {
+    final List<pw.Widget> matchWidgets = [];
+
+    for (int i = 0; i < matches.length; i++) {
+      matchWidgets.add(
+        _buildMatchCard(
+          matches[i],
+          startIndex + i + 1,
+          includeResults,
+          formatType,
+        ),
+      );
+      if (i < matches.length - 1) {
+        matchWidgets.add(pw.SizedBox(height: 5.5));
+      }
+    }
+
+    if (matches.length == 10) {
+      // 10 matches completely fill the page without awkward empty space
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: matchWidgets,
+      );
+    } else {
+      // For pages with < 10 matches, maintain exact card heights and balance the bottom
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
         children: [
-          // Scarlet tab
-          pw.Container(
-            width: 4,
-            height: 16,
-            color: _scarlet,
-          ),
-          pw.SizedBox(width: 7),
-          // Diamond bullet
-          pw.SvgImage(svg: _svgDiamond, width: 7, height: 7),
-          pw.SizedBox(width: 6),
-          // Label
-          pw.Text(
-            title,
-            style: const pw.TextStyle(
-              color: _navy,
-              fontSize: 8.5,
-              fontWeight: pw.FontWeight.bold,
-              letterSpacing: 1.8,
-            ),
-          ),
-          pw.SizedBox(width: 8),
-          // Trailing rule
+          ...matchWidgets,
+          pw.SizedBox(height: 6),
           pw.Expanded(
-            child: pw.Container(height: 0.7, color: _paperDark),
+            child: _buildOfficialNoticeCard(includeResults),
           ),
         ],
-      ),
-    );
+      );
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // MATCH CARD — clean two-column layout with diagonal centre split
+  // MATCH CARD — Clean two-column layout with fixed height proportions
   // ─────────────────────────────────────────────────────────────────────────────
 
   static pw.Widget _buildMatchCard(
@@ -812,10 +790,8 @@ class MatchdayPdfService {
           try { mdDate = DateTime.parse(mdDateStr); } catch (_) {}
         }
         
-        // If it's a match rescheduled into today's matchday, show its kickoff time today.
-        // If it's in its original matchday but moved to a different future date, show the target date.
         if (isRescheduled && !isReschedInto && mdDate != null && !_isSameDay(dt, mdDate)) {
-          timeStr = '${_pad(dt.day)} ${_monthName(dt.month).toUpperCase()} · $h:${_pad(dt.minute)} $ap';
+          timeStr = '${_pad(dt.day)} ${_monthName(dt.month).toUpperCase()} | $h:${_pad(dt.minute)} $ap';
         } else {
           timeStr = '$h:${_pad(dt.minute)} $ap';
         }
@@ -828,21 +804,19 @@ class MatchdayPdfService {
     final origMdNum = m['matchday_number'];
     if (isReschedInto && origMdNum != null) {
       if (groupName != null && groupName.isNotEmpty) {
-        stageLabel = 'MD $origMdNum · GRP $groupName · RD $roundNum';
+        stageLabel = 'MD $origMdNum | GRP $groupName | RD $roundNum';
       } else {
-        stageLabel = 'MD $origMdNum · RD $roundNum';
+        stageLabel = 'MD $origMdNum | RD $roundNum';
       }
     } else if (groupName != null && groupName.isNotEmpty) {
-      stageLabel = 'GRP $groupName  ·  RD $roundNum';
+      stageLabel = 'GRP $groupName | RD $roundNum';
     } else {
       stageLabel = _getRoundTitle(roundNum, formatType);
     }
 
-    // Card accent colour — left edge stripe
     final PdfColor accentLeft  = isRescheduled ? _amber : _navy;
     final PdfColor accentRight = isRescheduled ? _amber : _scarlet;
 
-    // Card background
     final PdfColor cardBg = isRescheduled
         ? const PdfColor.fromInt(0xFFFFF8F0)
         : _paper;
@@ -858,12 +832,11 @@ class MatchdayPdfService {
         children: [
           // ── Top metadata bar ─────────────────────────────────────────────
           pw.Container(
-            padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 3.5),
+            padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
             color: isRescheduled ? const PdfColor.fromInt(0xFFFFF3E0) : _paperMid,
             child: pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                // Index + stage
                 pw.Row(
                   children: [
                     pw.Text(
@@ -875,32 +848,46 @@ class MatchdayPdfService {
                         letterSpacing: 0.5,
                       ),
                     ),
-                    pw.SizedBox(width: 5),
-                    pw.Container(width: 0.5, height: 9, color: _paperDark),
-                    pw.SizedBox(width: 5),
+                    pw.SizedBox(width: 4),
+                    pw.Container(width: 0.5, height: 8, color: _paperDark),
+                    pw.SizedBox(width: 4),
                     pw.Text(
                       stageLabel,
                       style: const pw.TextStyle(
                         color: _textSecond,
-                        fontSize: 7,
+                        fontSize: 6.8,
                         fontWeight: pw.FontWeight.bold,
-                        letterSpacing: 0.8,
+                        letterSpacing: 0.6,
                       ),
                     ),
+                    if (isRescheduled && reason != null && reason.isNotEmpty) ...[
+                      pw.SizedBox(width: 4),
+                      pw.Container(width: 0.5, height: 8, color: _amber),
+                      pw.SizedBox(width: 4),
+                      pw.Text(
+                        'NOTE: $reason',
+                        maxLines: 1,
+                        overflow: pw.TextOverflow.clip,
+                        style: const pw.TextStyle(
+                          color: _amber,
+                          fontSize: 6.2,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
 
-                // Right: status / time
                 if (isRescheduled)
                   pw.Row(
                     children: [
                       _buildTag('RESCHEDULED', _amber, _navy),
-                      pw.SizedBox(width: 5),
+                      pw.SizedBox(width: 4),
                       pw.Text(
                         timeStr,
                         style: const pw.TextStyle(
                           color: _amber,
-                          fontSize: 7,
+                          fontSize: 6.5,
                           fontWeight: pw.FontWeight.bold,
                         ),
                       ),
@@ -912,21 +899,21 @@ class MatchdayPdfService {
                   pw.Row(
                     children: [
                       pw.Text(
-                        'KO  ',
+                        'KO ',
                         style: const pw.TextStyle(
                           color: _textMuted,
-                          fontSize: 7,
+                          fontSize: 6.5,
                           fontWeight: pw.FontWeight.bold,
-                          letterSpacing: 0.5,
+                          letterSpacing: 0.4,
                         ),
                       ),
                       pw.Text(
                         timeStr,
                         style: const pw.TextStyle(
                           color: _textPrimary,
-                          fontSize: 7,
+                          fontSize: 6.5,
                           fontWeight: pw.FontWeight.bold,
-                          letterSpacing: 0.5,
+                          letterSpacing: 0.4,
                         ),
                       ),
                     ],
@@ -935,25 +922,22 @@ class MatchdayPdfService {
             ),
           ),
 
-          // ── Hairline separator ────────────────────────────────────────────
           pw.Container(height: 0.5, color: cardBorder),
 
           // ── Main matchup row ─────────────────────────────────────────────
           pw.Row(
             crossAxisAlignment: pw.CrossAxisAlignment.center,
             children: [
-              // Left accent stripe
-              pw.Container(width: 3, height: 42, color: accentLeft),
+              pw.Container(width: 3, height: 44, color: accentLeft),
 
-              // ── Player 1 panel ──────────────────────────────────────────
+              // Player 1
               pw.Expanded(
                 child: pw.Padding(
-                  padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   child: pw.Row(
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: pw.CrossAxisAlignment.center,
                     children: [
-                      // Name + ELO
                       pw.Expanded(
                         child: pw.Column(
                           crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -969,20 +953,20 @@ class MatchdayPdfService {
                                     : (includeResults && isCompleted && !isDraw
                                         ? _textMuted
                                         : _textPrimary),
-                                fontSize: 12.5,
+                                fontSize: 11.5,
                                 fontWeight: pw.FontWeight.bold,
                                 letterSpacing: -0.2,
                               ),
                             ),
                             if (p1Rating != null) ...[
-                              pw.SizedBox(height: 2),
+                              pw.SizedBox(height: 1),
                               pw.Text(
-                                'ELO  $p1Rating',
+                                'ELO $p1Rating',
                                 style: const pw.TextStyle(
                                   color: _textMuted,
-                                  fontSize: 6.5,
+                                  fontSize: 6.2,
                                   fontWeight: pw.FontWeight.bold,
-                                  letterSpacing: 0.8,
+                                  letterSpacing: 0.6,
                                 ),
                               ),
                             ],
@@ -990,15 +974,13 @@ class MatchdayPdfService {
                         ),
                       ),
 
-                      // WIN badge (results mode)
                       if (p1Wins) ...[
-                        pw.SizedBox(width: 6),
+                        pw.SizedBox(width: 4),
                         _buildWinnerBadge(),
                       ],
 
-                      // Score box
                       if (includeResults && isCompleted && p1Score != null) ...[
-                        pw.SizedBox(width: 6),
+                        pw.SizedBox(width: 4),
                         _buildScoreBox('$p1Score', p1Wins, isDraw),
                       ],
                     ],
@@ -1006,45 +988,42 @@ class MatchdayPdfService {
                 ),
               ),
 
-              // ── Centre divider with VS or score separator ────────────────
+              // Centre divider
               pw.Container(
-                width: 36,
-                height: 42,
+                width: 32,
+                height: 44,
                 color: _navy,
                 child: pw.Center(
                   child: pw.Text(
-                    includeResults && isCompleted ? '—' : 'VS',
+                    includeResults && isCompleted ? '-' : 'VS',
                     style: const pw.TextStyle(
                       color: _paper,
-                      fontSize: 9,
+                      fontSize: 8.5,
                       fontWeight: pw.FontWeight.bold,
-                      letterSpacing: 1.5,
+                      letterSpacing: 1.2,
                     ),
                   ),
                 ),
               ),
 
-              // ── Player 2 panel ──────────────────────────────────────────
+              // Player 2
               pw.Expanded(
                 child: pw.Padding(
-                  padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   child: pw.Row(
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: pw.CrossAxisAlignment.center,
                     children: [
-                      // Score box
                       if (includeResults && isCompleted && p2Score != null) ...[
                         _buildScoreBox('$p2Score', p2Wins, isDraw),
-                        pw.SizedBox(width: 6),
+                        pw.SizedBox(width: 4),
                       ],
 
-                      // WIN badge (results mode)
                       if (p2Wins) ...[
                         _buildWinnerBadge(),
-                        pw.SizedBox(width: 6),
+                        pw.SizedBox(width: 4),
                       ],
 
-                      // Name + ELO
                       pw.Expanded(
                         child: pw.Column(
                           crossAxisAlignment: pw.CrossAxisAlignment.end,
@@ -1061,20 +1040,20 @@ class MatchdayPdfService {
                                     : (includeResults && isCompleted && !isDraw
                                         ? _textMuted
                                         : _textPrimary),
-                                fontSize: 12.5,
+                                fontSize: 11.5,
                                 fontWeight: pw.FontWeight.bold,
                                 letterSpacing: -0.2,
                               ),
                             ),
                             if (p2Rating != null) ...[
-                              pw.SizedBox(height: 2),
+                              pw.SizedBox(height: 1),
                               pw.Text(
-                                'ELO  $p2Rating',
+                                'ELO $p2Rating',
                                 style: const pw.TextStyle(
                                   color: _textMuted,
-                                  fontSize: 6.5,
+                                  fontSize: 6.2,
                                   fontWeight: pw.FontWeight.bold,
-                                  letterSpacing: 0.8,
+                                  letterSpacing: 0.6,
                                 ),
                               ),
                             ],
@@ -1086,42 +1065,142 @@ class MatchdayPdfService {
                 ),
               ),
 
-              // Right accent stripe
-              pw.Container(width: 3, height: 42, color: accentRight),
+              pw.Container(width: 3, height: 44, color: accentRight),
             ],
           ),
+        ],
+      ),
+    );
+  }
 
-          // ── Reschedule note ───────────────────────────────────────────────
-          if (isRescheduled && reason != null && reason.isNotEmpty) ...[
-            pw.Container(height: 0.5, color: _amber),
-            pw.Container(
-              padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              color: const PdfColor.fromInt(0xFFFFFBF5),
-              child: pw.Row(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
+  // ─────────────────────────────────────────────────────────────────────────────
+  // OFFICIAL NOTICE CARD (Balances layout when a page has < 10 matches)
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  static pw.Widget _buildOfficialNoticeCard(bool includeResults) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: pw.BoxDecoration(
+        color: const PdfColor.fromInt(0xFFEDE9DF),
+        border: pw.Border.all(color: _paperDark, width: 0.8),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+        mainAxisAlignment: pw.MainAxisAlignment.center,
+        children: [
+          pw.Row(
+            children: [
+              pw.Container(width: 3, height: 12, color: _scarlet),
+              pw.SizedBox(width: 6),
+              pw.Text(
+                includeResults ? 'OFFICIAL RESULT CERTIFICATION' : 'MATCHDAY REGULATIONS & FAIR PLAY CODE',
+                style: const pw.TextStyle(
+                  color: _navy,
+                  fontSize: 7.5,
+                  fontWeight: pw.FontWeight.bold,
+                  letterSpacing: 1.0,
+                ),
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 6),
+          pw.Text(
+            includeResults
+                ? 'All scores and results documented in this official matchday programme are validated and finalized. Any result disputes or appeals must be submitted with match screenshot evidence via the club management console within the designated review window.'
+                : 'All participants must report to scheduled kickoff lobbies on time. Matches rescheduled by mutual consent must follow the official tournament rescheduling procedure. Fair play, sportsmanship, and network integrity regulations apply to all fixtures.',
+            style: const pw.TextStyle(
+              color: _textSecond,
+              fontSize: 6.8,
+              lineSpacing: 1.4,
+            ),
+          ),
+          pw.SizedBox(height: 8),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text(
+                'eFootball Mobile Management System',
+                style: const pw.TextStyle(color: _textMuted, fontSize: 6.0),
+              ),
+              pw.Text(
+                'VERIFIED OFFICIAL SCHEDULE',
+                style: const pw.TextStyle(
+                  color: _gold,
+                  fontSize: 6.0,
+                  fontWeight: pw.FontWeight.bold,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // FOOTER — Anchored at bottom of every page
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  static pw.Widget _buildFooter({
+    required int pageNum,
+    required int totalPages,
+    required String tournamentName,
+    required bool includeResults,
+  }) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.only(top: 4),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+        children: [
+          pw.Container(height: 0.8, color: _paperDark),
+          pw.SizedBox(height: 3.5),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            children: [
+              pw.Row(
                 children: [
+                  pw.SvgImage(svg: _svgDiamond, width: 6, height: 6),
+                  pw.SizedBox(width: 4),
                   pw.Text(
-                    'NOTE  ',
+                    'eFOOTBALL CLUB MANAGER',
                     style: const pw.TextStyle(
-                      color: _amber,
+                      color: _navy,
                       fontSize: 6.5,
                       fontWeight: pw.FontWeight.bold,
                       letterSpacing: 0.8,
                     ),
                   ),
-                  pw.Expanded(
-                    child: pw.Text(
-                      reason,
-                      style: const pw.TextStyle(
-                        color: _textSecond,
-                        fontSize: 6.5,
-                      ),
+                  pw.SizedBox(width: 6),
+                  pw.Text(
+                    '| OFFICIAL ${includeResults ? "RESULTS" : "FIXTURES"} PROGRAMME',
+                    style: const pw.TextStyle(
+                      color: _textMuted,
+                      fontSize: 6.0,
+                      letterSpacing: 0.6,
                     ),
                   ),
                 ],
               ),
-            ),
-          ],
+              pw.Container(
+                padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: const pw.BoxDecoration(
+                  color: _navy,
+                  borderRadius: pw.BorderRadius.all(pw.Radius.circular(2)),
+                ),
+                child: pw.Text(
+                  'PAGE $pageNum OF $totalPages',
+                  style: const pw.TextStyle(
+                    color: _paper,
+                    fontSize: 6.5,
+                    fontWeight: pw.FontWeight.bold,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -1131,62 +1210,58 @@ class MatchdayPdfService {
   // SMALL WIDGETS
   // ─────────────────────────────────────────────────────────────────────────────
 
-  /// Solid colour tag pill
   static pw.Widget _buildTag(String label, PdfColor bg, PdfColor fg) {
     return pw.Container(
-      padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      padding: const pw.EdgeInsets.symmetric(horizontal: 4.5, vertical: 1.5),
       color: bg,
       child: pw.Text(
         label,
         style: pw.TextStyle(
           color: fg,
-          fontSize: 6.5,
+          fontSize: 6.2,
           fontWeight: pw.FontWeight.bold,
-          letterSpacing: 0.6,
+          letterSpacing: 0.5,
         ),
       ),
     );
   }
 
-  /// Large score numeral box
   static pw.Widget _buildScoreBox(String score, bool isWinner, bool isDraw) {
     final PdfColor bg = isWinner
         ? _emerald
         : (isDraw ? _navy : _paperMid);
     final PdfColor fg = (isWinner || isDraw) ? _paper : _textSecond;
     return pw.Container(
-      width: 24,
-      height: 24,
+      width: 22,
+      height: 22,
       alignment: pw.Alignment.center,
       color: bg,
       child: pw.Text(
         score,
         style: pw.TextStyle(
           color: fg,
-          fontSize: 13,
+          fontSize: 12,
           fontWeight: pw.FontWeight.bold,
         ),
       ),
     );
   }
 
-  /// "W" winner badge
   static pw.Widget _buildWinnerBadge() {
     return pw.Container(
-      padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      padding: const pw.EdgeInsets.symmetric(horizontal: 3.5, vertical: 1.5),
       color: _emerald,
       child: pw.Text(
         'W',
         style: const pw.TextStyle(
           color: _paper,
-          fontSize: 7,
+          fontSize: 6.5,
           fontWeight: pw.FontWeight.bold,
         ),
       ),
     );
   }
 
-  /// Empty state shown when no matches are found
   static pw.Widget _buildEmptyState() {
     return pw.Center(
       child: pw.Container(
@@ -1234,7 +1309,7 @@ class MatchdayPdfService {
       if (roundNum == 99 || roundNum >= 50) return 'GRAND FINAL';
       if (roundNum >= 20) return 'SEMI-FINAL';
       if (roundNum >= 10) return 'QUARTER-FINAL';
-      return 'ROUND $roundNum  ·  KNOCKOUT';
+      return 'ROUND $roundNum | KNOCKOUT';
     }
     return 'ROUND $roundNum';
   }

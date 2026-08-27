@@ -250,8 +250,14 @@ class ApiClient {
   }
 
   /// Fetches all members of a club with their ratings and roles.
-  Future<Map<String, dynamic>> getClubMembers(String clubId, ) async {
+  Future<Map<String, dynamic>> getClubMembers(String clubId) async {
     final response = await _getWithCache('/api/v1/clubs/$clubId/members');
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// Fetches full details for a single club.
+  Future<Map<String, dynamic>> getClubDetails(String clubId) async {
+    final response = await _getWithCache('/api/v1/clubs/$clubId');
     return response.data as Map<String, dynamic>;
   }
 
@@ -270,14 +276,43 @@ class ApiClient {
     return response.data as Map<String, dynamic>;
   }
 
-  /// Updates club details (name and invite code).
-  Future<Map<String, dynamic>> updateClub(String clubId, String name, String inviteCode) async {
-    final response = await _dio.put('/api/v1/clubs/$clubId', data: {
-      'name': name,
-      'invite_code': inviteCode,
-    });
+  /// Updates club details (name and optionally invite code).
+  Future<Map<String, dynamic>> updateClub(String clubId, String name, {String? inviteCode}) async {
+    final Map<String, dynamic> data = {'name': name};
+    if (inviteCode != null && inviteCode.isNotEmpty) {
+      data['invite_code'] = inviteCode;
+    }
+    final response = await _dio.put('/api/v1/clubs/$clubId', data: data);
     return response.data as Map<String, dynamic>;
   }
+
+  /// Regenerates the invite code for a club.
+  Future<Map<String, dynamic>> regenerateInviteCode(String clubId) async {
+    final response = await _dio.post('/api/v1/clubs/$clubId/regenerate-invite');
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// Transfers club ownership to another member.
+  Future<Map<String, dynamic>> transferOwnership(String clubId, String newOwnerId) async {
+    final response = await _dio.post(
+      '/api/v1/clubs/$clubId/transfer-ownership',
+      data: {'new_owner_id': newOwnerId},
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// Leaves a club.
+  Future<Map<String, dynamic>> leaveClub(String clubId) async {
+    final response = await _dio.post('/api/v1/clubs/$clubId/leave');
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// Deletes a club.
+  Future<Map<String, dynamic>> deleteClub(String clubId) async {
+    final response = await _dio.delete('/api/v1/clubs/$clubId');
+    return response.data as Map<String, dynamic>;
+  }
+
 
   /// Fetches all tournaments for a club.
   Future<Map<String, dynamic>> getClubTournaments(String clubId, ) async {

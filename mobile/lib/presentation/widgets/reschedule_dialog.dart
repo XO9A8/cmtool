@@ -57,13 +57,20 @@ class _RescheduleDialogState extends ConsumerState<RescheduleDialog> {
       lastDate: DateTime(2030),
       builder: (context, child) {
         return Theme(
-          data: ThemeData.dark().copyWith(
-            colorScheme: ColorScheme.dark(
-              primary: AppColors.primary,
-              onPrimary: Colors.black,
-              surface: AppColors.surface,
-              onSurface: Colors.white,
-            ),
+          data: (AppColors.isLight ? ThemeData.light() : ThemeData.dark()).copyWith(
+            colorScheme: AppColors.isLight
+                ? ColorScheme.light(
+                    primary: AppColors.primary,
+                    onPrimary: Colors.white,
+                    surface: AppColors.surface,
+                    onSurface: AppColors.textPrimary,
+                  )
+                : ColorScheme.dark(
+                    primary: AppColors.primary,
+                    onPrimary: Colors.black,
+                    surface: AppColors.surface,
+                    onSurface: Colors.white,
+                  ),
           ),
           child: child!,
         );
@@ -84,13 +91,20 @@ class _RescheduleDialogState extends ConsumerState<RescheduleDialog> {
       initialTime: _selectedTime ?? const TimeOfDay(hour: 18, minute: 0),
       builder: (context, child) {
         return Theme(
-          data: ThemeData.dark().copyWith(
-            colorScheme: ColorScheme.dark(
-              primary: AppColors.primary,
-              onPrimary: Colors.black,
-              surface: AppColors.surface,
-              onSurface: Colors.white,
-            ),
+          data: (AppColors.isLight ? ThemeData.light() : ThemeData.dark()).copyWith(
+            colorScheme: AppColors.isLight
+                ? ColorScheme.light(
+                    primary: AppColors.primary,
+                    onPrimary: Colors.white,
+                    surface: AppColors.surface,
+                    onSurface: AppColors.textPrimary,
+                  )
+                : ColorScheme.dark(
+                    primary: AppColors.primary,
+                    onPrimary: Colors.black,
+                    surface: AppColors.surface,
+                    onSurface: Colors.white,
+                  ),
           ),
           child: child!,
         );
@@ -202,7 +216,7 @@ class _RescheduleDialogState extends ConsumerState<RescheduleDialog> {
             Text(
               widget.isMatchday ? 'RESCHEDULE MATCHDAY' : 'RESCHEDULE MATCH',
               style: GoogleFonts.orbitron(
-                color: Colors.white,
+                color: AppColors.textPrimary,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
@@ -220,7 +234,7 @@ class _RescheduleDialogState extends ConsumerState<RescheduleDialog> {
                   decoration: BoxDecoration(
                     color: AppColors.surfaceLight.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                    border: Border.all(color: AppColors.cardBorder),
                   ),
                   child: Row(
                     children: [
@@ -230,7 +244,7 @@ class _RescheduleDialogState extends ConsumerState<RescheduleDialog> {
                         _selectedDate != null 
                           ? '${_selectedDate!.year}-${_selectedDate!.month.toString().padLeft(2, '0')}-${_selectedDate!.day.toString().padLeft(2, '0')}'
                           : 'Select Date',
-                        style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 16),
+                        style: GoogleFonts.rajdhani(color: AppColors.textPrimary, fontSize: 16),
                       ),
                     ],
                   ),
@@ -245,14 +259,14 @@ class _RescheduleDialogState extends ConsumerState<RescheduleDialog> {
                   child: CircularProgressIndicator(color: AppColors.primary),
                 ))
               else if (matchdays.isEmpty)
-                Text('No matchdays available', style: GoogleFonts.rajdhani(color: Colors.white70))
+                Text('No matchdays available', style: GoogleFonts.rajdhani(color: AppColors.textSecondary))
               else
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
                     color: AppColors.surfaceLight.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                    border: Border.all(color: AppColors.cardBorder),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
@@ -269,7 +283,7 @@ class _RescheduleDialogState extends ConsumerState<RescheduleDialog> {
                           child: Text(
                             'Matchday $mdNum ($dateStr)',
                             style: GoogleFonts.rajdhani(
-                              color: Colors.white,
+                              color: AppColors.textPrimary,
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                             ),
@@ -304,7 +318,7 @@ class _RescheduleDialogState extends ConsumerState<RescheduleDialog> {
                   decoration: BoxDecoration(
                     color: AppColors.surfaceLight.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                    border: Border.all(color: AppColors.cardBorder),
                   ),
                   child: Row(
                     children: [
@@ -314,7 +328,7 @@ class _RescheduleDialogState extends ConsumerState<RescheduleDialog> {
                         _selectedTime != null 
                           ? _selectedTime!.format(context)
                           : '6:00 PM',
-                        style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 16),
+                        style: GoogleFonts.rajdhani(color: AppColors.textPrimary, fontSize: 16),
                       ),
                     ],
                   ),
@@ -325,7 +339,7 @@ class _RescheduleDialogState extends ConsumerState<RescheduleDialog> {
               const SizedBox(height: 8),
               TextField(
                 controller: _reasonController,
-                style: GoogleFonts.rajdhani(color: Colors.white),
+                style: GoogleFonts.rajdhani(color: AppColors.textPrimary),
                 decoration: InputDecoration(
                   filled: true,
                   fillColor: AppColors.surfaceLight.withValues(alpha: 0.3),
@@ -334,7 +348,7 @@ class _RescheduleDialogState extends ConsumerState<RescheduleDialog> {
                     borderSide: BorderSide.none,
                   ),
                   hintText: 'e.g. Player unavailable',
-                  hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                  hintStyle: TextStyle(color: AppColors.textDim),
                 ),
               ),
             ],

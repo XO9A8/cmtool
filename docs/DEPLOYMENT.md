@@ -85,3 +85,5 @@ flutter build apk --split-per-abi --dart-define=SUPABASE_URL="https://ypsrkdefgb
 ```bash
 flutter build apk --dart-define=SUPABASE_URL="https://ypsrkdefgbghvluuyynm.supabase.co" --dart-define=SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." --dart-define=BACKEND_URL="https://cmtool-backend-asia-production.up.railway.app"
 ```
+
+~/Android/Sdk/platform-tools/adb reverse tcp:3000 tcp:3000

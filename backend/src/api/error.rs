@@ -53,3 +53,17 @@ pub fn forbidden(code: &str, msg: &str) -> (StatusCode, Json<ApiErrorResponse>) 
         }),
     )
 }
+
+pub fn not_found(code: &str, msg: &str) -> (StatusCode, Json<ApiErrorResponse>) {
+    tracing::warn!("⚠️ [HTTP 404 Not Found] [{}]: {}", code, msg);
+    (
+        StatusCode::NOT_FOUND,
+        Json(ApiErrorResponse {
+            error: ApiErrorDetail {
+                code: code.to_string(),
+                message: msg.to_string(),
+            },
+        }),
+    )
+}
+

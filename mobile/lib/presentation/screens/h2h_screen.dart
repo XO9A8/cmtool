@@ -288,7 +288,7 @@ class _H2hScreenState extends ConsumerState<H2hScreen>
                       style: GoogleFonts.rajdhani(
                         fontSize: 18,
                         fontWeight: FontWeight.w900,
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                         letterSpacing: 1.5,
                       ),
                       maxLines: 1,
@@ -372,7 +372,9 @@ class _H2hScreenState extends ConsumerState<H2hScreen>
                   avatar: Icon(
                     Icons.groups,
                     size: 14,
-                    color: isSelected ? Colors.black : Colors.white60,
+                    color: isSelected
+                        ? (AppColors.isLight ? Colors.white : Colors.black)
+                        : AppColors.textSecondary,
                   ),
                   label: Text(club['name'] ?? 'Club'),
                   selected: isSelected,
@@ -390,7 +392,9 @@ class _H2hScreenState extends ConsumerState<H2hScreen>
                   showCheckmark: false,
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   labelStyle: GoogleFonts.rajdhani(
-                    color: isSelected ? Colors.black : Colors.white70,
+                    color: isSelected
+                        ? (AppColors.isLight ? Colors.white : Colors.black)
+                        : AppColors.textPrimary,
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
                   ),
@@ -524,7 +528,7 @@ class _H2hScreenState extends ConsumerState<H2hScreen>
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        border: Border.all(color: AppColors.cardBorder),
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -589,7 +593,9 @@ class _H2hScreenState extends ConsumerState<H2hScreen>
             style: GoogleFonts.rajdhani(
               fontSize: 11,
               fontWeight: FontWeight.bold,
-              color: isSelected ? Colors.white : Colors.white60,
+              color: isSelected
+                  ? (AppColors.isLight ? Colors.white : AppColors.cyan)
+                  : AppColors.textSecondary,
             ),
           ),
         ),
@@ -618,7 +624,7 @@ class _H2hScreenState extends ConsumerState<H2hScreen>
           style: GoogleFonts.rajdhani(
             fontSize: 11,
             fontWeight: FontWeight.bold,
-            color: isSelected ? AppColors.primary : Colors.white60,
+            color: isSelected ? AppColors.primary : AppColors.textSecondary,
           ),
         ),
       ),
@@ -699,7 +705,7 @@ class _H2hScreenState extends ConsumerState<H2hScreen>
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.2,
-                color: Colors.white,
+                color: AppColors.textPrimary,
               ),
             ),
           ],
@@ -748,7 +754,7 @@ class _H2hScreenState extends ConsumerState<H2hScreen>
                   style: GoogleFonts.rajdhani(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ],
@@ -877,7 +883,7 @@ class _H2hScreenState extends ConsumerState<H2hScreen>
                       style: GoogleFonts.rajdhani(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -885,7 +891,7 @@ class _H2hScreenState extends ConsumerState<H2hScreen>
                     Text(
                       '$p1Elo  vs  $p2Elo ELO',
                       style: GoogleFonts.orbitron(
-                          fontSize: 9, color: Colors.white54),
+                          fontSize: 9, color: AppColors.textSecondary),
                     ),
                   ],
                 ),
@@ -937,7 +943,7 @@ class _H2hScreenState extends ConsumerState<H2hScreen>
           final isP1 = id == _p1Id;
           final isP2 = id == _p2Id;
 
-          Color borderColor = Colors.white12;
+          Color borderColor = AppColors.cardBorder;
           if (isP1) borderColor = AppColors.primary;
           if (isP2) borderColor = AppColors.cyan;
 
@@ -972,7 +978,7 @@ class _H2hScreenState extends ConsumerState<H2hScreen>
                         ? AppColors.primary
                         : isP2
                             ? AppColors.cyan
-                            : Colors.white70,
+                            : AppColors.textSecondary,
                   ),
                 ),
                 Text(
@@ -980,7 +986,7 @@ class _H2hScreenState extends ConsumerState<H2hScreen>
                   style: GoogleFonts.rajdhani(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -1051,7 +1057,9 @@ class _H2hScreenState extends ConsumerState<H2hScreen>
           style: GoogleFonts.rajdhani(
             fontSize: 10,
             fontWeight: FontWeight.bold,
-            color: active ? Colors.black : Colors.white70,
+            color: active
+                ? (AppColors.isLight ? Colors.white : Colors.black)
+                : AppColors.textSecondary,
           ),
         ),
       ),
@@ -1118,7 +1126,7 @@ class _H2hScreenState extends ConsumerState<H2hScreen>
                       style: GoogleFonts.rajdhani(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1161,7 +1169,7 @@ class _H2hScreenState extends ConsumerState<H2hScreen>
               style: GoogleFonts.orbitron(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 8),

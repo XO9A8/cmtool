@@ -147,7 +147,7 @@ class _GroupStandingsWidgetState extends ConsumerState<GroupStandingsWidget> {
                 Text(
                   'GROUP STAGE STANDINGS',
                   style: GoogleFonts.orbitron(
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 1.0,
@@ -237,17 +237,17 @@ class _GroupStandingsWidgetState extends ConsumerState<GroupStandingsWidget> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.35),
-                border: Border(bottom: BorderSide(color: AppColors.offWhite.withValues(alpha: 0.15))),
+                color: AppColors.isLight ? AppColors.surfaceLight : Colors.black.withValues(alpha: 0.35),
+                border: Border(bottom: BorderSide(color: AppColors.cardBorder)),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.shield_outlined, color: AppColors.offWhite, size: 18),
+                  Icon(Icons.shield_outlined, color: AppColors.primary, size: 18),
                   const SizedBox(width: 8),
                   Text(
                     groupName,
                     style: GoogleFonts.orbitron(
-                      color: Colors.white,
+                      color: AppColors.textPrimary,
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 1.2,
@@ -417,7 +417,7 @@ class _GroupStandingsWidgetState extends ConsumerState<GroupStandingsWidget> {
                             style: GoogleFonts.rajdhani(
                               fontSize: 13,
                               fontWeight: isQualified ? FontWeight.bold : FontWeight.w600,
-                              color: Colors.white,
+                              color: AppColors.textPrimary,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -470,7 +470,7 @@ class _GroupStandingsWidgetState extends ConsumerState<GroupStandingsWidget> {
               style: GoogleFonts.rajdhani(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
-                color: isQualified ? AppColors.cyan : Colors.white,
+                color: isQualified ? AppColors.cyan : AppColors.textPrimary,
               ),
               textAlign: TextAlign.center,
             ),
@@ -512,7 +512,7 @@ class _GroupStandingsWidgetState extends ConsumerState<GroupStandingsWidget> {
         children: [
           Icon(Icons.grid_view, color: AppColors.textMuted, size: 48),
           const SizedBox(height: 12),
-          Text('No Group Standings Available', style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          Text('No Group Standings Available', style: GoogleFonts.rajdhani(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
           Text('Start the tournament to generate group stage tables', style: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 13)),
         ],

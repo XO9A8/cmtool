@@ -90,7 +90,7 @@ class TournamentLeadersWidget extends ConsumerWidget {
                 Text(
                   'TOURNAMENT LEADERS & STATS',
                   style: GoogleFonts.orbitron(
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 1.2,
@@ -233,7 +233,7 @@ class TournamentLeadersWidget extends ConsumerWidget {
                 child: Text(
                   playerName,
                   style: GoogleFonts.rajdhani(
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                   ),
@@ -256,7 +256,7 @@ class TournamentLeadersWidget extends ConsumerWidget {
           Text(
             subStat,
             style: GoogleFonts.rajdhani(
-              color: Colors.white70,
+              color: AppColors.textSecondary,
               fontSize: 11,
               fontWeight: FontWeight.w600,
             ),

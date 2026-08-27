@@ -226,7 +226,7 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> {
                               fontSize: 36,
                               fontWeight: FontWeight.w900,
                               letterSpacing: 3,
-                              color: Colors.white,
+                              color: AppColors.textPrimary,
                             ),
                           ),
                         )
@@ -266,7 +266,7 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        border: Border.all(color: AppColors.cardBorder),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
@@ -274,7 +274,7 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> {
           filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
           child: TextField(
             controller: _searchCtrl,
-            style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 15),
+            style: GoogleFonts.rajdhani(color: AppColors.textPrimary, fontSize: 15),
             decoration: InputDecoration(
               hintText: 'Search clubs...',
               hintStyle: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 15),
@@ -407,7 +407,7 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> {
                 fontSize: 24,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 2,
-                color: Colors.white,
+                color: AppColors.textPrimary,
               ),
             ).animate().fadeIn(delay: 100.ms),
             const SizedBox(height: 10),
@@ -443,7 +443,7 @@ class _ClubsScreenState extends ConsumerState<ClubsScreen> {
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white10),
+          border: Border.all(color: AppColors.cardBorder),
         ),
       ),
     ).animate(delay: Duration(milliseconds: i * 80)).fadeIn().shimmer(
@@ -471,7 +471,10 @@ class _ClubCard extends StatelessWidget {
   Color get _roleColor {
     final role = (club['user_role'] ?? club['role'] ?? 'player').toString().toLowerCase();
     if (role == 'admin') return AppColors.primary;
+    if (role == 'president') return const Color(0xFFFFD700);
     if (role == 'organizer') return AppColors.offWhite;
+    if (role == 'captain') return AppColors.amber;
+    if (role == 'vice-captain') return const Color(0xFFFF9E00);
     return AppColors.cyan;
   }
 
@@ -518,7 +521,7 @@ class _ClubCard extends StatelessWidget {
                       style: GoogleFonts.rajdhani(
                         fontSize: 20,
                         fontWeight: FontWeight.w900,
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                         letterSpacing: 0.5,
                       ),
                       maxLines: 1,
@@ -529,12 +532,12 @@ class _ClubCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.arrow_forward_ios, color: Colors.white24, size: 16),
+              Icon(Icons.arrow_forward_ios, color: AppColors.textDim, size: 16),
             ],
           ),
 
           const SizedBox(height: 16),
-          const Divider(color: Colors.white10, height: 1),
+          Divider(color: AppColors.divider, height: 1),
           const SizedBox(height: 14),
 
           // ── Stats row ─────────────────────────────────────────────────
@@ -796,10 +799,10 @@ class _AddClubSheetState extends ConsumerState<_AddClubSheet>
         labelStyle: GoogleFonts.rajdhani(color: AppColors.textMuted, fontSize: 14),
         prefixIcon: Icon(icon, color: AppColors.textMuted, size: 20),
         filled: true,
-        fillColor: Colors.white.withValues(alpha: 0.05),
+        fillColor: AppColors.isLight ? AppColors.surfaceLight : Colors.white.withValues(alpha: 0.05),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+          borderSide: BorderSide(color: AppColors.cardBorder),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -820,7 +823,7 @@ class _AddClubSheetState extends ConsumerState<_AddClubSheet>
           decoration: BoxDecoration(
             color: AppColors.surface.withValues(alpha: 0.96),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+            border: Border.all(color: AppColors.cardBorder),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -832,7 +835,7 @@ class _AddClubSheetState extends ConsumerState<_AddClubSheet>
                   width: 36,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.white24,
+                    color: AppColors.divider,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -846,7 +849,7 @@ class _AddClubSheetState extends ConsumerState<_AddClubSheet>
                   fontSize: 22,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 2,
-                  color: Colors.white,
+                  color: AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 16),
@@ -854,7 +857,7 @@ class _AddClubSheetState extends ConsumerState<_AddClubSheet>
               // Tabs
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.05),
+                  color: AppColors.isLight ? AppColors.surfaceLight : Colors.white.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: TabBar(
@@ -890,13 +893,13 @@ class _AddClubSheetState extends ConsumerState<_AddClubSheet>
                         children: [
                           TextField(
                             controller: _nameCtrl,
-                            style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 15),
+                            style: GoogleFonts.rajdhani(color: AppColors.textPrimary, fontSize: 15),
                             decoration: _field('Club Name', Icons.shield),
                           ),
                           const SizedBox(height: 12),
                           TextField(
                             controller: _codeCtrl,
-                            style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 15),
+                            style: GoogleFonts.rajdhani(color: AppColors.textPrimary, fontSize: 15),
                             decoration: _field('Invite Code', Icons.vpn_key),
                           ),
                           const SizedBox(height: 16),
@@ -930,7 +933,7 @@ class _AddClubSheetState extends ConsumerState<_AddClubSheet>
                         children: [
                           TextField(
                             controller: _joinCtrl,
-                            style: GoogleFonts.rajdhani(color: Colors.white, fontSize: 15),
+                            style: GoogleFonts.rajdhani(color: AppColors.textPrimary, fontSize: 15),
                             decoration: _field('Invite Code', Icons.vpn_key),
                           ),
                           const SizedBox(height: 16),

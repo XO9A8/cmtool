@@ -74,7 +74,7 @@ class _DisputeDialogState extends ConsumerState<DisputeDialog> {
       title: Text(
         'RAISE MATCH DISPUTE',
         style: GoogleFonts.rajdhani(
-          color: Colors.white,
+          color: AppColors.textPrimary,
           fontWeight: FontWeight.bold,
           fontSize: 18,
         ),
@@ -85,7 +85,7 @@ class _DisputeDialogState extends ConsumerState<DisputeDialog> {
         children: [
           Text(
             'Raise a formal dispute for match: ${widget.matchTitle}.',
-            style: const TextStyle(color: Colors.white70, fontSize: 13),
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
           ),
           const SizedBox(height: 16),
           TextField(
@@ -93,13 +93,13 @@ class _DisputeDialogState extends ConsumerState<DisputeDialog> {
             enabled: !_isLoading,
             decoration: InputDecoration(
               labelText: 'Reason for dispute',
-              labelStyle: const TextStyle(color: Colors.white54),
+              labelStyle: TextStyle(color: AppColors.textMuted),
               filled: true,
-              fillColor: Colors.white.withValues(alpha: 0.05),
+              fillColor: AppColors.isLight ? AppColors.surfaceLight : Colors.white.withValues(alpha: 0.05),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
+                borderSide: BorderSide(color: AppColors.cardBorder),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -107,7 +107,7 @@ class _DisputeDialogState extends ConsumerState<DisputeDialog> {
               ),
             ),
             maxLines: 3,
-            style: const TextStyle(color: Colors.white),
+            style: TextStyle(color: AppColors.textPrimary),
           ),
           if (_errorMessage != null) ...[
             const SizedBox(height: 10),
@@ -121,7 +121,7 @@ class _DisputeDialogState extends ConsumerState<DisputeDialog> {
       actions: [
         TextButton(
           onPressed: _isLoading ? null : () => Navigator.of(context).pop(false),
-          child: const Text('CANCEL', style: TextStyle(color: Colors.white54)),
+          child: Text('CANCEL', style: TextStyle(color: AppColors.textDim)),
         ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(

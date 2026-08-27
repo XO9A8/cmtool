@@ -319,9 +319,9 @@ class H2hResultWidget extends ConsumerWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.06),
+                        color: AppColors.isLight ? AppColors.surfaceLight : Colors.white.withValues(alpha: 0.06),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.white12),
+                        border: Border.all(color: AppColors.cardBorder),
                       ),
                       child: Column(
                         children: [
@@ -331,7 +331,7 @@ class H2hResultWidget extends ConsumerWidget {
                               style: GoogleFonts.orbitron(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                                color: AppColors.textPrimary,
                               ),
                             ),
                             Text(
@@ -340,7 +340,7 @@ class H2hResultWidget extends ConsumerWidget {
                                 fontSize: 9,
                                 letterSpacing: 1.2,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.white70,
+                                color: AppColors.textSecondary,
                               ),
                             ),
                             if (directDraws > 0) ...[
@@ -368,7 +368,7 @@ class H2hResultWidget extends ConsumerWidget {
                               style: GoogleFonts.orbitron(
                                   fontSize: 13,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.white),
+                                  color: AppColors.textPrimary),
                             ),
                             Text(
                               'PROFILES',
@@ -376,7 +376,7 @@ class H2hResultWidget extends ConsumerWidget {
                                 fontSize: 9,
                                 letterSpacing: 1.2,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.white70,
+                                color: AppColors.textSecondary,
                               ),
                             ),
                           ],
@@ -495,7 +495,7 @@ class H2hResultWidget extends ConsumerWidget {
         Text(
           name,
           style: GoogleFonts.rajdhani(
-              fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+              fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           textAlign: alignRight ? TextAlign.right : TextAlign.left,
@@ -574,7 +574,7 @@ class H2hResultWidget extends ConsumerWidget {
           style: GoogleFonts.orbitron(
             fontSize: 12,
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            color: AppColors.textPrimary,
           ),
         ),
       ],
@@ -1562,13 +1562,13 @@ class H2hResultWidget extends ConsumerWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.07),
+                      color: AppColors.isLight ? AppColors.surfaceLight : Colors.white.withValues(alpha: 0.07),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
                       '$p1Sc – $p2Sc',
                       style: GoogleFonts.orbitron(
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),
@@ -1581,7 +1581,7 @@ class H2hResultWidget extends ConsumerWidget {
                   child: Text(
                     p2Name,
                     style: GoogleFonts.rajdhani(
-                      color: isP2Winner ? AppColors.cyan : Colors.white70,
+                      color: isP2Winner ? AppColors.cyan : AppColors.textSecondary,
                       fontWeight:
                           isP2Winner ? FontWeight.bold : FontWeight.w500,
                       fontSize: 13,
@@ -1642,7 +1642,7 @@ class H2hResultWidget extends ConsumerWidget {
         Text(
           name,
           style: GoogleFonts.rajdhani(
-              fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+              fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
           overflow: TextOverflow.ellipsis,
           textAlign: alignLeft ? TextAlign.left : TextAlign.right,
         ),

@@ -323,7 +323,7 @@ class _TournamentPlayerStandingsWidgetState
                       Text(
                         title,
                         style: GoogleFonts.orbitron(
-                          color: Colors.white,
+                          color: AppColors.textPrimary,
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 1.1,
@@ -428,7 +428,7 @@ class _TournamentPlayerStandingsWidgetState
                         Text(
                           topPlayer['player_name']?.toString() ?? 'Player',
                           style: GoogleFonts.rajdhani(
-                            color: Colors.white,
+                            color: AppColors.textPrimary,
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
@@ -514,7 +514,7 @@ class _TournamentPlayerStandingsWidgetState
                             Text(
                               item['player_name']?.toString() ?? 'Player',
                               style: GoogleFonts.rajdhani(
-                                color: Colors.white,
+                                color: AppColors.textPrimary,
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -569,7 +569,7 @@ class _TournamentPlayerStandingsWidgetState
           Text(
             'NO PLAYER STATS YET',
             style: GoogleFonts.orbitron(
-              color: Colors.white,
+              color: AppColors.textPrimary,
               fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
