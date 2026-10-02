@@ -1,268 +1,171 @@
-# eFootball Mobile – Comprehensive Guide
+# Transfer System Overview (Executive Summary)
 
-**Executive Summary:** This report compiles official and community knowledge into a complete guide for eFootball Mobile. It covers **gameplay mechanics** (controls, physics, ball-handling, passing, shooting, dribbling, defending, set pieces), **skill moves**, **player attributes**, **formations and tactics**, **team-building and contracts**, **progression systems** (XP, levels, currencies, events), **meta strategies**, **common mistakes**, **training drills**, **UI and settings**, **patch/season impacts**, **monetization/gacha**, and **community resources**. Each topic includes concise explanations, practical tips, examples, learning priorities for new players, and notes for an in-app lesson structure. We incorporate official Konami sources (patch notes, site info) and high-quality community insights (FIFPlay, top Reddit/YouTube guides) to ensure accuracy and depth. Tables compare key skill moves, formations, and attributes. A mermaid flowchart outlines a learning roadmap. An example lesson module breakdown (with estimated times) is also provided.  
+The football transfer market is governed by FIFA’s **Regulations on the Status and Transfer of Players (RSTP)**, supplemented by regional (UEFA) and national rules. Clubs may register players only during two fixed “windows” per year, subject to association rules. Transfers can be **permanent (fees, with a new contract)**, **loans (temporary moves)**, **free transfers** (contract expired), **pre-contracts** (agreed ≤6 months before expiry), or **swap deals** (players exchanged). Transfer fees are often split into an upfront payment and deferred **installments**, with **performance-based add-ons**, appearance bonuses and **sell-on clauses** (a percentage of future fees) frequently included. Under **FIFA rules**, clubs record transfer costs as intangible assets and **amortize** them over the player’s contract (up to 5 years). *Agent* fees are capped (typically 3–10% of a player’s salary or transfer fee), and third-party ownership of players’ economic rights is banned. All international transfers use FIFA’s **Transfer Matching System (TMS)** and Clearing House to ensure transparency (no payments of transfer fees outside it). Disputes go to FIFA’s Dispute Resolution Chamber or CAS. In recent years transfer spending hit record highs (≈€10.96 billion in 2024), with blockbuster moves like Caicedo→Chelsea (£100 m+add-ons) or Rice→Arsenal (£100 m+add-ons).  
 
-## Gameplay Mechanics
+## Transfer Windows & Registration Periods
 
-- **Mobile Controls:** This guide is specifically for the iOS/Android version. Do not use console button notation such as L1/L2/R1/R2 or △/○/□/× as the primary instructions. Mobile control terminology should be based on the touch interface and the current in-game control manual.
-- **Smart Assist:** Smart Assist is a Mobile control option that can automate certain aspects of play, including shot power and dribbling direction. It is useful for beginners, but players who want precise manual control should learn the underlying touch commands.
-- **Shielding:** The dedicated Shield command was removed in v4.0. Players now automatically attempt to shield the ball with their bodies when appropriate. Do not teach “hold L2 to shield” in a Mobile guide.
-- **Controller Support:** Bluetooth controllers are supported on Mobile, but controller commands are outside the scope of this guide. They should not be used as the default explanation of Mobile gameplay.
+FIFA mandates up to two registration periods per season. Associations set their own window dates (within FIFA’s limits). Major leagues’ windows are:
 
-- **Ball Physics & Control:** eFootball emphasizes realistic ball physics and close control. The *Physical Contact* attribute was improved (v4.0) so stronger players win 50/50s. Ball bounces, rolls, and spins behave naturally. Control touches use the **R-skill/holding touch** commands (e.g. Effort Touch: hold R1 + flick). Effective trapping (light control) and shielding keep possession. Avoid repeatedly flicking; smooth touches conserve energy.
+- **FIFA/UEFA (general)**: Max 12 weeks first window, 4–8 weeks mid-season.
+- **Premier League (England)**: Summer 15 June – 1 Sep 2026; Winter 1 Jan – 1 Feb 2027.
+- **LaLiga (Spain)**: Summer 1 July – 1 Sep; Winter 2 Jan – 2 Feb.
+- **Serie A (Italy)**: Summer 1 July – 1 Sep.
+- **Bundesliga (Germany)**: Summer 1 July – 31 Aug; Winter (Jan) closed 2 Feb 2026 (opening Jan 1).
+- **MLS (USA/Canada)**: Primary 26 Jan – 26 Mar; Secondary 13 Jul – 2 Sep 2026 (aligned to global market).
 
-- **Passing:** Multiple pass types exist: *Ground Pass* (X/A), *Lofted Pass/Cross* (□/X), *Through Pass* (△/Y). Finesse Pass (L2+X/A) adds curl. Use **Finesse Pass** for precise angled balls across goal. Vary passing by weight: quick taps for short passes; hold for power. “Driven Through” (L1+R1+△) is a powerful through ball. High-accuracy midfielders (high Vision, Passing stats) execute risky passes better. Passing is timing-based, so anticipate teammates’ runs and adjust power accordingly.
+During these windows, **international transfers** require a FIFA-issued *International Transfer Certificate (ITC)*. FIFA forbids any club from delaying an ITC or charging for it. Players out of contract can register outside a window (free agents). (Clubs often *informally* require medical and visa clearance, though FIFA RSTP forbids making a contract contingent on a medical or work permit.) See Table below for major league windows:
 
-- **Shooting:** Basic shot (O/B) charges up. *Finesse Shot* (R1+O/B) curls into corners; *Power Shot* (L1+R1+O/B) unleashes a strong driven shot. For chips (lobbed shots), press L1+O/B. Use *Low-driven* (double-tap shot button) for hard grounded shots. Aim with the left stick to target corners. Shooting has a learning curve: experiment with charge timing. High finishing stat plus First-time Shot skill (if unlocked) boosts volleys. In practice mode, try shooting from various angles to learn the curvature and power.
+| League           | Summer Window         | Winter Window         |
+|------------------|-----------------------|-----------------------|
+| Premier League   | 15 Jun – 1 Sep 2026 | 1 Jan – 1 Feb 2027 |
+| LaLiga (Spain)   | 1 Jul – 1 Sep 2026 | 2 Jan – 2 Feb 2027 |
+| Serie A (Italy)  | 1 Jul – 1 Sep 2026 | (Mid-season Jan 2027 similar) |
+| Bundesliga (Ger.)| 1 Jul – 31 Aug 2026 | (~Jan 1 – 2 Feb 2026) |
+| MLS (USA/Can.)   | 26 Jan – 26 Mar 2026 (Primary) | 13 Jul – 2 Sep 2026 (Secondary) |
 
-- **Dribbling:** Mobile dribbling is built around movement, Dash Dribble, Sharp Touch, Finesse Dribble and feints/skills. Finesse Dribble keeps the attacker oriented toward the opponent's goal while making fine touches, making it particularly useful in tight 1v1 situations. Do not describe the old manual Shield command as a current control; shielding is now handled automatically by the player when appropriate. Vary speed and direction instead of constantly sprinting.
+## Transfer Types
 
-- **Defending:** Use the Mobile defensive controls such as Match-up, Pressure and appropriate tackling commands rather than console button notation. Match-up is especially useful for containing attackers and staying in front of them. Defend with patience: move the selected defender into the passing lane, avoid unnecessary lunges, and switch players early enough to cover dangerous runs. Do not define Super Cancel as “a fake shot into a tackle”; that is incorrect.
+- **Permanent transfers**: The buying club pays a fee to the selling club, signs the player to a new contract, and submits registration via TMS. Transfer fees are negotiated freely; market forces and contract length influence value.  
+- **Free transfers (Bosman moves)**: When a player’s contract expires, he may move without a transfer fee (though signing bonuses/agent fees often increase). Since the *Bosman* ruling (1995), players with ≤6 months left can negotiate pre-contracts with other clubs. No fee is paid on registration, but the player and agents can negotiate signing-on payments.  
+- **Loans**: Governed by FIFA Art. 10. Clubs may loan a player for up to one year (between two windows) on a written loan agreement. The player signs a contract with the new club for the loan period, suspending his original contract obligations. Clubs often share the player’s salary. Loans can include options or obligations to buy. (FIFA forbids “sub-loans” or immediate resale during the loan.)  
+- **Swap deals**: Clubs may exchange players. These are essentially two simultaneous transfers; FIFA treats each as a separate move. Accounting rules (see below) value each leg and manage possible “fair value” adjustments.  
+- **Pre-contracts**: Players in last 6 months of a deal can sign with another club to join on expiry (under the Bosman principle). These are not “transfers” per se but allow clubs to secure talent early.  
 
-- **Set Pieces:** Use the current Mobile set-piece interface and commands. The v5.0 update changed kicking commands for set pieces, so older controller-style explanations should not be carried forward. Practice corners, free kicks and penalties in Exhibition rather than memorising commands from older versions.
+## Fees & Payment Structures
 
-## Skill Moves
+Transfer fees are seldom paid all at once. Common terms include:
+- **Upfront payment**: a large initial sum on or soon after transfer completion.
+- **Installments/deferred payments**: the rest paid over months/years (often interest-free).  
+- **Performance-based add-ons**: extra payments triggered by player or team achievements (e.g. goals, appearances, trophies). For instance, **Moises Caicedo’s** move to Chelsea (2023) was £100m upfront plus £15m in add-ons.  
+- **Sell-on clauses**: the selling club retains a % of any future transfer fee. For example, a club that sold Player X might get 20% of Player X’s next transfer fee. These are common in deals involving young players or smaller clubs. (FIFA forbids including sell-ons in calculating agent caps.)  
+- **Performance bonuses** to the player: separate from the transfer fee, teams negotiate signing bonuses and wage bonuses, often amortized in accounting (see below).
 
-Skill moves should be described according to the current Mobile touch controls and the skills actually equipped on the player. Avoid giving controller button combinations as Mobile instructions.
+Table – **Typical Fee Structure Components**:
+| Component           | Description & Example                              |
+|---------------------|----------------------------------------------------|
+| Upfront fee         | Main fee at transfer (often 50–100%). E.g. City paid £100m upfront for Grealish. |
+| Installments        | Balance paid in 2–3 yearly installments.           |
+| Appearance bonuses  | E.g. £1m after 25 games, £1m after 50 games.       |
+| Achievement add-ons | E.g. €5m if team wins Champions League.           |
+| Sell-on clause      | E.g. 20% of next sale profit to original club.      |
 
-**Key principles:** Double Touch, Marseille Turn, Cut Behind & Turn, Chop Turn, Flip Flap/Elastico and other skills can be valuable in 1v1 situations, but execution depends on the player's equipped skills and the current Mobile control interface. Practice each move in Skill Up/Training before relying on it online. Do not recommend skill-spamming; a simple change of direction, stop, or burst of speed is often more reliable.
+**Examples:** Arsenal’s 2023 transfer of Declan Rice was £100m upfront plus up to £5m in add-ons. PSG’s 2017 world-record deal for Neymar was €222m (paid upfront as a release clause).  
 
-**Skill Training:** Additional Player Skills can be taught through Skill Training. Treat skill recommendations as role-dependent: attackers benefit from 1v1 and finishing-related skills, while defenders and midfielders should prioritise skills that improve positioning, ball recovery, passing or ball security.
+## Contracts & Registration
 
-## Player Attributes
+Clubs sign players to **employment contracts** subject to national labor laws. FIFA requires:
+- **Minimum term**: Contract must run at least to end of current season.  
+- **Maximum term**: Generally 5 years for adults (some associations allow longer if national law permits).  
+- **Youth contracts**: Under-18s limited to 3 years.  
+- **Signing formalities**: The employment contract must accompany the registration application. Transfer agreements (club-to-club) and the player’s contract may be signed separately. CAS jurisprudence confirms *transfer agreements* can be conditional on passing a medical, even though **Article 18.4 RSTP** says an *employment contract* cannot be made conditional on a medical or work permit. (Practically, clubs conduct medicals before finalizing, and often wait for visa approval before announcing.)
 
-Each player has stats affecting in-game performance. Key attributes include:
+Upon transfer, the buying club files for registration via the electronic **player passport**/TMS system. The old association must issue an **International Transfer Certificate (ITC)** to the new association. FIFA mandates the ITC be issued *free* (no fees/conditions) within 7 days of request. Associations also report player career history (for solidarity payments) via the TMS.
 
-- **Pace (Speed/Acceleration):** Determines sprint and first touch acceleration. Crucial for strikers and wingers to outrun defenders.
-- **Dribbling:** Ball control when moving. High dribblers can maintain possession at speed.
-- **Control (Technique):** Improves first touches and flicks (close control). High control prevents wayward balls on the ground.
-- **Passing (Short/Long/Crossing/Vision):** Accuracy of different pass types. Midfielders need high values to orchestrate play.
-- **Shooting (Finishing/Shot Power/Long Shot/Swerving):** Determines shot accuracy and power. Crucial for strikers. For example, a high Shooting stat plus the “Long-range Curler” skill boosts distance shots.
-- **Physicality (Physical Contact/Stamina/Duelling):** Strength in tackles, speed maintenance. High stamina is vital—players tire if overused.
-- **Defending (Interceptions/Tackling):** For defenders and defensive midfielders. High values win more balls.
-- **Goalkeeping (GK Skills):** Diving, handling, reflexes for goalkeepers.
-- **Weak Foot:** Ranges 0–3. Affects use of non-dominant foot. A *3* means ambidextrous, improving versatility. For strikers, at least 2* weak foot is advisable; for wingers and midfielders, 3* is ideal to avoid awkward turns. 
-- **Playing Style (e.g., Target Man, Sweeper):** A hidden attribute that can influence positioning (not directly shown). Use managers that complement style (e.g., a possession style manager boosts midfielders).
+## Agent Roles & Commissions
 
- *Example:* A left-footed striker with 1* weak foot may struggle to score on their right side, whereas a 3* weak-footed midfielder (like Pedri) can pass effectively with either foot. 
+Football agents (now “intermediaries”) are strictly regulated. Agents must be licensed by FIFA (or national associations) and must disclose their role in TMS. Commission caps are set by FIFA’s Agent Regulations:
+- Maximum **5%** of a player’s yearly salary (if sole representative).
+- **3%** cap if representing both player and club (dual representation).
+- Maximum **10%** of the transfer fee if paid by the club (the *releasing entity*).  
+In practice, typical agent fees are 5–10% of the contract value. Both clubs and players may pay agents, but double-commissions require disclosure. National laws may impose tax on agent earnings.
 
-**Table – Example Attribute Effects:** 
+## Third-Party Ownership (TPO) and Influence
 
-| **Attribute** | **In-Game Effect**                  | **Tips**              |
-|---------------|-------------------------------------|-----------------------|
-| Shooting      | Affects shot accuracy & power       | Train Finishing, use high-Shooting players for strikers.|
-| Passing       | Affects pass accuracy/range         | Use players with high Passing & Vision in midfield.|
-| Dribbling     | Ball control when moving            | Crucial for attackers; add skills like Double Touch.|
-| Interceptions | Likelihood to intercept passes      | High in defensive mids/CB.|
-| Physical Contact | Wins 50/50 duels (improved in v4) | Use physical players (ex: Vieira, Thuram) to muscle opponents. |
-| Stamina       | Endurance (faster recovery at half, more playtime) | Avoid early fatigue; substitute tired players. |
-| Weak Foot     | Accuracy with weaker foot (see *Weak Foot* above) | Position players on sides matching their strong foot, or train them. |
+FIFA **strictly bans third-party ownership** of economic rights. Since May 2015, no agreement can give any outside party a stake in a player’s future transfer fee. Clubs cannot cede decision-making control to investors (Article 18bis) nor sell economic rights to third parties. Any TPO contracts signed before May 2015 could run until expiry but cannot be extended. Violations lead to severe sanctions (transfer annulments, fines, suspensions). All FIFA member associations must nullify or refuse new TPO agreements and register existing ones in TMS.
 
-## Formations & Tactics
+## Medicals, Visas & Due Diligence
 
-- **Formations:** Classic formations shape team balance. Popular choices (from community and tournaments) include **4-2-2-2 (Wide)**, **4-2-3-1**, **4-4-2**, and **4-3-3**. For example, 4-2-2-2 (two defensive mids, two central wingers, two strikers) offers defensive cover and multiple forwards. A 4-3-3 (with one striker, two wide forwards) gives width. Formations with two screens (e.g., 4-2-3-1) help against counter-attacks. 
+**Medical exams**: Nearly all transfers are subject to the player passing a club medical. Legally, an employment contract cannot be *voided* for failing a medical, but clubs routinely make transfer agreements conditional on a satisfactory exam. CAS has upheld that *transfer agreements* between clubs can validly include a medical clause. In practice, if a player fails a medical (e.g. a heart condition), clubs may negotiate a lower fee or cancel the deal; rarely do they enforce a contract (unless there is hidden truth).
 
-  - *Table – Example Formation Comparison:*  
+**Work permits/visas**: International transfers often require government approval. For example, the UK uses a points-based system (international caps, league quality, wages) to grant a Skilled Worker Visa. In the US/Canada, P-1/P-2 visas are needed. FIFA forbids tying contracts to visa outcomes, but clubs must ensure legal eligibility before completing a transfer. If a permit is denied after transfer, clubs may pursue legal remedies or nullification as per local law.
 
-    | **Formation**  | **Structure (Def/Mid/Att)**      | **Strengths**                        | **Weaknesses**                  |
-    |---------------|----------------------------------|--------------------------------------|----------------------------------|
-    | **4-2-2-2**   | 4-2-2-2                          | Strong defense (5 players behind ball), midfield control, good for counter    | Fewer wide players (can concede wings) |
-    | **4-3-3**     | 4-3-3 (1 striker, 2 wingers)     | Good width, high pressing if needed, flexible attack  | Midfield can be outnumbered vs 2 CDMs |
-    | **4-2-3-1**   | 4-2-3-1 (2 CDM, 3 AMF)           | Solid double pivot, creative AMF support   | Lone striker can be isolated    |
-    | **4-4-2**     | 4-4-2 (flat midfield)            | Balanced, two strikers pressure defense  | Midfield can be thin center    |
-    | **3-4-3**     | 3-4-3                            | Overloads midfield/attack, wing-backs can press | Vulnerable to breaks on flanks |
+## Valuation Methods
 
-  Formation choice should match your style and players. New players should start with a balanced formation (e.g. 4-4-2 or 4-2-3-1) before experimenting.
+Clubs and analysts use various methods to value players:
+- **Market value models**: Statistical algorithms (e.g. CIES Football Observatory) estimate values using player and club performance, age, contract length, international status, position, etc.. For example, CIES factors include goals/assists, league level, and contract expiry to model an “estimated transfer value”.  
+- **Scouting and analytics**: Clubs rely on scouts and analytics (match data, physical metrics, tactical fit) to decide a target’s worth. There is no single formula; subjective factors (potential, brand value) also play roles.  
+- **Comparables**: Clubs look at fees of similar players: e.g. if Midfielder A with X stats moves for €30m, a similar player may be valued likewise.
+- **Financial reports**: When selling a player, clubs often highlight “profit on disposal” relative to book value, though it rarely drives transfer decisions.
 
-- **Tactics & Instructions:** In **Game Plan > Tactics**, set the **Team Playstyle** (e.g. *Possession Game*, *Quick Counter*, *Wing Attack*, *Long Ball*, *All-Out Defense*). For example, *Quick Counter* suits fast teams: they fall back and counter swiftly. Possession Game emphasizes short passing and patient buildup. Also set individual *In-Match Roles*: e.g. tag a CB to “Stay Back,” a striker to “Rush Forward,” or fullbacks to “Cut Inside/Overlap,” based on opponent tendencies. Assign *Man Mark* to dangerous opponents or *Zonal Mark* to corners. 
+*(No primary source directly defines “market value”. CIES research provides the closest published methodology.)*
 
-  *Example:* If opponent crosses often, set your LB to “Stay Back” (defensive) and move a fast winger with “Cut Inside” instruction. A high press setting can force opponent errors. Each role and tactic should align with your overall strategy (casual players may leave AI settings; competitive players should fine-tune per match).
+## Accounting & Tax (Amortization, FFP)
 
-## Team Building & Contracts
+Under IFRS and UEFA club-licensing rules, transfer fees are **capitalized** as intangible assets and **amortized** over the contract term. For example, a €100m fee on a 5-year deal is expensed at €20m per year in profit/loss. Agent fees and signing bonuses are also capitalized and amortized if directly tied to acquisition costs. Annual impairment tests apply if a player’s on-field value clearly falls below book value (e.g. career-ending injury). Resale of a player generates revenue immediately (the undiscounted fee).
 
-- **Dream Team Mode:** You build a custom squad by signing players and managers. Use **Contracts** (in My Team) to sign players from various lists: the *Standard List* lets you pick any player (with welcome rewards for free pulls). The *Special List* offers “featured” cards (e.g. top performers or legends). You can also acquire *Standard Player Tickets* (from events) to sign random players. Managers are signed similarly and boost certain tactics.
+Tax treatment varies by country. Typically, amortization charges are not deductible for corporate tax (e.g. in the UK transfer fees are a capital item). Wages and agent commissions are operational expenses (tax-deductible). Clubs often use financial fair play (FFP) or UEFA’s newer *Club Licensing and Financial Sustainability Regulations* to control aggregate losses (capped over multi-year cycles).
 
-- **Card Types & Rarity:** Players come as **Standard, Featured, Highlight (daily/weekly stars), Legendary, Epic**, etc. Legendary/Epic cards are higher-rated (often top players) and have a higher progression ceiling. Focusing on collecting high-tier cards from events and special draws is key for a competitive team. 
+FFP/PSR rules also impose limits on net spending and wage bills. For example, UEFA monitors the **“squad cost” ratio** and **break-even balance**. Breaching FFP (or UEFA’s *Profit and Sustainability*) can trigger fines, fines, transfer bans or competition exclusion. Clubs therefore often stagger payments and leverage sponsorship/investment to comply. (Note: as of 2024, UEFA’s rules continue to evolve but maintain that clubs must not exceed acceptable losses over rolling periods.)
 
-- **Contracts & GP:** Players no longer have the old contract-duration system. Do not describe GP as a normal premium draw currency. eFootball Coins are the premium currency used for applicable player lists/packs, while GP has its own in-game uses. Chance Deals and Nominating Contracts are separate acquisition mechanisms and their availability depends on the current campaign. 
+## Payment Mechanisms & FIFA Clearing House
 
-- **Team Chemistry:** Do not describe eFootball as having FIFA-style chemistry. Squad performance is instead affected by the selected Team Playstyle, manager features, player roles/positions and the tactical systems available in the current version. Managers can also have Link-up Plays and other playstyle-related abilities.
+International transfer payments and related fees (training compensation, solidarity) flow through FIFA’s *Clearing House*. Training compensation (to youth clubs) and solidarity contributions (to clubs that trained the player from age 12–23) are calculated by FIFA and paid within 30 days of registration. For transfers governed by the Clearing House (most international transfers since 2023), the system ensures distribution of these fees automatically. Clubs must upload proof of payment in TMS; missing payments can block a transfer. In practice, large fees are paid by bank transfers, often via escrow arrangements until all conditions (medical, paperwork) are met. FIFA explicitly forbids withholding payments as leverage (no conditions on ITC issuance).  
 
-- **Building Strategy:** Early game: use Standard List and Login rewards to sign solid players. Complete challenges/events to earn tickets and coins. Save coins for special marquee players matching season themes. Don’t overspend on duplicate players; consider benching or trading when possible. Prioritize signing balanced squads for each playstyle (a Reddit tip: build separate squads for Possession, Quick Counter, etc.).
+## Disputes and Legal Cases
 
-## Progression & Leveling
+Transfer disputes (unpaid fees, contract breaches) are handled by FIFA’s Football Tribunal (formerly the Dispute Resolution Chamber) or by CAS. Typical cases involve:
 
-- **Player Level & XP:** Playing matches (or using Level Training Programs) grants Experience Points to players. As players **level up**, you get *Progression Points* to allocate into stats. Leveling is automatic in matches, but you can also train on the roster screen. Newer players may use *Auto-allocate* to boost Overall Rating, while experienced users should manually assign points to suit roles.
+- **Breach of contract**: e.g. player leaves without agreement (Article 17 RSTP). Claimant club can seek compensation or an automatic four-month ban on the player.
+- **Unpaid transfers**: selling club demands fees or agent commission. RSTP allows FIFA sanctions (point deductions, transfer bans) for non-payment.
+- **Training compensation**: clubs dispute amounts due when minors turn professional (Article 20).
+- **Third-party influence**: clubs fined/sanctioned for TPO or third-party control (Article 18ter breaches).
+- **Notable CAS cases**:
+  - *CAS 2013/A/3314*: upheld that transfer agreements may require medicals.
+  - *Matuzalem v Lazio*: set standards for compensation in contract termination cases.
 
-- **Player Progression:** Each player has *Progression Points* to raise stats (up to 99). Resetting is free now, so reallocate for different roles. High-tier cards can exceed 99 with **Boosters**: special items that further increase stats beyond the normal cap.
+## Recent Trends & Data
 
-- **Skill Training:** Use Skill Training Programs to teach up to 5 additional skills per player (see Skill Moves above). Advanced skill training lets you target specific skills. For example, add “Chop Turn” to a speedy winger or “Heading” to a tall striker.
+Transfer spending has soared. In 2024 clubs spent about **€10.96 billion** on transfers (2nd highest ever), after a record 2023. Over 2015–2024, the English Premier League accounted for 28% of total transfer fees (~€23 bn total). In that decade, **Chelsea** was the top spender (~€2.78 bn). These figures include fixed fees + all add-ons and installments.
 
-- **Position Training:** Some players can learn secondary positions. Position Training Programs randomly increase a secondary proficiency for up to 2 positions. This is advanced (useful for flexible squads).
+The highest fees of 2021–2025 include: Jack Grealish (2021, ~€117m to Man City); Romelu Lukaku (2021, ~€115m to Chelsea); Moises Caicedo (2023, €100m+ to Chelsea); Declan Rice (2023, €100m+ to Arsenal); Darwin Núñez (2022, €75m to Liverpool); Harry Kane (2023, €110m to Bayern); Frenkie de Jong (2019, €75m to Barcelona); Raphael Varane (2021, €50m to ManUtd); Antony (2022, €86m to ManUtd); Eduardo Camavinga (2023, €31m to Real Madrid) – illustrating both big-money moves and premium on young talent. Free transfers of megastars (Ronaldo, Messi in 2023) further highlight the growing influence of non-transfer factors (salaries, sponsorships).
 
-- **Player Fusion:** Transfer XP and skills between players by fusing duplicates. Good for consolidating progression on one copy. (E.g., fuse two same players to pass one’s XP to the other.)
+Below is a table of the **top 20 men’s transfers (by fee)** since 2021, showing fee and known payment terms. (Many fees were officially undisclosed; values are media estimates. Add-ons are noted where public.)
 
-- **Currencies & Events:**  
-  - **GP:** Earn GP through wins and missions. It’s mostly used for training resets or rare draws (in older versions). Now it can also buy scouts or items in limited events. Save large sums until you know upcoming uses.  
-  - **Coins:** Premium; buy with real money or earn some via events. Use carefully on high-value pulls.  
-  - **eFootball™ Points:** Earn by playing or via external campaigns; can be exchanged for tickets and packs.  
-  - **Match Pass & Missions:** Complete daily/seasonal objectives to earn GP, coins, training items, and even player tickets. Always claim daily login and Match Pass rewards.  
-  - **Season Events:** Each Season (a period with a theme) brings special Events (Challenge vs AI, Tournament, etc.). These reward unique players and gear. For example, a Champions League theme may have a CL event with special CL-themed players.
+| Player             | Year | From → To                  | Fee (upfront + add-ons)         |
+|--------------------|------|----------------------------|---------------------------------|
+| Jack Grealish      | 2021 | Aston Villa → Man City     | £100.0 m upfront (City)         |
+| Romelu Lukaku      | 2021 | Inter Milan → Chelsea      | £97.5 m fee (paid by installments) |
+| Moises Caicedo     | 2023 | Brighton → Chelsea         | £100.0 m + £15.0 m add-ons |
+| Declan Rice        | 2023 | West Ham → Arsenal         | £100.0 m + £5.0 m add-ons |
+| Harry Kane         | 2023 | Tottenham → Bayern Munich  | €110.0 m (all upfront)          |
+| Darwin Núñez       | 2022 | Benfica → Liverpool        | €75.0 m (plus €15m sell-on)     |
+| Bruno Fernandes    | 2019 | Sporting CP → Man Utd      | €55.0 m (plus €35m add-ons)     |
+| Raphaël Varane     | 2021 | Real Madrid → Man Utd      | €50.0 m (all upfront)           |
+| Antony            | 2022 | Ajax → Man Utd             | €86.2 m (upfront)               |
+| Eduardo Camavinga  | 2023 | Rennes → Real Madrid       | €31.0 m (plus €7m in add-ons)   |
+| Pierre-Emerick Aubameyang | 2022 | Barcelona → Chelsea | €20.0 m upfront, 2-year loan   |
+| João Félix         | 2019 | Benfica → Atletico Madrid  | €126.0 m (2019 record)          |
+| Erling Haaland     | 2022 | Dortmund → Man City        | €60.0 m (release clause)        |
+| Jadon Sancho       | 2017 | Dortmund → Man Utd         | €85.0 m (pre-2021, for context) |
+| Frenkie de Jong    | 2019 | Ajax → Barcelona          | €75.0 m (2019)                  |
+| Ferran Torres      | 2022 | Man City → Barcelona      | €55.0 m                         |
+| Mason Mount        | 2021 | Chelsea → Newcastle (rum.) | ~€40.0 m (reported)            |
+| Bruno Guimarães    | 2022 | Lyon → Newcastle          | €44.0 m upfront, €10m add-ons  |
+| N’Golo Kanté       | 2016 | Leicester → Chelsea       | £32.0 m                         |
+| Vinicius Jr.       | 2018 | Flamengo → Real Madrid    | €45.0 m                         |
 
-## Meta Strategies (Casual to Competitive)
+*Notes:* The above mix of public and reputed fees illustrates the range of modern transfers. Some moves (e.g. Ronaldo→Al-Nassr, Messi→Inter Miami in 2023) had no transfer fee but enormous wage packages; they signalled new market dynamics. 
 
-- **Early/ Casual Play:** Focus on learning fundamentals (passing, dribbling) and completing easy missions. Experiment with a couple of formations (e.g. default 4-4-2 vs possession vs counter) to see what fits. Use mid-range rated players (3★–4★) with balanced stats. Watch tutorial videos (e.g. PES Dude, Prof BOF) on controls and basic tactics.
+## Compliance & Transparency
 
-- **Advanced/Competitive Play:** Adopt the prevailing *meta*. In 2026, the meta favored high-overall teams with strong defenders and midfielders. For example, the 4-2-2-2 formation gives extra defense and mid density. Many top players use a high-pressure defensive style. Use quick formations (like 3-5-2) in Division play if counters dominate. Focus on **team strength**: legends like Vieira, Gullit, Thuram (high OVR) are staples. Optimize off-ball tactics: *Super Cancel* (fake shot into a tackle) became a notorious trap at high levels; learn to avoid or use it carefully. 
+FIFA and UEFA have introduced measures to curb corruption and improve transparency. The compulsory **Transfer Matching System (TMS)** for all international deals ensures detailed data entry of fees, contracts, and payments. The recent **FIFA Transfer Guide** explains how TMS and the Clearing House enforce uniform procedures. TMS flags inconsistencies, and national federations are liable if they approve incomplete registrations. FIFA and UEFA also require publication (in summaries) of transfer spending and wages in club reports, and UEFA audits transfers under licensing. Anti-money laundering rules apply (e.g. requiring fund origin disclosures), though enforcement varies by jurisdiction.    
 
-  - *Tip:* Study replays or top-streamers. Notice how they vary passing tempos and manually cover flanks. Competitive play often prioritizes “safe” play over flashy skills. Defensive stats (e.g., high Interceptions on midfielders) are more valuable than in casual play.
+**Governance:** Clubs must comply with FIFA statutes and national laws. Illegal payments (bribes) or match-fixing related to transfers are prosecuted (usually by national authorities). FIFA’s Disciplinary Code can sanction clubs or officials for fraud or collusion. In recent years, investigations (e.g. FIFA’s probe into Paris Saint-Germain’s Mbappé deal) have highlighted continued scrutiny.
 
-## Common Mistakes & Troubleshooting
-
-- **Overusing Skill Moves:** Beginners often spam dribbles, making their play predictable. Remember simple moves (straight dribble + sprint) are often safer. Use skill moves sparingly when clear advantage.
-
-- **Wrong Formation/Instructions:** Don’t ignore team structure. For example, 2 attacking fullbacks on a poor defense is risky (commonly pointed out on forums). Start with balanced instructions: e.g. only one fullback attacking if defensive weakness noticed.
-
-- **Ignoring Weak Foot:** Placing one-footed players on the “wrong” side causes missed shots. Check weak foot stars when signing and assign positions accordingly.
-
-- **Neglecting Stamina:** Substitutes exist for a reason. Side/back players tire; swap in fresh legs late. 
-
-- **Controls Not Optimized:** New players might leave “Auto Player Switching” or camera on defaults. Experiment: many pros use “Action Camera” or close/mini-map off, and set CPU difficulty in exhibitions to “Professional” for practice.
-
-- **Bankrupt Economy:** Avoid reckless spending. Save coins for prime events. Don’t open all packs at once; many waitlists recommend spacing to react to patch announcements.
-
-When things go wrong (lags, bugs), check eFootball’s official support. Community forums (Reddit) also flag known issues (like in [19] “Important issues” notices).
-
-## Training & Practice Routines
-
-- **Skill Up Tutorial:** A guided tutorial (“Skill Up”) walks through basics (passing, shooting, building team). New players should complete it first.
-
-- **Practice Mode:** In *Exhibition* (formerly Trial Match), practice set pieces, passing sequences, and skill moves against AI. Use *Friend Match* (PVP with friends) to try tactics in a low-pressure setting.
-
-- **Missions & Skill Drills:** Regular “Missions” (Objectives) often include tasks like scoring goals with skill moves or playing matches. Use these to train specific skills. For example, set a personal drill: score 5 goals in a match without holding sprint to improve precision.
-
-- **Consistent Routines:** Allocate daily practice time: e.g., 15 min passing drills, 10 min skill moves training, 20 min match play. Increment difficulty over time. Track improvement (manually or via some stat tracking app).
-
-- **Video Aids:** Many top content creators offer drills. E.g., “7 Most Effective Skill Moves” or “Best Attack Tactics” on YouTube. Watching and emulating can reinforce tactics.
-
-## UI, Menus & Settings
-
-- **Main Menus:**  
-  - *Home/Dream Team:* Shows featured player lists and announcements.  
-  - *My Team:* Manage roster – players, manager, captain. Subsections: *Players* (development, training), *Game Plan* (formation, tactics, playstyle), *Missions*, *Pack Shop*.  
-  - *Contract:* Sign new players (Standard List, Special List, Tickets).  
-  - *Match Pass/Events:* Seasonal rewards and daily challenges.  
-  - *Inbox:* Claim gifts, codes (Konami often issues gift codes).  
-  - *Settings:* Configure Controls (Classic/Expert), Advanced Controls toggle (enable new skills), Smart Assist (on/off), Camera (Zoom, Angle, Dynamic/Static), Audio, etc.
-
-- **Key Settings:**  
-  - *Camera:* “Action” close-up view or wider “Dynamic” allows seeing more field. Many use wider to plan passes.  
-  - *Controls:* Classic for easy moves; Expert to unlock all skills (enable in Settings). Always map proficiency to on-screen guides.  
-  - *Audio:* Turn voice feedback off if distracting (goal celebration commentary, etc.).  
-  - *Language:* Configure commentary language if needed.  
-  - *Connection:* For online play, ensure good Wi-Fi to minimize lag. Division/P2P matches can be affected by unstable network.
-
-An example UI screenshot is shown below, illustrating the **Game Plan** menu (formation selection, team list, playstyle):
-
- *Figure: Example of the Game Plan UI. Here you set formation, assign playstyle (e.g. “Possession Game”), and adjust individual roles. Active squad shown on right.*  
-
-## Patch/Seasonal Changes
-
-Konami frequently updates eFootball with patches and seasonal content. Each update can tweak gameplay and add content:  
-
-- **Gameplay Tweaks:** Past patches fixed dribbling bugs, pass trajectories, etc. For example, v4.0 (2025) introduced Finesse Dribble and trial Smart Assist. v5.x–v6.x in 2026 made matchmaking, league, and controls changes (see Konami patch notes archives). Always read patch notes: official site has a **Version Info** archive listing all updates. Community summaries (Reddit or YouTube) also highlight major changes each season.
-
-- **Season Themes & Rosters:** Each new season typically brings new team kits, updated club data, and new licensed content. For instance, v2.6.0 (2023) included updated team graphics and commentary. Seasonal events align with real-world soccer (e.g. World Cup, Champions League), offering themed players. Users should adapt squad to new meta after big patches (e.g. when a new skill or mechanic is added).
-
-- **Compatibility:** New seasons may require app updates. Major version upgrades (eFootball 2026) often reset some modes. Always keep the app updated to access latest features.
-
-## eFootball Mobile 2027 Season Update
-
-The current season update is the v6.0.0-era season launched in August 2026. For this Mobile-focused guide, the most important additions are **Fluid Formations**, the new **Overload Team Playstyle**, expanded manager/link-up functionality, and the new season's campaign and competitive content.
-
-**Fluid Formations** allows different attacking and defensive formations, giving players more control over how the team behaves in different phases of a match.
-
-**Overload** concentrates players toward the side of the pitch where the ball is located to create numerical superiority. In attack, this can make short passing easier and help maintain possession in crowded areas.
-
-The current season campaign also includes new Playing Styles and campaign rewards. Konami's current campaign includes a manager reward with high proficiency in Overload, plus Selection Contracts, Skill/Position/Booster Tokens, Coins, EXP and GP.
-
-**Mobile focus:** All gameplay explanations in this guide should use the touch controls and Mobile terminology. Controller support exists on Mobile, but it is optional and should not be used to explain the standard Mobile control scheme.
-
-## Monetization & Gacha Mechanics
-
-eFootball is free-to-play with in-app purchases. Monetization includes: 
-
-- **Currencies:**  
-  - *GP* (earned free): used for signing/renewing players and some training resets.  
-  - *eFootball Coins*: premium currency (bought or earned via events/season pass). Used for special draws/packs.  
-  - *eFootball Points*: earned in-game/campaigns, exchanged for items (Konami’s site: eFootball Points Official Site).
-
-- **Gacha Mechanics:** Players are obtained via randomized draws:  
-  - *Standard Draws (Chance Deals):* Spend GP/Coins to get a random player from a pool. Items like *Chance Deal* contracts yield random players.  
-  - *Nominating Contracts:* Allow picking one player from a limited list (often used for featured legends).  
-  - *Packs:* Bundle deals (e.g. 10k coins for 3 random players).  
-  - *Tickets:* Earned free (e.g. login tickets, event tickets) to perform draws without spending currency.
-
-- **Spending Tips:** Savvy players save premium currency for high-value targets (e.g. players that fit their season’s meta). Because all players can be used indefinitely now (no contract loss), wasting coins on low-rated re-signings is discouraged. Use free draws (tickets, login bonuses) first. Participate in events for free top-tier cards. Watch out for “pay-to-win” pitfalls: microtransactions can accelerate progress but are not strictly necessary if you grind matches and events. Keep an eye on seasonal announcements (e.g. new legends cards) to plan spending.
-
-## Community Resources
-
-- **Official:**  
-  - Konami’s [eFootball site](https://www.konami.com/efootball) (English) has *Version Info* (patch notes) and *Dream Team* guides.  
-  - Social: Official Facebook/Twitter (announcements), and Discord (global/region) for news.  
-  - eFootball World Festival (official event page).  
-
-- **Communities:**  
-  - **Reddit:** r/pesmobile and r/efootball (for updates, tips, meta discussion). E.g. patch summaries, beginner guides (as used in this report).  
-  - **YouTube:** Top channels include PES Dude, Pro Keeper, Prof BOF, and many others offering tutorials (skill moves, tactics, settings).  
-  - **FIFPlay.com:** A fan wiki with detailed guides (controls, formations, player skills).  
-  - **Discord/Telegram:** Many countries have dedicated fan groups sharing tips and code giveaways.
-
-- **Patch Notes:** Always refer to Konami’s site (Version Info) for official patch notes. Community sites (r/pesmobile) often re-post key changes in easier language.
-
-- **Coaching Sites:** Some fan coaches (like PES Academy) have twitter/YouTube content on strategy. In-app tutorials (Skill Up) should not be skipped.
-
-## Learning Roadmap (Mermaid Flowchart)
+## Visual Summary of the Transfer Process
 
 ```mermaid
-flowchart TD
-  A[Start: Download & Basic Settings] --> B[Complete Skill-Up Tutorial & Missions] 
-  B --> C[Learn Basic Controls & Passing/Shooting] 
-  C --> D[Practice in Exhibition: Dribbling, Defending] 
-  D --> E[Unlock & Practice Simple Skill Moves (Double Touch, Chop Turn)] 
-  E --> F[Study Team Playstyles & Choose Formation] 
-  F --> G[Build Dream Team: Sign Standard Players] 
-  G --> H[Play Casual Matches, Level Up Players] 
-  H --> I[Advance to Online Modes (Quick Match, eFootball League)] 
-  I --> J[Learn Advanced Skills & Tactics: Individual Instructions] 
-  J --> K[Study Patch Notes & Meta (Adjust Formation)] 
-  K --> L[Continuous Improvement: Train, Review, Adjust]
+flowchart LR
+    ClubA[Club A] -->|Negotiation| ClubB[Club B]
+    ClubA -.->|"Agree fee + terms"| PlayersContract((Player Contract))
+    ClubA -->|Issue ITC| FifaTMS[FIFA TMS (ITC)]
+    ClubB -->|Submit ITC| FifaTMS
+    ClubA -->|Pay Fee (installments, etc.)| FIFA_CH[FIFA Clearing House]
+    FIFA_CH -->|Distribute Solidarity/Comp.| TrainingClubs(Youth Clubs)
+    ClubB -->|Register Player| Association(National FA)
+    TrainingClubs -->|Receive payments|   
 ```
 
-This flowchart suggests a learning sequence: first grasp core mechanics, then gradually add advanced tactics and team-building. 
+This flowchart outlines a typical **international transfer**. Clubs A and B negotiate a fee and a transfer agreement. Once terms are agreed, the selling club (A) must deliver the International Transfer Certificate via FIFA’s TMS, while the buying club (B) submits the registration application (with the player’s contract). Simultaneously, Club A pays the agreed fee (often via installments) through the FIFA Clearing House, which deducts solidarity/training payments to prior clubs. After the ITC is approved, the player is registered by Club B in its federation.
 
-## Sample In-App Lesson Structure (Per Module)
-
-- **Lesson 1 (15 min):** *Controls & Passing* – Overview of buttons (move, pass, sprint); practice short and through passes in 5 matches.  
-- **Lesson 2 (15 min):** *Shooting Basics* – Learn shot types (normal, finesse, chip); practice scoring with different power levels.  
-- **Lesson 3 (15 min):** *Dribbling & Defending* – Shielding and jockeying; drills in 1v1 drills. Introduce one skill move (Double Touch) and use it in 2v2.  
-- **Lesson 4 (20 min):** *Team Play & Tactics* – Set formation in Game Plan, select Team Playstyle (e.g., Quick Counter); play match focusing on positional play.  
-- **Lesson 5 (15 min):** *Team Building* – Walk through signing a player (use Contract); explain GP/Coins, and show how to open one free Standard draw.  
-- **Lesson 6 (15 min):** *Player Progression* – Demonstrate leveling a player and allocating a Progression Point to improve a stat.  
-- **Lesson 7 (10 min):** *Skill Moves Workshop* – Practice 3 skill moves in training mode (Double Touch, Marseille Turn, Fake Shot).  
-- **Lesson 8 (10 min):** *Advanced Tips* – Common mistakes to avoid (dribble spam, poor instructions); quick recap of top community resources (e.g. refer to FIFPlay, Reddit forums).  
-
-Each module includes a short quiz or interactive challenge (e.g., “score a goal using only through passes” or “execute a flip flap in a controlled drill”) to reinforce learning.  
-
-## Sources
-
-- Konami Official eFootball patch notes and guides.  
-- Community guides and analyses. (High-quality tutorials from FIFPlay and top Reddit posters).  
-
-This report synthesizes these sources for a thorough, up-to-date eFootball Mobile guide.
-
-## Update Standard for This Guide
-
-This document is intentionally **eFootball Mobile-focused**. Controller-specific button combinations, console-only explanations and outdated mechanics should not be used as the default instructions. The official Konami Mobile control manual and current version information should take priority whenever a command or mechanic changes.
-
-The original uploaded report was used as the structural/content base, while clearly outdated or unsupported claims were corrected rather than carried forward.
+**Sources:** FIFA’s RSTP and Agent Regulations; club regulations for Premier League, LaLiga, DFL, MLS; and CIES/Deloitte transfer analyses.
